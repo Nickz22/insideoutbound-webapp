@@ -1,0 +1,4 @@
+react-client/node_modules
+react-client/build
+server/venv
+server/__pycache__
