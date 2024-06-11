@@ -1,7 +1,34 @@
 import React from "react";
-import { NavLink } from "react-router-dom";
-import { Drawer, List, ListItem, ListItemText, Divider } from "@mui/material";
+import { NavLink, useLocation } from "react-router-dom";
+import {
+  Drawer,
+  List,
+  ListItemButton,
+  ListItemText,
+  Divider,
+} from "@mui/material";
 import "./Sidebar.css";
+
+const CustomNavLink = ({ to, label }) => {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
+  return (
+    <ListItemButton
+      component={NavLink}
+      to={to}
+      className={isActive ? "active" : ""}
+      sx={{
+        "&:hover": {
+          color: "blue",
+          fontWeight: "bold",
+        },
+      }}
+    >
+      <ListItemText primary={label} />
+    </ListItemButton>
+  );
+};
 
 const Sidebar = () => {
   return (
@@ -14,59 +41,17 @@ const Sidebar = () => {
       }}
     >
       <List>
-        <ListItem
-          button
-          component={NavLink}
-          to="/prospecting"
-          className={({ isActive }) => (isActive ? "active" : "")}
-        >
-          <ListItemText primary="Prospecting" />
-        </ListItem>
+        <CustomNavLink to="/prospecting" label="Prospecting" />
         <Divider />
-        <ListItem
-          button
-          component={NavLink}
-          to="/performance"
-          className={({ isActive }) => (isActive ? "active" : "")}
-        >
-          <ListItemText primary="Performance" />
-        </ListItem>
+        <CustomNavLink to="/performance" label="Performance" />
         <Divider />
-        <ListItem
-          button
-          component={NavLink}
-          to="/forecast"
-          className={({ isActive }) => (isActive ? "active" : "")}
-        >
-          <ListItemText primary="Forecast" />
-        </ListItem>
+        <CustomNavLink to="/forecast" label="Forecast" />
         <Divider />
-        <ListItem
-          button
-          component={NavLink}
-          to="/analysis"
-          className={({ isActive }) => (isActive ? "active" : "")}
-        >
-          <ListItemText primary="Analysis" />
-        </ListItem>
+        <CustomNavLink to="/analysis" label="Analysis" />
         <Divider />
-        <ListItem
-          button
-          component={NavLink}
-          to="/settings"
-          className={({ isActive }) => (isActive ? "active" : "")}
-        >
-          <ListItemText primary="Settings" />
-        </ListItem>
+        <CustomNavLink to="/settings" label="Settings" />
         <Divider />
-        <ListItem
-          button
-          component={NavLink}
-          to="/account"
-          className={({ isActive }) => (isActive ? "active" : "")}
-        >
-          <ListItemText primary="Account" />
-        </ListItem>
+        <CustomNavLink to="/account" label="Account" />
       </List>
     </Drawer>
   );
