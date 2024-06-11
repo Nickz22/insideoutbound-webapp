@@ -72,38 +72,38 @@ const Prospecting = () => {
         </FormControl>
       </Box>
       <Grid container spacing={2}>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
           <MetricCard title="Accounts Approached" value="86" subText="" />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
           <MetricCard title="Opportunities Created" value="7" subText="" />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
           <MetricCard title="Pipeline Generated" value="$210,000" subText="" />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
           <MetricCard title="Avg Contacts Per Account" value="4.8" subText="" />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
           <MetricCard
             title="Avg Activities Per Contact"
             value="7.3"
             subText=""
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={4}>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
           <MetricCard
             title="Prospecting Cycle Time"
             value="11.6 Days"
             subText=""
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={6}>
+        <Grid item xs={12} sm={6} md={6} lg={6}>
           <DiagramCard title="Conversion Rates">
             <ConversionRatesChart />
           </DiagramCard>
         </Grid>
-        <Grid item xs={12} sm={6} md={6}>
+        <Grid item xs={12} sm={6} md={6} lg={6}>
           <DiagramCard title="Prospecting Funnel">
             <FunnelChart />
           </DiagramCard>
