@@ -76,17 +76,7 @@ const Prospecting = () => {
           <MetricCard title="Accounts Approached" value="86" subText="" />
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
-          <DiagramCard title="Conversion Rates">
-            <ConversionRatesChart />
-          </DiagramCard>
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
           <MetricCard title="Opportunities Created" value="7" subText="" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4}>
-          <DiagramCard title="Prospecting Funnel">
-            <FunnelChart />
-          </DiagramCard>
         </Grid>
         <Grid item xs={12} sm={6} md={4}>
           <MetricCard title="Pipeline Generated" value="$210,000" subText="" />
@@ -107,6 +97,16 @@ const Prospecting = () => {
             value="11.6 Days"
             subText=""
           />
+        </Grid>
+        <Grid item xs={12} sm={6} md={6}>
+          <DiagramCard title="Conversion Rates">
+            <ConversionRatesChart />
+          </DiagramCard>
+        </Grid>
+        <Grid item xs={12} sm={6} md={6}>
+          <DiagramCard title="Prospecting Funnel">
+            <FunnelChart />
+          </DiagramCard>
         </Grid>
       </Grid>
     </Box>
