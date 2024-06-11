@@ -1,0 +1,19 @@
+/* Sidebar container styling */
+.sidebar {
+  width: 240px;
+  height: 100vh;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1); /* Slight shadow for separation */
+}
+
+/* Active link styling */
+.sidebar .active {
+  font-weight: bold; /* Bold font for active link */
+  color: #007bff; /* Blue text color for active link */
+  background-color: #e2e6ea; /* Light gray background for active link */
+}
+
+/* General link styling */
+.sidebar a {
+  text-decoration: none; /* No underline */
+  color: inherit; /* Inherit text color */
+}

@@ -1,43 +1,20 @@
-import logo from "./logo.svg";
-import "./App.css";
-import React, { useEffect, useState } from "react";
+import React from 'react';
+import { BrowserRouter as Router } from 'react-router-dom';
+import { Container, Box } from '@mui/material';
+import Sidebar from './components/Sidebar/Sidebar';
+import MainContent from './components/MainContent';
+import './App.css';
 
 function App() {
-  const [message, setMessage] = useState("");
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const apiBaseUrl = process.env.REACT_APP_API_BASE_URL;
-        const response = await fetch(`${apiBaseUrl}`);
-        const data = await response.json();
-        setMessage(data.message);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    };
-
-    fetchData();
-  }, []);
-
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>{message}</p>
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
+    <Router>
+      <Container maxWidth="lg">
+        <Box display="flex">
+          <Sidebar />
+          <MainContent />
+        </Box>
+      </Container>
+    </Router>
   );
 }
 
