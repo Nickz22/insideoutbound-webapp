@@ -16,21 +16,13 @@ REDIRECT_URI = 'http://localhost:3000/oauth/callback'
 def hello_world():
     return jsonify(message="Hello, World!")
 
-@app.route('/login')
-def login():
-    login_url = (
-        f"https://login.salesforce.com/services/oauth2/authorize"
-        f"?response_type=code"
-        f"&client_id={CLIENT_ID}"
-        f"&redirect_uri={REDIRECT_URI}"
-    )
-    return redirect(login_url)
-
 @app.route('/oauth/callback')
 def oauth_callback():
     code = request.args.get('code')
     if not code:
         return 'Error: Authorization code not found', 400
+
+    verifier = request.args.get('code_verifier')  # Retrieve the code verifier from a secure place
 
     token_url = 'https://login.salesforce.com/services/oauth2/token'
     payload = {
@@ -38,7 +30,8 @@ def oauth_callback():
         'code': code,
         'client_id': CLIENT_ID,
         'client_secret': CLIENT_SECRET,
-        'redirect_uri': REDIRECT_URI
+        'redirect_uri': REDIRECT_URI,
+        'code_verifier': verifier  # Include the verifier in the token request
     }
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
 
@@ -50,7 +43,8 @@ def oauth_callback():
     session['access_token'] = token_data['access_token']
     session['instance_url'] = token_data['instance_url']
 
-    return redirect(url_for('home'))
+    return redirect('http://localhost:3000/app')
+
 
 @app.route('/home')
 def home():
@@ -61,7 +55,7 @@ def home():
         return redirect(url_for('login'))
 
     headers = {'Authorization': f'Bearer {access_token}'}
-    account_url = f"{instance_url}/services/data/v52.0/sobjects/Account/001Hu0000391mv9IAA"  # Replace with a valid Account ID
+    account_url = f"{instance_url}/services/data/v52.0/sobjects/Account/0011r00002xxxxxxx"  # Replace with a valid Account ID
 
     account_response = requests.get(account_url, headers=headers)
     if account_response.status_code != 200:

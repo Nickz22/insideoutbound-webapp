@@ -1,0 +1,25 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Python: Flask",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "flask", // Use "module" to ensure Flask is launched correctly
+      "console": "integratedTerminal",
+      "env": {
+        "FLASK_APP": "server/app.py", // Ensure this is the correct relative path to your app module
+        "FLASK_ENV": "development"
+      },
+      "args": ["run", "--no-debugger", "--no-reload"],
+      "jinja": true
+    },
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Launch Chrome against localhost",
+      "url": "http://localhost:3000",
+      "webRoot": "${workspaceFolder}/frontend" // Adjust this path to the frontend folder
+    }
+  ]
+}
