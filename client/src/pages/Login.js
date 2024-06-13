@@ -11,9 +11,13 @@ const Login = () => {
     const { codeVerifier, codeChallenge } = await generatePKCEChallenge();
     sessionStorage.setItem("code_verifier", codeVerifier); // Save the verifier securely
 
-    await axios.post("http://localhost:8000/store_code_verifier", {
-      code_verifier: { data: codeVerifier },
-    });
+    await axios.post(
+      "http://localhost:8000/store_code_verifier",
+      {
+        code_verifier: codeVerifier,
+      },
+      { withCredentials: true }
+    );
 
     const clientId = process.env.REACT_APP_CLIENT_ID;
     const redirectUri = `http://localhost:8000/oauth/callback?code_verifier=${encodeURIComponent(

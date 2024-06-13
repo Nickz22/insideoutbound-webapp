@@ -1,15 +1,39 @@
-from flask import Flask, jsonify, redirect, request, session, url_for, Response
+from flask import Flask, jsonify, redirect, request, url_for
 from flask_cors import CORS
 import requests
-import os
+import os, json
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
 app.secret_key = os.urandom(24)  # Secure secret key for session management
 
 CLIENT_ID = '3MVG9ZF4bs_.MKug8aF61l5hklOzKnQLJ47l7QqY0HZN_Jis82hhCslKFnc2otkBLkOZpjBsIVBaSYojRW.kZ'
 CLIENT_SECRET = 'C3B5CD6936000FEFF40809F74D8260DC2BDA2B3446EF24A1454E39BB13C34BD8'
 REDIRECT_URI = 'http://localhost:8000/oauth/callback'
+CODE_VERIFIER_FILE = 'code_verifier.json'
+TOKEN_FILE = 'tokens.json'
+
+def save_code_verifier(code_verifier):
+    with open(CODE_VERIFIER_FILE, 'w') as f:
+        json.dump({'code_verifier': code_verifier}, f)
+
+def load_code_verifier():
+    if os.path.exists(CODE_VERIFIER_FILE):
+        with open(CODE_VERIFIER_FILE, 'r') as f:
+            data = json.load(f)
+            return data.get('code_verifier')
+    return None
+
+def save_tokens(access_token, instance_url):
+    with open(TOKEN_FILE, 'w') as f:
+        json.dump({'access_token': access_token, 'instance_url': instance_url}, f)
+
+def load_tokens():
+    if os.path.exists(TOKEN_FILE):
+        with open(TOKEN_FILE, 'r') as f:
+            data = json.load(f)
+            return data.get('access_token'), data.get('instance_url')
+    return None, None
 
 @app.before_request
 def before_request():
@@ -29,7 +53,8 @@ def store_code_verifier():
     data = request.json
     code_verifier = data.get('code_verifier')
     if code_verifier:
-        session['code_verifier'] = code_verifier
+        save_code_verifier(code_verifier)
+        print("Stored code_verifier:", code_verifier)  # Debug log
         return jsonify({'message': 'Code verifier stored successfully'}), 200
     else:
         return jsonify({'error': 'Code verifier not provided'}), 400
@@ -37,12 +62,15 @@ def store_code_verifier():
 @app.route('/oauth/callback')
 def oauth_callback():
     code = request.args.get('code')
-    code_verifier = session.pop('code_verifier', None)  # Retrieve and remove the code verifier from the session
+    code_verifier = load_code_verifier()  # Retrieve the code verifier from the file
 
     if not code or not code_verifier:
+        print("Missing code or code_verifier")  # Debug log
         return jsonify({'error': 'Missing authorization code or verifier'}), 400
 
-    token_url = 'https://login.salesforce.com/services/oauth2/token'
+    print("Retrieved code_verifier:", code_verifier)  # Debug log
+
+    token_url = 'https://test.salesforce.com/services/oauth2/token'
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     payload = {
         'grant_type': 'authorization_code',
@@ -56,8 +84,7 @@ def oauth_callback():
     response = requests.post(token_url, headers=headers, data=payload)
     if response.status_code == 200:
         token_data = response.json()
-        session['access_token'] = token_data['access_token']
-        session['instance_url'] = token_data['instance_url']
+        save_tokens(token_data['access_token'], token_data['instance_url'])  # Save tokens to file
         return redirect('http://localhost:3000/app')
     else:
         error_details = {
@@ -70,11 +97,10 @@ def oauth_callback():
 
 @app.route('/home')
 def home():
-    access_token = session.get('access_token')
-    instance_url = session.get('instance_url')
+    access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not access_token or not instance_url:
-        return redirect(url_for('login'))
+        return redirect(url_for('hello_world'))
 
     headers = {'Authorization': f'Bearer {access_token}'}
     account_url = f"{instance_url}/services/data/v52.0/sobjects/Account/0011r00002xxxxxxx"  # Replace with a valid Account ID
