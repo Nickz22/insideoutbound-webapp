@@ -15,8 +15,7 @@ const Login = () => {
       "http://localhost:8000/store_code_verifier",
       {
         code_verifier: codeVerifier,
-      },
-      { withCredentials: true }
+      }
     );
 
     const clientId = process.env.REACT_APP_CLIENT_ID;

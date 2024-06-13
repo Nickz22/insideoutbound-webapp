@@ -11,7 +11,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<Login />} />
-        <Route path="/app" element={
+        <Route path="/app/*" element={
           <Container maxWidth="lg">
             <Box display="flex">
               <Sidebar />

@@ -12,12 +12,12 @@ const MainContent = () => {
   return (
     <Box flex={1} p={3}>
       <Routes>
-        <Route path="/prospecting" element={<Prospecting />} />
-        <Route path="/performance" element={<Performance />} />
-        <Route path="/forecast" element={<Forecast />} />
-        <Route path="/analysis" element={<Analysis />} />
-        <Route path="/settings" element={<Settings />} />
-        <Route path="/account" element={<Account />} />
+        <Route path="prospecting" element={<Prospecting />} />
+        <Route path="performance" element={<Performance />} />
+        <Route path="forecast" element={<Forecast />} />
+        <Route path="analysis" element={<Analysis />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="account" element={<Account />} />
         <Route path="/" element={<Prospecting />} />
       </Routes>
     </Box>

@@ -41,17 +41,17 @@ const Sidebar = () => {
       }}
     >
       <List>
-        <CustomNavLink to="/prospecting" label="Prospecting" />
+        <CustomNavLink to="/app/prospecting" label="Prospecting" />
         <Divider />
-        <CustomNavLink to="/performance" label="Performance" />
+        <CustomNavLink to="/app/performance" label="Performance" />
         <Divider />
-        <CustomNavLink to="/forecast" label="Forecast" />
+        <CustomNavLink to="/app/forecast" label="Forecast" />
         <Divider />
-        <CustomNavLink to="/analysis" label="Analysis" />
+        <CustomNavLink to="/app/analysis" label="Analysis" />
         <Divider />
-        <CustomNavLink to="/settings" label="Settings" />
+        <CustomNavLink to="/app/settings" label="Settings" />
         <Divider />
-        <CustomNavLink to="/account" label="Account" />
+        <CustomNavLink to="/app/account" label="Account" />
       </List>
     </Drawer>
   );

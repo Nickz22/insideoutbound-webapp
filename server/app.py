@@ -95,15 +95,15 @@ def oauth_callback():
         print(error_details)
         return jsonify(error_details), 500
 
-@app.route('/home')
-def home():
+@app.route('/load')
+def load():
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not access_token or not instance_url:
         return redirect(url_for('hello_world'))
 
     headers = {'Authorization': f'Bearer {access_token}'}
-    account_url = f"{instance_url}/services/data/v52.0/sobjects/Account/0011r00002xxxxxxx"  # Replace with a valid Account ID
+    account_url = f"{instance_url}/services/data/v52.0/sobjects/Account/001RK00000FdqanYAB"  # Replace with a valid Account ID
 
     account_response = requests.get(account_url, headers=headers)
     if account_response.status_code != 200:
