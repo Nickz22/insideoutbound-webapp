@@ -28,7 +28,7 @@ const Login = () => {
     localStorage.setItem("code_verifier", codeVerifier); // Save the verifier to use later in the token exchange
 
     const clientId = process.env.REACT_APP_CLIENT_ID;
-    const redirectUri = "http://localhost:3000/oauth/callback";
+    const redirectUri = "http://localhost:5000/oauth/callback"; // Flask OAuth handler endpoint
     const loginUrl = `${loginUrlBase}/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
     window.location.href = loginUrl;

@@ -11,7 +11,13 @@
         "FLASK_APP": "server/app.py", // Ensure this is the correct relative path to your app module
         "FLASK_ENV": "development"
       },
-      "args": ["run", "--no-debugger", "--no-reload"],
+      "args": [
+        "run",
+        "--host=localhost",
+        "--port=5000",
+        "--debug",
+        "--no-reload"
+      ],
       "jinja": true
     },
     {
@@ -19,7 +25,7 @@
       "request": "launch",
       "name": "Launch Chrome against localhost",
       "url": "http://localhost:3000",
-      "webRoot": "${workspaceFolder}/frontend" // Adjust this path to the frontend folder
+      "webRoot": "${workspaceFolder}/client" // Adjust this path to the frontend folder
     }
   ]
 }
