@@ -14,9 +14,8 @@
       "args": [
         "run",
         "--host=localhost",
-        "--port=5000",
-        "--debug",
-        "--no-reload"
+        "--port=8000",
+        "--debug"
       ],
       "jinja": true
     },

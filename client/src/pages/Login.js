@@ -1,35 +1,27 @@
 import React from "react";
 import { Button, Box, Container } from "@mui/material";
 import logo from "../assets/images/logo.jpeg";
-
-// Helper function to generate a code verifier and code challenge
-const generatePKCEChallenge = async () => {
-  const array = new Uint8Array(32);
-  window.crypto.getRandomValues(array);
-  const codeVerifier = Array.from(array, (byte) =>
-    byte.toString(16).padStart(2, "0")
-  ).join("");
-  const encoder = new TextEncoder();
-  const codeData = encoder.encode(codeVerifier);
-  const digest = await window.crypto.subtle.digest("SHA-256", codeData);
-  const base64Digest = btoa(String.fromCharCode(...new Uint8Array(digest)));
-  const codeChallenge = base64Digest
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
-  return { codeVerifier, codeChallenge };
-};
+import axios from "axios";
+import { generatePKCEChallenge } from "../utils/crypto";
 
 const Login = () => {
   const handleLogin = async (e, loginUrlBase) => {
     e.preventDefault();
 
     const { codeVerifier, codeChallenge } = await generatePKCEChallenge();
-    localStorage.setItem("code_verifier", codeVerifier); // Save the verifier to use later in the token exchange
+    sessionStorage.setItem("code_verifier", codeVerifier); // Save the verifier securely
+
+    await axios.post("http://localhost:8000/store_code_verifier", {
+      code_verifier: { data: codeVerifier },
+    });
 
     const clientId = process.env.REACT_APP_CLIENT_ID;
-    const redirectUri = "http://localhost:5000/oauth/callback"; // Flask OAuth handler endpoint
-    const loginUrl = `${loginUrlBase}/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${redirectUri}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+    const redirectUri = `http://localhost:8000/oauth/callback?code_verifier=${encodeURIComponent(
+      codeVerifier
+    )}`;
+    const loginUrl = `${loginUrlBase}/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+      redirectUri
+    )}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
 
     window.location.href = loginUrl;
   };
