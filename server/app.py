@@ -2,6 +2,9 @@ from flask import Flask, jsonify, redirect, request, url_for
 from flask_cors import CORS
 import requests
 import os, json
+from models import Filter, FilterContainer
+
+from api.salesforce import fetch_tasks_by_criteria
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}}, supports_credentials=True)
@@ -70,7 +73,9 @@ def oauth_callback():
 
     print("Retrieved code_verifier:", code_verifier)  # Debug log
 
-    token_url = 'https://test.salesforce.com/services/oauth2/token'
+    is_sandbox = "test" in request.referrer or "scratch" in request.referrer
+    base_sf_domain = "test" if is_sandbox else "login"
+    token_url = f'https://{base_sf_domain}.salesforce.com/services/oauth2/token'
     headers = {'Content-Type': 'application/x-www-form-urlencoded'}
     payload = {
         'grant_type': 'authorization_code',
@@ -95,23 +100,45 @@ def oauth_callback():
         print(error_details)
         return jsonify(error_details), 500
 
-@app.route('/load')
-def load():
+criteria = [
+    FilterContainer(
+        filters=[
+            Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 1a]"),
+            Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 2a]"),
+            Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 3a]"),
+            Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 4a]"),
+            Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 5a]")
+        ],
+        filterLogic="((1 OR 2 OR 3) AND 4 AND 5)"
+    ),
+    FilterContainer(
+        filters=[
+            Filter(field="Priority", data_type="string", operator="equals", value="High"),
+            Filter(field="Status", data_type="string", operator="not equals", value="Completed"),
+            Filter(field="CreatedDate", data_type="date",  operator="last n days", value="30")
+        ],
+        filterLogic="1 AND 2 AND 3"
+    ),
+    FilterContainer(
+        filters=[
+            Filter(field="OwnerId", data_type="string", operator="equals", value="0051t000000TXXXXXX"),
+            Filter(field="ActivityDate", data_type="date", operator="on or after", value="2022-01-01"),
+            Filter(field="ActivityDate", data_type="date", operator="on or before", value="2022-12-31")
+        ],
+        filterLogic="1 AND (2 OR 3)"
+    )
+]
+
+@app.route('/load_prospecting_activities')
+def load_prospecting_activities():
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not access_token or not instance_url:
-        return redirect(url_for('hello_world'))
-
-    headers = {'Authorization': f'Bearer {access_token}'}
-    account_url = f"{instance_url}/services/data/v52.0/sobjects/Account/001RK00000FdqanYAB"  # Replace with a valid Account ID
-
-    account_response = requests.get(account_url, headers=headers)
-    if account_response.status_code != 200:
-        return f"Error: {account_response.content}", 500
-
-    account_data = account_response.json()
-
-    return jsonify(account_data)
+        return redirect(url_for('login'))
+    
+    fetch_tasks_by_criteria(criteria, instance_url, access_token)
+    
+    return ""
 
 if __name__ == '__main__':
     app.run(debug=True, host='localhost', port=8000)  # Updated to run on localhost

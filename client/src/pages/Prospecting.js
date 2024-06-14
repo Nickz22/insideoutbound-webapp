@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import axios from "axios";
 import {
   Box,
   Grid,
@@ -15,6 +16,22 @@ import FunnelChart from "../components/FunnelChart/FunnelChart";
 const Prospecting = () => {
   const [period, setPeriod] = useState("");
   const [view, setView] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        await axios.get("http://localhost:8000/load_prospecting_activities");
+        setLoading(false);
+      } catch (err) {
+        setError(err);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   const handlePeriodChange = (event) => {
     setPeriod(event.target.value);
@@ -24,7 +41,9 @@ const Prospecting = () => {
     setView(event.target.value);
   };
 
-  return (
+  return loading ? (
+    <p>Loading...</p>
+  ) : (
     <Box sx={{ padding: "24px" }}>
       <Box
         sx={{
