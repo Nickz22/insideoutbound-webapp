@@ -15,20 +15,21 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     account_inactivity_threshold = settings["account_inactivity_threshold"]
 
     tasks_by_account = {}
+    contact_by_id = {contact.id: contact for contact in contacts}
     for criteria_key, tasks in tasks_by_criteria.items():
         for task in tasks:
-            contact = contacts.get(task["who_id"])
+            contact = contact_by_id.get(task.who_id)
             if not contact:
-                response.message += f"Contact with id {task['who_id']} for Task with id {task['id']} not found. \n"
+                response.message += f"Contact with id {task.who_id} for Task with id {task.id} not found. \n"
                 continue
-            account_id = contact["account_id"]
+            account_id = contact.account_id
             if account_id not in tasks_by_account:
                 tasks_by_account[account_id] = {}
-            if task["who_id"] not in tasks_by_account[account_id]:
-                tasks_by_account[account_id][task["who_id"]] = {}
-            if criteria_key not in tasks_by_account[account_id][task["who_id"]]:
-                tasks_by_account[account_id][task["who_id"]][criteria_key] = []
-            tasks_by_account[account_id][task["who_id"]][criteria_key].append(task)
+            if task.who_id not in tasks_by_account[account_id]:
+                tasks_by_account[account_id][task.who_id] = {}
+            if criteria_key not in tasks_by_account[account_id][task.who_id]:
+                tasks_by_account[account_id][task.who_id][criteria_key] = []
+            tasks_by_account[account_id][task.who_id][criteria_key].append(task)
 
     for account_id, tasks_by_criteria_by_who_id in tasks_by_account.items():
         all_tasks_under_account = []
@@ -40,7 +41,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     task_ids_by_criteria_name[criteria] = set()
                 all_tasks_under_account.extend(tasks)
                 task_ids_by_criteria_name[criteria].update(
-                    [task["id"] for task in tasks]
+                    [task.id for task in tasks]
                 )
 
         if len(all_tasks_under_account) < (
@@ -51,10 +52,10 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
         # although the Task API query is sorted already, grouping them potentially breaks a perfect sort
         ## so we'll sort again here to be safe...opportunity for optimization
         all_tasks_under_account = sorted(
-            all_tasks_under_account, key=lambda x: x["created_date"]
+            all_tasks_under_account, key=lambda x: x.created_date
         )
 
-        start_tracking_period = all_tasks_under_account[0]["created_date"]
+        start_tracking_period = all_tasks_under_account[0].created_date
         valid_task_ids_by_who_id = {}
         for task in all_tasks_under_account:
             if not is_within_period(task, start_tracking_period, tracking_period):
@@ -72,7 +73,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     )
                     valid_task_ids_by_who_id = {}
                     if is_within_period(task, start_tracking_period, tracking_period):
-                        valid_task_ids_by_who_id[task["who_id"]] = [task["id"]]
+                        valid_task_ids_by_who_id[task.who_id] = [task.id]
                     continue
 
                 # Can add Prospecting Metadata by
@@ -81,19 +82,19 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     Activation(
                         id=generate_unique_id(),
                         account=Account(
-                            name=contacts[active_contact_ids[0]]["account"]["name"],
+                            name=contacts[active_contact_ids[0]].account.name,
                             id=account_id,
                         ),
-                        activated_date=task["created_date"],
+                        activated_date=task.created_date,
                         active_contacts=len(active_contact_ids),
-                        last_prospecting_activity=task["created_date"],
+                        last_prospecting_activity=task.created_date,
                     )
                 )
                 # ensure that no Task within account_inactivity_threshold before incrementing start_tracking_period to the next period
 
-            if task["who_id"] not in valid_task_ids_by_who_id:
-                valid_task_ids_by_who_id[task["who_id"]] = []
-            valid_task_ids_by_who_id[task["who_id"]].append(task["id"])
+            if task.who_id not in valid_task_ids_by_who_id:
+                valid_task_ids_by_who_id[task.who_id] = []
+            valid_task_ids_by_who_id[task.who_id].append(task.id)
 
         # this account's tasks have ended, check for activation
         active_contact_ids = []
@@ -112,12 +113,12 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             Activation(
                 id=generate_unique_id(),
                 account=Account(
-                    name=contacts[active_contact_ids[0]]["account"]["name"],
+                    name=contact_by_id.get(active_contact_ids[0]).account.name,
                     id=account_id,
                 ),
-                activated_date=task["created_date"],
+                activated_date=task.created_date,
                 active_contacts=len(active_contact_ids),
-                last_prospecting_activity=task["created_date"],
+                last_prospecting_activity=task.created_date,
             )
         )
 
@@ -129,7 +130,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 # helpers
 def filter_tasks_within_period(tasks, start_date, period_days):
     end_date = start_date + timedelta(days=period_days)
-    return [task for task in tasks if start_date <= Task["created_date"] <= end_date]
+    return [task for task in tasks if start_date <= Task.created_date <= end_date]
 
 
 def add_days(date, days):
@@ -138,7 +139,7 @@ def add_days(date, days):
 
 def is_within_period(task, start_date, period_days):
     end_date = start_date + timedelta(days=period_days)
-    return start_date <= task["created_date"] <= end_date
+    return start_date <= task.created_date <= end_date
 
 
 def filter_tasks_outside_cooloff(tasks, reference_date, cooloff_days):
@@ -146,5 +147,5 @@ def filter_tasks_outside_cooloff(tasks, reference_date, cooloff_days):
     return [
         task
         for task in tasks
-        if Task["created_date"] < cooloff_date or Task["created_date"] > reference_date
+        if Task.created_date < cooloff_date or Task.created_date > reference_date
     ]

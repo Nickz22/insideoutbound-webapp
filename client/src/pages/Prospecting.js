@@ -41,7 +41,7 @@ const Prospecting = () => {
           break;
         case 400:
           if (response.data === "session_expired") {
-            navigate.push("/");
+            navigate("/");
           } else {
             setError(response.data);
           }

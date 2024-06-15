@@ -62,6 +62,8 @@ class Task:
     id: str
     created_date: date
     who_id: str
+    subject: str
+    status: str
 
 
 @dataclass
@@ -69,8 +71,8 @@ class Contact:
     id: str
     first_name: str
     last_name: str
-    created_date: date
     account_id: str
+    account: Account
 
 
 @dataclass

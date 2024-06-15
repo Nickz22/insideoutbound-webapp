@@ -1,5 +1,5 @@
 MISSING_ACCESS_TOKEN = "missing access token"
-WHO_ID = "WhoId"
+WHO_ID = "who_id"
 FILTER_OPERATOR_MAPPING = {
     "string": {
         "contains": "LIKE",
