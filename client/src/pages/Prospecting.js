@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -20,12 +20,12 @@ const Prospecting = () => {
   const [view, setView] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [inFlight, setInFlight] = useState(false); // State to track if a request is in flight
+  const inFlightRef = useRef(false);
   const navigate = useNavigate();
   useEffect(() => {
     const fetchData = async () => {
-      if (inFlight) return; // Prevent new request if one is already in flight
-      setInFlight(true); // Set request as in-flight
+      if (inFlightRef.current) return;
+      inFlightRef.current = true;
       setLoading(true);
       const response = await axios.get(
         "http://localhost:8000/load_prospecting_activities",
@@ -52,10 +52,11 @@ const Prospecting = () => {
       }
 
       setLoading(false);
-      setInFlight(false); // Reset in-flight state after request completes
+      inFlightRef.current = false;
     };
 
     fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePeriodChange = (event) => {

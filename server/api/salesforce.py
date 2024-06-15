@@ -48,7 +48,7 @@ def fetch_contact_tasks_by_criteria(criteria):
                 f"{soql_query} {combined_conditions}",
             )
             fetch_response = _fetch_tasks(
-                f"{soql_query} {combined_conditions}", instance_url, access_token
+                f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC", instance_url, access_token
             )
             if not fetch_response.success:
                 api_response.success = False
@@ -89,7 +89,7 @@ def fetch_contacts_by_ids(contact_ids):
     try:
 
         joined_ids = ",".join([f"'{id}'" for id in contact_ids])
-        soql_query = f"SELECT Id, Name, Email FROM Contact WHERE Id IN ({joined_ids})"
+        soql_query = f"SELECT Id, Name, Email, AccountId, Account.Name FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
         request_url = f"{instance_url}/services/data/v55.0/query?q={soql_query}"
 
         response = requests.get(request_url, headers=headers)

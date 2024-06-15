@@ -1,20 +1,23 @@
 from dataclasses import dataclass
 from typing import List
 from datetime import date
+from typing import List, Optional
+
 
 @dataclass
 class ProcessResponse:
     data: List[dict]
     message: str
     success: bool
-    metadata: dict
-    
+    metadata: Optional[dict] = None
+
 
 @dataclass
 class ApiResponse:
     data: List[dict]
     message: str
     success: bool
+
 
 @dataclass
 class Filter:
@@ -37,12 +40,14 @@ class ProspectingMetadata:
     first_occurrence: date
     last_occurrence: date
     total: int
-    
+
+
 @dataclass
 class Account:
     id: str
     name: str
-    
+
+
 @dataclass
 class Opportunity:
     id: str
@@ -50,10 +55,22 @@ class Opportunity:
     amount: int
     close_date: date
     created_date: date
-    
+
+
 @dataclass
-class Task: 
+class Task:
     id: str
+    created_date: date
+    who_id: str
+
+
+@dataclass
+class Contact:
+    id: str
+    first_name: str
+    last_name: str
+    created_date: date
+    account_id: str
 
 
 @dataclass
@@ -61,6 +78,8 @@ class Activation:
     id: str
     account: Account
     activated_date: date
+    active_contacts: int
+    prospecting_metadata: List[ProspectingMetadata]
     days_activated: int
     days_engaged: int
     engaged_date: date
@@ -68,8 +87,7 @@ class Activation:
     last_prospecting_activity: date
     opportunity: Opportunity
     status: str
-    active_contacts: int
-    prospecting_metadata: List[ProspectingMetadata]
+
 
 @dataclass
 class ProspectingEffort:

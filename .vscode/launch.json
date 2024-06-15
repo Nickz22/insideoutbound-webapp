@@ -2,6 +2,17 @@
   "version": "0.2.0",
   "configurations": [
     {
+      "name": "Python: Unittest",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "unittest",
+      "args": [
+        "${file}", // This uses the currently active file
+        "-v" // Verbose output; adjust as needed
+      ],
+      "console": "integratedTerminal"
+    },
+    {
       "name": "Python: Flask",
       "type": "debugpy",
       "request": "launch",
@@ -11,12 +22,7 @@
         "FLASK_APP": "server/app.py", // Ensure this is the correct relative path to your app module
         "FLASK_ENV": "development"
       },
-      "args": [
-        "run",
-        "--host=localhost",
-        "--port=8000",
-        "--debug"
-      ],
+      "args": ["run", "--host=localhost", "--port=8000", "--debug"],
       "jinja": true
     },
     {
