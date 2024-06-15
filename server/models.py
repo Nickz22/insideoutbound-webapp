@@ -79,14 +79,14 @@ class Activation:
     account: Account
     activated_date: date
     active_contacts: int
-    prospecting_metadata: List[ProspectingMetadata]
-    days_activated: int
-    days_engaged: int
-    engaged_date: date
-    last_outbound_engagement: date
     last_prospecting_activity: date
-    opportunity: Opportunity
-    status: str
+    prospecting_metadata: Optional[List[ProspectingMetadata]] = None
+    days_activated: Optional[int] = None
+    days_engaged: Optional[int] = None
+    engaged_date: Optional[date] = None
+    last_outbound_engagement: Optional[date] = None
+    opportunity: Optional[Opportunity] = None
+    status: Optional[str] = "Activated"
 
 
 @dataclass

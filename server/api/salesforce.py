@@ -2,6 +2,7 @@ import requests, traceback
 from models import ApiResponse
 from cache import load_tokens
 from constants import MISSING_ACCESS_TOKEN, FILTER_OPERATOR_MAPPING
+from datetime import datetime
 
 
 def fetch_contact_tasks_by_criteria(criteria):
@@ -26,7 +27,9 @@ def fetch_contact_tasks_by_criteria(criteria):
         api_response.message = MISSING_ACCESS_TOKEN
         return api_response
 
-    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status FROM Task WHERE"
+    soql_query = (
+        f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate FROM Task WHERE"
+    )
     tasks_by_filter_name = {}
 
     try:
@@ -48,7 +51,9 @@ def fetch_contact_tasks_by_criteria(criteria):
                 f"{soql_query} {combined_conditions}",
             )
             fetch_response = _fetch_tasks(
-                f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC", instance_url, access_token
+                f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC",
+                instance_url,
+                access_token,
             )
             if not fetch_response.success:
                 api_response.success = False
@@ -59,6 +64,16 @@ def fetch_contact_tasks_by_criteria(criteria):
                 task
                 for task in fetch_response.data
                 if task.get("WhoId", "") and task.get("WhoId", "").startswith("003")
+            ]
+            # convert the ISO String returned in CreatedDate into a Datetime
+            contact_tasks = [
+                {
+                    **task,
+                    "CreatedDate": datetime.fromisoformat(
+                        task["CreatedDate"].replace("Z", "+00:00")
+                    ),
+                }
+                for task in contact_tasks
             ]
             tasks_by_filter_name[filter_container.name] = contact_tasks
     except Exception as e:
