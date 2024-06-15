@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
   Box,
+  Alert,
   Grid,
   FormControl,
   InputLabel,
@@ -19,20 +21,38 @@ const Prospecting = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [inFlight, setInFlight] = useState(false); // State to track if a request is in flight
-
+  const navigate = useNavigate();
   useEffect(() => {
     const fetchData = async () => {
       if (inFlight) return; // Prevent new request if one is already in flight
       setInFlight(true); // Set request as in-flight
       setLoading(true);
-      try {
-        await axios.get("http://localhost:8000/load_prospecting_activities");
-      } catch (err) {
-        setError(err);
-      } finally {
-        setLoading(false);
-        setInFlight(false); // Reset in-flight state after request completes
+      const response = await axios.get(
+        "http://localhost:8000/load_prospecting_activities",
+        {
+          validateStatus: function (status) {
+            return true;
+          },
+        }
+      );
+      switch (response.status) {
+        case 200:
+          console.log(response.data);
+          break;
+        case 400:
+          if (response.data === "session_expired") {
+            navigate.push("/");
+          } else {
+            setError(response.data);
+          }
+          break;
+        default:
+          setError(response.data);
+          break;
       }
+
+      setLoading(false);
+      setInFlight(false); // Reset in-flight state after request completes
     };
 
     fetchData();
@@ -48,6 +68,8 @@ const Prospecting = () => {
 
   return loading ? (
     <p>Loading...</p>
+  ) : error ? (
+    <Alert severity="error">{error}</Alert> // Display error message
   ) : (
     <Box sx={{ padding: "24px" }}>
       <Box

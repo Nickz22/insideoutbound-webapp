@@ -1,8 +1,9 @@
 import os, json
+from models import Filter, FilterContainer
 
 CODE_VERIFIER_FILE = "code_verifier.json"
 TOKEN_FILE = "tokens.json"
-
+SETTINGS_FILE = "settings.json"
 
 def save_code_verifier(code_verifier):
     with open(CODE_VERIFIER_FILE, "w") as f:
@@ -28,3 +29,17 @@ def load_tokens():
             data = json.load(f)
             return data.get("access_token"), data.get("instance_url")
     return None, None
+
+def custom_decoder(obj):
+    if 'filters' in obj and 'name' in obj and 'filterLogic' in obj:
+        return FilterContainer(name=obj['name'], filters=obj['filters'], filterLogic=obj['filterLogic'])
+    if 'field' in obj and 'data_type' in obj and 'operator' in obj and 'value' in obj:
+        return Filter(field=obj['field'], data_type=obj['data_type'], operator=obj['operator'], value=obj['value'])
+    return obj
+
+def load_settings():
+    if os.path.exists(SETTINGS_FILE):
+        with open(SETTINGS_FILE, "r") as file:
+            settings = json.load(file, object_hook=custom_decoder)
+            return settings
+    return None

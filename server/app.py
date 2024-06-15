@@ -1,12 +1,12 @@
 from flask import Flask, jsonify, redirect, request, url_for
 from flask_cors import CORS
-import requests
-import os
-from settings import settings
+import requests, os
 from engine.activation_engine import compute_activated_accounts
-from api.salesforce import fetch_tasks_by_criteria
-from cache import save_code_verifier, load_code_verifier, save_tokens,
-from constants import c
+from api.salesforce import fetch_contact_tasks_by_criteria, fetch_contacts_by_ids
+from cache import save_code_verifier, load_code_verifier, save_tokens, load_settings
+from constants import MISSING_ACCESS_TOKEN, WHO_ID
+from utils import pluck
+from models import ApiResponse
 
 app = Flask(__name__)
 CORS(
@@ -85,16 +85,28 @@ def oauth_callback():
 @app.route("/load_prospecting_activities")
 def load_prospecting_activities():
 
-    api_response = fetch_tasks_by_criteria(
-        settings.criteria
-    )
-    
-    if api_response.message == c.MISSING_ACCESS_TOKEN:
-        return redirect(url_for("login"))
-    
-    activated_accounts = compute_activated_accounts(tasks_by_criteria, settings)
+    settings = load_settings()
+    fetch_task_response = fetch_contact_tasks_by_criteria(settings["criteria"])
 
-    return tasks, 200
+    if (
+        fetch_task_response.message == MISSING_ACCESS_TOKEN
+        or "session expired" in fetch_task_response.message.lower()
+    ):
+        return "session_expired", 400
+
+    if not fetch_task_response.success:
+        return fetch_task_response.message, 400
+
+    contact_ids = []
+    for criteria_name in fetch_task_response.data:
+        contact_ids.extend(pluck(fetch_task_response.data[criteria_name], WHO_ID))
+
+    contacts = fetch_contacts_by_ids(contact_ids)
+    activated_accounts = compute_activated_accounts(
+        fetch_task_response.data, contacts.data, settings
+    )
+
+    return "success", 200
 
 
 if __name__ == "__main__":

@@ -3,6 +3,14 @@ from typing import List
 from datetime import date
 
 @dataclass
+class ProcessResponse:
+    data: List[dict]
+    message: str
+    success: bool
+    metadata: dict
+    
+
+@dataclass
 class ApiResponse:
     data: List[dict]
     message: str
