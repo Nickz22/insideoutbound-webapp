@@ -100,8 +100,14 @@ def oauth_callback():
         print(error_details)
         return jsonify(error_details), 500
 
+settings = {
+    "activities_per_contact" : 5,
+    "contacts_per_account" : 2,
+    "tracking_period" : 10
+}
 criteria = [
     FilterContainer(
+        name="Inbound Emails",
         filters=[
             Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 1a]"),
             Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 2a]"),
@@ -109,23 +115,34 @@ criteria = [
             Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 4a]"),
             Filter(field="Subject", data_type="string", operator="contains", value="[Disposition 5a]")
         ],
-        filterLogic="((1 OR 2 OR 3) AND 4 AND 5)"
+        filterLogic="((_1_ OR _2_ OR _3_) AND _4_ AND _5_)"
     ),
     FilterContainer(
+        name="Outbound Emails",
         filters=[
             Filter(field="Priority", data_type="string", operator="equals", value="High"),
             Filter(field="Status", data_type="string", operator="not equals", value="Completed"),
             Filter(field="CreatedDate", data_type="date",  operator="last n days", value="30")
         ],
-        filterLogic="1 AND 2 AND 3"
+        filterLogic="_1_ AND _2_ AND _3_"
     ),
     FilterContainer(
+        name="Inbound Calls",
         filters=[
-            Filter(field="OwnerId", data_type="string", operator="equals", value="0051t000000TXXXXXX"),
+            Filter(field="OwnerId", data_type="string", operator="equals", value="005RK000005pIWHYA2"),
             Filter(field="ActivityDate", data_type="date", operator="on or after", value="2022-01-01"),
             Filter(field="ActivityDate", data_type="date", operator="on or before", value="2022-12-31")
         ],
-        filterLogic="1 AND (2 OR 3)"
+        filterLogic="_1_ AND (_2_ OR _3_)"
+    ),
+    FilterContainer(
+        name="Outbound Calls",
+        filters=[
+            Filter(field="OwnerId", data_type="string", operator="equals", value="005RK000005pIWHYA2"),
+            Filter(field="ActivityDate", data_type="date", operator="on or after", value="2022-01-01"),
+            Filter(field="ActivityDate", data_type="date", operator="on or before", value="2022-12-31")
+        ],
+        filterLogic="_1_ AND (_2_ OR _3_)"
     )
 ]
 
@@ -136,9 +153,9 @@ def load_prospecting_activities():
     if not access_token or not instance_url:
         return redirect(url_for('login'))
     
-    fetch_tasks_by_criteria(criteria, instance_url, access_token)
+    tasks = fetch_tasks_by_criteria(criteria, instance_url, access_token)
     
-    return ""
+    return tasks, 200
 
 if __name__ == '__main__':
     app.run(debug=True, host='localhost', port=8000)  # Updated to run on localhost

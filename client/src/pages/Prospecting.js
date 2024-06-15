@@ -18,15 +18,20 @@ const Prospecting = () => {
   const [view, setView] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [inFlight, setInFlight] = useState(false); // State to track if a request is in flight
 
   useEffect(() => {
     const fetchData = async () => {
+      if (inFlight) return; // Prevent new request if one is already in flight
+      setInFlight(true); // Set request as in-flight
+      setLoading(true);
       try {
         await axios.get("http://localhost:8000/load_prospecting_activities");
-        setLoading(false);
       } catch (err) {
         setError(err);
+      } finally {
         setLoading(false);
+        setInFlight(false); // Reset in-flight state after request completes
       }
     };
 

@@ -60,7 +60,7 @@ def fetch_tasks_by_criteria(criteria, instance_url, access_token):
     criteria - list(FilterContainer): 
     """
     soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status FROM Task WHERE"
-    soql_queries = []
+    tasksByFilterName = {}
 
     for filter_container in criteria:
         conditions = [construct_condition(f) for f in filter_container.filters]
@@ -71,16 +71,13 @@ def fetch_tasks_by_criteria(criteria, instance_url, access_token):
         # Replace each index in the filterLogic with the corresponding condition
         combined_conditions = filter_container.filterLogic
         for index, condition in index_to_condition.items():
-            combined_conditions = combined_conditions.replace(index, condition)
+            combined_conditions = combined_conditions.replace(f"_{index}_", condition)
+
         
-        soql_queries.append(f"{soql_query} {combined_conditions}")
-    
-    # SOQL query
-    tasks = []
-    
-    for soql_query in soql_queries:
-        print("SOQL Query:", soql_query)  # For debugging
-        tasks.extend(fetch_tasks(soql_query, instance_url, access_token))
+        print(f"{filter_container.name} SOQL Query:", f"{soql_query} {combined_conditions}")
+        tasksByFilterName[filter_container.name] = fetch_tasks(f"{soql_query} {combined_conditions}", instance_url, access_token)
+        
+    return tasksByFilterName
     
 def fetch_tasks(soql_query, instance_url, access_token):
     headers = { "Authorization": f"Bearer {access_token}" }

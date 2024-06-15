@@ -10,5 +10,6 @@ class Filter:
 
 @dataclass
 class FilterContainer:
+    name: str
     filters: List[Filter]
     filterLogic: str
