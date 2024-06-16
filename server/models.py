@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import List
 from datetime import date
-from typing import List, Optional
+from typing import List, Optional, Any
 
 
 @dataclass
@@ -14,7 +14,7 @@ class ProcessResponse:
 
 @dataclass
 class ApiResponse:
-    data: List[dict]
+    data: Any
     message: str
     success: bool
 
@@ -98,7 +98,7 @@ class Activation:
     days_activated: Optional[int] = None
     days_engaged: Optional[int] = None
     engaged_date: Optional[date] = None
-    last_outbound_engagement: Optional[date] = Nones
+    last_outbound_engagement: Optional[date] = None
     opportunity: Optional[Opportunity] = None
     status: Optional[str] = "Activated"
 

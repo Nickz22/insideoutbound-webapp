@@ -6,7 +6,7 @@ from datetime import datetime
 from utils import pluck
 
 
-def fetch_tasks_by_account_ids_from_date(
+def fetch_tasks_by_account_ids_from_date_not_in_ids(
     account_ids, start, criteria, already_counted_task_ids
 ):
     """
@@ -130,7 +130,7 @@ def fetch_contact_tasks_by_criteria_from_date(
             if not fetch_response.success:
                 api_response.success = False
                 api_response.message = fetch_response.message
-                break
+                return api_response
 
             contact_task_models = []
             for task in fetch_response.data:
@@ -173,7 +173,7 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
     - dict: A dictionary where each key is an account ID and each value is the list of events fetched from Salesforce
       for that account. The events are represented as dictionaries with keys corresponding to the fields selected in the SOQL query.
     """
-    api_response = ApiResponse(data=[], message="", success=False)
+    api_response = ApiResponse(data={}, message="", success=False)
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not instance_url or not access_token:
@@ -235,7 +235,7 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
     - dict: A dictionary where each key is an account ID and each value is the list of opportunities fetched from Salesforce
       for that account. The opportunities are represented as dictionaries with keys corresponding to the fields selected in the SOQL query.
     """
-    api_response = ApiResponse(data=[], message="", success=False)
+    api_response = ApiResponse(data={}, message="", success=False)
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not instance_url or not access_token:

@@ -89,13 +89,24 @@ def upsert_activations(new_activations):
             "id": activation.id,
             "account": {"id": activation.account.id, "name": activation.account.name},
             "activated_date": activation.activated_date.isoformat(),
-            "active_contacts": activation.active_contacts,
-            "last_prospecting_activity": activation.last_prospecting_activity.isoformat(),
+            "active_contact_ids": activation.active_contact_ids,
+            "first_prospecting_activity": (
+                activation.first_prospecting_activity.isoformat()
+                if activation.first_prospecting_activity
+                else None
+            ),
+            "last_prospecting_activity": (
+                activation.last_prospecting_activity.isoformat()
+                if activation.last_prospecting_activity
+                else None
+            ),
             "prospecting_metadata": [
                 meta.__dict__ for meta in (activation.prospecting_metadata or [])
             ],
-            "days_activated": activation.days_activated,
-            "days_engaged": activation.days_engaged,
+            "days_activated": (
+                activation.days_activated if activation.days_activated else 0
+            ),
+            "days_engaged": activation.days_engaged if activation.days_engaged else 0,
             "engaged_date": (
                 activation.engaged_date.isoformat() if activation.engaged_date else None
             ),
@@ -109,6 +120,8 @@ def upsert_activations(new_activations):
                 if activation.opportunity
                 else None
             ),
+            "task_ids": activation.task_ids if activation.task_ids else None,
+            "event_ids": activation.event_ids if activation.event_ids else None,
             "status": activation.status,
         }
         # Upsert the activation data
@@ -151,7 +164,7 @@ def load_active_activations_order_by_first_prospecting_activity_asc():
                 id=entry["id"],
                 account=account,
                 activated_date=datetime.fromisoformat(entry["activated_date"]),
-                active_contacts=entry["active_contacts"],
+                active_contact_ids=entry["active_contact_ids"],
                 prospecting_metadata=prospecting_metadata,
                 days_activated=entry.get("days_activated"),
                 days_engaged=entry.get("days_engaged"),
@@ -165,13 +178,19 @@ def load_active_activations_order_by_first_prospecting_activity_asc():
                     if entry.get("last_outbound_engagement")
                     else None
                 ),
-                first_prospecting_activity=datetime.fromisoformat(
-                    entry["first_prospecting_activity"]
+                first_prospecting_activity=(
+                    datetime.fromisoformat(entry["first_prospecting_activity"])
+                    if "first_prospecting_activity" in entry
+                    else None
                 ),
                 last_prospecting_activity=datetime.fromisoformat(
                     entry["last_prospecting_activity"]
                 ),
-                opportunity=opportunity,
+                task_ids=(entry["task_ids"] if "task_ids" in entry else None),
+                event_ids=(entry.get("event_ids") if "event_ids" in entry else None),
+                opportunity=(
+                    entry.get("opportunity") if "opportunity" in entry else None
+                ),
                 status=entry.get("status", "Activated"),
             )
             activations.append(activation)

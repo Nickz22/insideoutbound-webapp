@@ -16,7 +16,28 @@ from server.utils import (
 )
 from datetime import datetime
 
+# Positive Testing steps:
+#     1. Mock activations with a last_prospecting_activity of settings["account_inactivity_threshold"] + 1 days ago.
+#     2. Mock api return results to return 0 tasks
+#     3. Assert activations are returned with Unresponsive status
 
+# Negative Testing steps:
+#     1. Mock activations with a last_prospecting_activity of settings["account_inactivity_threshold"] - 1 days ago.
+#     2. Mock api return results to return 0 tasks
+#     3. Assert activations are returned with Activated status
+
+# Edge Testing steps (Opportunity exists):
+#    1. Mock activations with a last_prospecting_activity of settings["account_inactivity_threshold"] + 1 days ago.
+#    2. Mock api return results to return 0 tasks
+#    3. Mock api return results to return 1 opportunity
+#    4. Assert activations are returned with Opportunity Created status
+
+
+# Edge Testing steps (Event exists):
+#    1. Mock activations with a last_prospecting_activity of settings["account_inactivity_threshold"] + 1 days ago.
+#    2. Mock api return results to return 0 tasks
+#    3. Mock api return results to return 1 event
+#    4. Assert activations are returned with Meeting Set status
 def find_unresponsive_activations(activations, settings):
     """
     This function processes a list of activation objects and a settings dictionary to determine which activations are unresponsive.
@@ -39,22 +60,17 @@ def find_unresponsive_activations(activations, settings):
     first_prospecting_activity = activations[0].first_prospecting_activity
     activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
 
-    # find activations where last_prospecting_activity + settings["account_inactivity_threshold"] < today
     today = datetime.now().date()
     unresponsive_activation_candidates = [
         activation
         for activation in activations
         if add_days(
-            activation.last_prospecting_activity,
+            activation.last_prospecting_activity.date(),
             settings["account_inactivity_threshold"],
         )
         < today
     ]
 
-    latest_task_to_be_evaluated = add_days(
-        unresponsive_activation_candidates[0].last_prospecting_activity,
-        settings["account_inactivity_threshold"],
-    )
     account_ids = pluck(unresponsive_activation_candidates, "account.id")
     already_counted_task_ids = [
         task_id
@@ -74,7 +90,7 @@ def find_unresponsive_activations(activations, settings):
         activation.account.id: activation
         for activation in unresponsive_activation_candidates
     }
-    for account_id in criteria_group_tasks_by_account_id:
+    for account_id in criteria_group_tasks_by_account_id.data:
         activation = activations_by_account_id.get(account_id)
         criteria_name_by_task_id = {}
         all_tasks = []
@@ -102,6 +118,28 @@ def find_unresponsive_activations(activations, settings):
     return activations_by_account_id.values()
 
 
+# Positive Testing steps:
+#     1. Mock activations with a last_prospecting_activity of yesterday
+#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the account_inactivity_threshold
+#     3. Assert activations are returned with incremented Prospecting Metadata
+
+# Positive Testing steps (Opportunity Created):
+#     1. Mock activations with a last_prospecting_activity of yesterday
+#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the account_inactivity_threshold
+#     3. Mock api return results to return 1 opportunity per Account
+#     4. Assert activations are returned with Opportunity Created status
+
+# Positive Testing steps (Meeting Set):
+#     1. Mock activations with a last_prospecting_activity of yesterday
+#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the account_inactivity_threshold
+#     3. Mock api return results to return 1 event per Account
+#     4. Assert activations are returned with Meeting Set status
+
+
+# Negative Testing steps:
+#     1. Mock activations with a last_prospecting_activity of 2 days ago
+#     2. Mock api return results to return 3 tasks per Account, 2 of which are outside of the account_inactivity_threshold
+#     3. Assert activations are returned with no additional Prospecting Metadata
 def increment_existing_activations(activations, settings):
     """
     Processes a list of activation objects and updates their counters based on criteria specified in the settings.
@@ -145,7 +183,7 @@ def increment_existing_activations(activations, settings):
         activation.account.id: activation for activation in activations
     }
 
-    for account_id in criteria_group_tasks_by_account_id:
+    for account_id in criteria_group_tasks_by_account_id.data:
         activation = activations_by_account_id.get(account_id)
         criteria_name_by_task_id = {}
         all_tasks = []
@@ -171,12 +209,12 @@ def increment_existing_activations(activations, settings):
             activations_by_account_id[account_id] = activation
             # rollup prospecting metadata via criteria_name_by_task_id
 
-    opportunities_by_account_id = group_by(opportunities, "account_id")
+    opportunities_by_account_id = group_by(opportunities.data, "account_id")
 
     for account_id in activations_by_account_id:
         activation = activations_by_account_id[account_id]
         opportunities = opportunities_by_account_id.get(account_id, [])
-        events = events_by_account_id.get(account_id, [])
+        events = events_by_account_id.data.get(account_id, [])
 
         if events:
             for event in events:
@@ -248,7 +286,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 response.message += f"Contact with id {task.who_id} for Task with id {task.id} not found. \n"
                 continue
             account_id = contact.account_id
-            if account_id not in tasks_by_account:
+            if account_id not in tasks_by_account.keys():
                 tasks_by_account[account_id] = {}
             if task.who_id not in tasks_by_account[account_id]:
                 tasks_by_account[account_id][task.who_id] = {}
@@ -259,7 +297,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     opportunity_by_account_id = group_by(
         fetch_opportunities_by_account_ids_from_date(
             tasks_by_account.keys(), first_prospecting_activity
-        ),
+        ).data,
         "account_id",
     )
     events_by_account_id = fetch_events_by_account_ids_from_date(
@@ -289,7 +327,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
         start_tracking_period = all_tasks_under_account[0].created_date
 
         qualifying_event = None
-        for event in events_by_account_id.get(account_id, []):
+        for event in events_by_account_id.data.get(account_id, []):
             if is_model_created_within_period(
                 event, start_tracking_period, tracking_period
             ):
@@ -307,8 +345,6 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
         valid_task_ids_by_who_id = {}
         task_ids = []
 
-        # track first prospecting activity for the current tracking period
-        first_prospecting_activity = None
         for task in all_tasks_under_account:
 
             if not is_model_created_within_period(
@@ -350,7 +386,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                             id=account_id,
                         ),
                         activated_date=first_prospecting_activity,
-                        active_contact_ids=set(active_contact_ids),
+                        active_contact_ids=active_contact_ids,
                         last_prospecting_activity=task.created_date,
                         first_prospecting_activity=first_prospecting_activity,
                         task_ids=task_ids,
@@ -381,6 +417,8 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 active_contact_ids.append(who_id)
         is_account_active_for_tracking_period = (
             len(active_contact_ids) >= contacts_per_account
+            or qualifying_event
+            or qualifying_opportunity
         )
         if not is_account_active_for_tracking_period:
             continue
@@ -394,10 +432,12 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     id=account_id,
                 ),
                 activated_date=first_prospecting_activity,
-                active_contact_ids=set(active_contact_ids),
+                active_contact_ids=active_contact_ids,
+                first_prospecting_activity=first_prospecting_activity,
                 last_prospecting_activity=task.created_date,
                 opportunity=qualifying_opportunity,
                 event_ids=(set(qualifying_event.id) if qualifying_event else None),
+                task_ids=task_ids,
                 status=(
                     "Opportunity Created"
                     if qualifying_opportunity

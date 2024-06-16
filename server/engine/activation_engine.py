@@ -31,18 +31,22 @@ def update_activation_states():
         load_active_activations_order_by_first_prospecting_activity_asc()
     )
 
-    unresponsive_activations = find_unresponsive_activations(
-        active_activations, settings
-    )
+    unresponsive_activations = []
+    if len(active_activations) > 0:
+        unresponsive_activations = find_unresponsive_activations(
+            active_activations, settings
+        )
+
     if len(unresponsive_activations) > 0:
         upsert_activations(unresponsive_activations)
 
     active_activations = [
-        a for a in active_activations if a["id"] not in unresponsive_activations
+        a for a in active_activations if a.id not in unresponsive_activations
     ]
-
-    activations = increment_existing_activations(active_activations, settings)
-    upsert_activations(activations)
+    
+    if len(active_activations) > 0:
+        activations = increment_existing_activations(active_activations, settings)
+        upsert_activations(activations)
 
     last_task_date_with_cooloff_buffer = add_days(
         datetime.strptime(settings["latest_date_queried"], "%Y-%m-%d").date(),
@@ -51,13 +55,13 @@ def update_activation_states():
 
     account_ids = pluck(active_activations, "account.id")
     activated_account_contact_ids = pluck(
-        fetch_contacts_by_account_ids(account_ids), "id"
+        fetch_contacts_by_account_ids(account_ids).data, "id"
     )
 
     fetch_task_response = fetch_contact_tasks_by_criteria_from_date(
         settings["criteria"],
         f"{last_task_date_with_cooloff_buffer}T00:00:00Z",
-        f"WHERE WhoId NOT IN ('{','.join(activated_account_contact_ids)}')",
+        f"WHERE WhoId NOT IN ('{','.join(activated_account_contact_ids)}')" if len(activated_account_contact_ids) > 0 else None,
     )
 
     if (
