@@ -47,7 +47,7 @@ def fetch_tasks_by_account_ids_from_date(
         additional_filter = f"AND WhoId IN ('{','.join(contact_by_id.keys())}')"
 
         # Fetch tasks by criteria
-        fetch_response = fetch_contact_tasks_by_criteria(
+        fetch_response = fetch_contact_tasks_by_criteria_from_date(
             criteria, start, additional_filter
         )
         if not fetch_response.success:
@@ -82,10 +82,10 @@ def fetch_tasks_by_account_ids_from_date(
 
     return api_response
 
-    return api_response
 
-
-def fetch_contact_tasks_by_criteria(criteria, from_datetime, additional_filter=None):
+def fetch_contact_tasks_by_criteria_from_date(
+    criteria, from_datetime, additional_filter=None
+):
     """
     Fetches tasks from Salesforce based on a list of filtering criteria.
 
