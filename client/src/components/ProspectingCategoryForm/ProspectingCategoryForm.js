@@ -1,27 +1,19 @@
 import React, { useState } from "react";
-import {
-  Button,
-  TextField,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Checkbox,
-} from "@mui/material";
+import { TextField, Button } from "@mui/material";
+import CustomTable from "../CustomTable/CustomTable"; // Adjust the path as necessary
 
-const ProspectingCategoryForm = ({ tasks, onAddCategory }) => {
+const ProspectingCategoryForm = ({ tasks, onAddCategory, onDone }) => {
   const [categoryName, setCategoryName] = useState("");
-  const [selectedTasks, setSelectedTasks] = useState(new Set());
+  const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
 
   const handleTaskToggle = (task) => {
-    const newSelectedTasks = new Set(selectedTasks);
-    if (newSelectedTasks.has(task.id)) {
-      newSelectedTasks.delete(task.id);
+    const newSelectedTaskIds = new Set(selectedTaskIds);
+    if (newSelectedTaskIds.has(task.id)) {
+      newSelectedTaskIds.delete(task.id);
     } else {
-      newSelectedTasks.add(task.id);
+      newSelectedTaskIds.add(task.id);
     }
-    setSelectedTasks(newSelectedTasks);
+    setSelectedTaskIds(newSelectedTaskIds);
   };
 
   const handleCreateCategory = () => {
@@ -29,9 +21,9 @@ const ProspectingCategoryForm = ({ tasks, onAddCategory }) => {
       alert("Please enter a category name.");
       return;
     }
-    onAddCategory(categoryName, Array.from(selectedTasks));
+    onAddCategory(categoryName, selectedTaskIds);
     setCategoryName("");
-    setSelectedTasks(new Set());
+    setSelectedTaskIds(new Set());
   };
 
   return (
@@ -44,46 +36,35 @@ const ProspectingCategoryForm = ({ tasks, onAddCategory }) => {
         fullWidth
         margin="normal"
       />
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Subject</TableCell>
-            <TableCell>Who</TableCell>
-            <TableCell>Priority</TableCell>
-            <TableCell>Status</TableCell>
-            <TableCell>Type</TableCell>
-            <TableCell>Task Subtype</TableCell>
-            <TableCell>Select</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {tasks.map((task) => (
-            <TableRow key={task.id}>
-              <TableCell>{task.subject}</TableCell>
-              <TableCell>{task.who}</TableCell>
-              <TableCell>{task.priority}</TableCell>
-              <TableCell>{task.status}</TableCell>
-              <TableCell>{task.type}</TableCell>
-              <TableCell>{task.taskSubtype}</TableCell>
-              <TableCell>
-                <Checkbox
-                  checked={selectedTasks.has(task.id)}
-                  onChange={() => handleTaskToggle(task)}
-                />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      <div style={{ marginTop: 20 }}>
-        <Button
-          onClick={handleCreateCategory}
-          variant="contained"
-          color="primary"
-        >
-          Create New
-        </Button>
-      </div>
+      <CustomTable
+        columns={[
+          { id: "subject", label: "Subject" },
+          { id: "who", label: "Who" },
+          { id: "priority", label: "Priority" },
+          { id: "status", label: "Status" },
+          { id: "type", label: "Type" },
+          { id: "taskSubtype", label: "Task Subtype" },
+          { id: "select", label: "", selectedIds: selectedTaskIds },
+        ]}
+        data={tasks}
+        onToggle={handleTaskToggle}
+      />
+      <Button
+        onClick={handleCreateCategory}
+        variant="contained"
+        color="primary"
+        style={{ marginTop: 20 }}
+      >
+        Create New
+      </Button>
+      <Button
+        onClick={onDone}
+        variant="outlined"
+        color="primary"
+        style={{ marginTop: 20, marginLeft: 20 }}
+      >
+        Done
+      </Button>
     </div>
   );
 };

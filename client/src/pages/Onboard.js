@@ -1,10 +1,23 @@
-/**
- * // fetch("http://localhost:8000/fetch_tasks_for_wizard")
-    //   .then((response) => response.json())
-    //   .then((data) => setTasks(data.tasks))
-    //   .catch((error) => console.error("Error fetching tasks:", error));
- * 
- * [
+import React, { useState, useEffect } from "react";
+import {
+  Dialog,
+  DialogContent,
+  Box,
+  IconButton,
+  Typography,
+  Fade,
+} from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
+import { useNavigate } from "react-router-dom";
+import AnimatedIconButton from "../components/AnimatedIconButton/AnimatedIconButton";
+import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
+import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
+
+const Onboard = () => {
+  const navigate = useNavigate();
+  const [step, setStep] = useState(0); // Initialize step to 0 for the introduction step
+  const [categories, setCategories] = useState(new Map());
+  const [tasks, setTasks] = useState([
     {
       id: 1,
       subject: "Call John Doe",
@@ -41,39 +54,9 @@
       type: "Email",
       task_subtype: "Inbound",
     },
-  ]
- */
+  ]);
 
-import React, { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  Box,
-  IconButton,
-  Typography,
-  Fade,
-} from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
-import { useNavigate } from "react-router-dom";
-import AnimatedIconButton from "../components/AnimatedIconButton/AnimatedIconButton";
-import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
-import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
-
-const Onboard = () => {
-  const navigate = useNavigate();
-  const [step, setStep] = useState(0); // Initialize step to 0 for the introduction step
-  const [categories, setCategories] = useState(new Map());
-  const [tasks, setTasks] = useState([]);
-
-  useEffect(() => {
-    // Add event listener for 'Enter' keydown
-    window.addEventListener("keydown", handleKeyPress);
-
-    // Clean up the event listener
-    return () => {
-      window.removeEventListener("keydown", handleKeyPress);
-    };
-  }, []);
+  useEffect(() => {}, []);
 
   const handleReturnToLogin = () => {
     navigate("/"); // Navigate to the login route
@@ -87,19 +70,27 @@ const Onboard = () => {
     setStep(step + 1);
   };
 
-  const handleKeyPress = (event) => {
-    if (event.key === "Enter") {
-      handleNext();
-    }
-  };
-
-  const addCategory = (category, tasks) => {
+  const addCategory = (category, selectedTaskIds) => {
     if (categories.has(category)) {
       alert("Category already exists!");
       return;
     }
-    setCategories(new Map(categories.set(category, tasks)));
-    handleNext();
+
+    // Add the new category with selected tasks
+    const newCategories = new Map(categories);
+    const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.id));
+    newCategories.set(category, selectedTasks);
+    setCategories(newCategories);
+
+    // Remove selected tasks from the available tasks list
+    const remainingTasks = tasks.filter(
+      (task) => !selectedTaskIds.has(task.id)
+    );
+    setTasks(remainingTasks);
+  };
+
+  const handleDone = () => {
+    handleNext(); // Move to the overview step
   };
 
   const renderStep = () => {
@@ -115,7 +106,11 @@ const Onboard = () => {
           >
             <Typography
               variant="h6"
-              style={{ fontWeight: "lighter", paddingRight: "5rem", marginBottom: ".5rem" }}
+              style={{
+                fontWeight: "lighter",
+                paddingRight: "5rem",
+                marginBottom: ".5rem",
+              }}
             >
               Help us categorize the different types of prospecting activities
               in your organization
@@ -124,7 +119,13 @@ const Onboard = () => {
           </Box>
         );
       case 1:
-        return <CategoryForm onAddCategory={addCategory} tasks={tasks} />;
+        return (
+          <CategoryForm
+            onAddCategory={addCategory}
+            onDone={handleDone}
+            tasks={tasks}
+          />
+        );
       case 2:
         return <CategoryOverview categories={categories} />;
       default:
@@ -145,20 +146,22 @@ const Onboard = () => {
       }}
       TransitionComponent={Fade}
     >
-      <Typography
-        variant="caption"
-        onClick={handleReturnToLogin}
-        style={{
-          position: "absolute",
-          left: 5,
-          bottom: 5,
-          color: "#aaa", // Light gray color for the text
-          cursor: "pointer", // Change cursor to indicate clickable
-          textDecoration: "underline", // Underline to suggest it's a link
-        }}
-      >
-        Return to login
-      </Typography>
+      {step === 0 && (
+        <Typography
+          variant="caption"
+          onClick={handleReturnToLogin}
+          style={{
+            position: "absolute",
+            left: 5,
+            bottom: 5,
+            color: "#aaa", // Light gray color for the text
+            cursor: "pointer", // Change cursor to indicate clickable
+            textDecoration: "underline", // Underline to suggest it's a link
+          }}
+        >
+          Return to login
+        </Typography>
+      )}
       <DialogContent>{renderStep()}</DialogContent>
     </Dialog>
   );
