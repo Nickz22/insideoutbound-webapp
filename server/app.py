@@ -4,7 +4,7 @@ import requests, os
 
 from engine.activation_engine import update_activation_states
 
-from cache import save_code_verifier, load_code_verifier, save_tokens
+from cache import save_code_verifier, load_code_verifier, save_tokens, load_settings
 from constants import MISSING_ACCESS_TOKEN
 from models import ApiResponse
 
@@ -71,7 +71,14 @@ def oauth_callback():
         save_tokens(
             token_data["access_token"], token_data["instance_url"]
         )  # Save tokens to file
-        return redirect("http://localhost:3000/app")
+
+        redirect_url = "http://localhost:3000/onboard"
+        # redirect_url = (
+        #     "http://localhost:3000/onboard"
+        #     if len(load_settings()["criteria"]) == 0
+        #     else "http://localhost:3000/app"
+        # )
+        return redirect(redirect_url)
     else:
         error_details = {
             "error": "Failed to retrieve access token",
