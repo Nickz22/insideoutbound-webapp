@@ -4,13 +4,19 @@ import requests, os
 from engine.activation_engine import (
     compute_activated_accounts,
     increment_existing_activations,
+    find_unresponsive_activations,
 )
-from api.salesforce import fetch_contact_tasks_by_criteria, fetch_contacts_by_ids
+from api.salesforce import (
+    fetch_contact_tasks_by_criteria,
+    fetch_contacts_by_ids,
+    fetch_contacts_by_account_ids,
+)
 from cache import (
     save_code_verifier,
     load_code_verifier,
     save_tokens,
     load_settings,
+    save_settings,
     upsert_activations,
     load_active_activations,
 )
@@ -98,10 +104,19 @@ def load_prospecting_activities():
 
     api_response = ApiResponse(data=[], message="", success=False)
     settings = load_settings()
-    
-    # Set activations as unresponsive so I don't wastefully process them in increment_existing_activations
 
-    activations = increment_existing_activations(load_active_activations(), settings)
+    # Set activations as unresponsive so I don't wastefully process them in increment_existing_activations
+    active_activations = load_active_activations()
+    unresponsive_activations = find_unresponsive_activations(
+        active_activations, settings
+    )
+    upsert_activations(unresponsive_activations)
+
+    active_activations = [
+        a for a in active_activations if a["id"] not in unresponsive_activations
+    ]
+
+    activations = increment_existing_activations(active_activations, settings)
     upsert_activations(activations)
 
     last_task_date_with_cooloff_buffer = add_days(
@@ -109,8 +124,15 @@ def load_prospecting_activities():
         -(settings["cooloff_period"] + settings["tracking_period"]),
     )
 
+    account_ids = pluck(active_activations, "account.id")
+    activated_account_contact_ids = pluck(
+        fetch_contacts_by_account_ids(account_ids), "id"
+    )
+
     fetch_task_response = fetch_contact_tasks_by_criteria(
-        last_task_date_with_cooloff_buffer, f"T00:00:00Z"
+        settings["criteria"],
+        f"{last_task_date_with_cooloff_buffer}T00:00:00Z",
+        f"WHERE WhoId NOT IN ('{','.join(activated_account_contact_ids)}')",
     )
 
     if (
@@ -137,6 +159,10 @@ def load_prospecting_activities():
     if not activation_response.success:
         api_response.message = activation_response.message
         return jsonify(api_response.__dict__), 503
+
+    today = datetime.now().date()
+    settings["latest_date_queried"] = today.strftime("%Y-%m-%d")
+    save_settings(settings)
 
     api_response.data = activation_response.data
     api_response.success = True

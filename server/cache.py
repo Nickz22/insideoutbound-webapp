@@ -64,6 +64,11 @@ def load_settings():
     return None
 
 
+def save_settings(settings):
+    with open(SETTINGS_FILE, "w") as file:
+        json.dump(settings, file, indent=4, default=lambda x: x.__dict__)
+
+
 def upsert_activations(new_activations):
     # Load existing activations from the file if it exists
     if os.path.exists(ACTIVATIONS_FILE):

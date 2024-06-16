@@ -65,6 +65,7 @@ class Task:
     subject: str
     status: str
 
+
 @dataclass
 class Event:
     id: str
@@ -72,6 +73,7 @@ class Event:
     who_id: str
     subject: str
     status: str
+
 
 @dataclass
 class Contact:
@@ -91,6 +93,7 @@ class Activation:
     first_prospecting_activity: date
     last_prospecting_activity: date
     task_ids: set[str]
+    event_ids: Optional[set[str]] = None
     prospecting_metadata: Optional[List[ProspectingMetadata]] = None
     days_activated: Optional[int] = None
     days_engaged: Optional[int] = None

@@ -162,7 +162,7 @@ def fetch_contact_tasks_by_criteria(criteria, from_datetime, additional_filter=N
     return api_response
 
 
-def fetch_events_by_account_ids_within_range(account_ids, start, end):
+def fetch_events_by_account_ids_from_date(account_ids, start):
     """
     Fetches events from Salesforce based on a list of account IDs.
 
@@ -185,7 +185,7 @@ def fetch_events_by_account_ids_within_range(account_ids, start, end):
     contact_by_id = {contact.id: contact for contact in contacts.data}
     contact_ids = pluck(contacts.data, "id")
 
-    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{','.join(contact_ids)}') AND StartDateTime >= {start} AND EndDateTime <= {end} ORDER BY StartDateTime ASC"
+    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{','.join(contact_ids)}') AND CreatedDate >= {start} ORDER BY StartDateTime ASC"
     events_by_account_id = {}
 
     try:
@@ -224,7 +224,7 @@ def fetch_events_by_account_ids_within_range(account_ids, start, end):
     return api_response
 
 
-def fetch_opportunities_by_account_ids_within_range(account_ids, start, end):
+def fetch_opportunities_by_account_ids_from_date(account_ids, start):
     """
     Fetches opportunities from Salesforce based on a list of account IDs.
 
@@ -250,7 +250,7 @@ def fetch_opportunities_by_account_ids_within_range(account_ids, start, end):
 
     try:
         joined_ids = ",".join([f"'{id}'" for id in account_ids])
-        soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, Status FROM Opportunity WHERE AccountId IN ({joined_ids})"
+        soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, Status FROM Opportunity WHERE CreatedDate >= {start}  AccountId IN ({joined_ids})"
         request_url = f"{instance_url}/services/data/v55.0/query?q={soql_query}"
         opportunity_models = []
 

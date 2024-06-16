@@ -30,6 +30,7 @@ def pluck(arr: list, param: str) -> Set[Any]:
             plucked.add(value)
     return plucked
 
+
 def group_by(arr: list, param: str) -> dict:
     grouped = {}
     for item in arr:
@@ -51,6 +52,6 @@ def add_days(date, days):
     return date + timedelta(days=days)
 
 
-def is_task_created_within_period(task, start_date, period_days):
+def is_model_created_within_period(sobject_model, start_date, period_days):
     end_date = start_date + timedelta(days=period_days)
-    return start_date <= task.created_date <= end_date
+    return start_date <= sobject_model.created_date <= end_date
