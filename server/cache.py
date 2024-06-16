@@ -1,9 +1,19 @@
 import os, json
-from models import Filter, FilterContainer
+from models import (
+    Filter,
+    FilterContainer,
+    Account,
+    ProspectingMetadata,
+    Activation,
+    Opportunity,
+)
+from datetime import datetime
 
 CODE_VERIFIER_FILE = "code_verifier.json"
 TOKEN_FILE = "tokens.json"
 SETTINGS_FILE = "settings.json"
+ACTIVATIONS_FILE = "activations.json"
+
 
 def save_code_verifier(code_verifier):
     with open(CODE_VERIFIER_FILE, "w") as f:
@@ -30,12 +40,21 @@ def load_tokens():
             return data.get("access_token"), data.get("instance_url")
     return None, None
 
+
 def custom_decoder(obj):
-    if 'filters' in obj and 'name' in obj and 'filterLogic' in obj:
-        return FilterContainer(name=obj['name'], filters=obj['filters'], filterLogic=obj['filterLogic'])
-    if 'field' in obj and 'data_type' in obj and 'operator' in obj and 'value' in obj:
-        return Filter(field=obj['field'], data_type=obj['data_type'], operator=obj['operator'], value=obj['value'])
+    if "filters" in obj and "name" in obj and "filterLogic" in obj:
+        return FilterContainer(
+            name=obj["name"], filters=obj["filters"], filterLogic=obj["filterLogic"]
+        )
+    if "field" in obj and "data_type" in obj and "operator" in obj and "value" in obj:
+        return Filter(
+            field=obj["field"],
+            data_type=obj["data_type"],
+            operator=obj["operator"],
+            value=obj["value"],
+        )
     return obj
+
 
 def load_settings():
     if os.path.exists(SETTINGS_FILE):
@@ -43,3 +62,115 @@ def load_settings():
             settings = json.load(file, object_hook=custom_decoder)
             return settings
     return None
+
+
+def upsert_activations(new_activations):
+    # Load existing activations from the file if it exists
+    if os.path.exists(ACTIVATIONS_FILE):
+        with open(ACTIVATIONS_FILE, "r") as file:
+            try:
+                activations = json.load(file)
+            except json.JSONDecodeError:
+                activations = []
+    else:
+        activations = []
+
+    # Convert list of dictionaries to dictionary of dictionaries indexed by 'id'
+    activation_dict = {act["id"]: act for act in activations}
+
+    # Update existing or add new activations
+    for activation in new_activations:
+        activation_data = {
+            "id": activation.id,
+            "account": {"id": activation.account.id, "name": activation.account.name},
+            "activated_date": activation.activated_date.isoformat(),
+            "active_contacts": activation.active_contacts,
+            "last_prospecting_activity": activation.last_prospecting_activity.isoformat(),
+            "prospecting_metadata": [
+                meta.__dict__ for meta in (activation.prospecting_metadata or [])
+            ],
+            "days_activated": activation.days_activated,
+            "days_engaged": activation.days_engaged,
+            "engaged_date": (
+                activation.engaged_date.isoformat() if activation.engaged_date else None
+            ),
+            "last_outbound_engagement": (
+                activation.last_outbound_engagement.isoformat()
+                if activation.last_outbound_engagement
+                else None
+            ),
+            "opportunity": (
+                {"id": activation.opportunity.id, "name": activation.opportunity.name}
+                if activation.opportunity
+                else None
+            ),
+            "status": activation.status,
+        }
+        # Upsert the activation data
+        activation_dict[activation.id] = activation_data
+
+    # Write updated/ new data back to the file
+    with open(ACTIVATIONS_FILE, "w") as file:
+        json.dump(list(activation_dict.values()), file, indent=4)
+
+
+def deserialize_account(data):
+    return Account(id=data["id"], name=data["name"])
+
+
+def deserialize_prospecting_metadata(data):
+    return [ProspectingMetadata(**meta) for meta in data]
+
+
+def deserialize_opportunity(data):
+    if data:
+        return Opportunity(id=data["id"], name=data["name"])
+    return None
+
+
+def load_active_activations_order_by_first_prospecting_activity_asc():
+    file_path = ACTIVATIONS_FILE
+    with open(file_path, "r") as file:
+        data = json.load(file)
+        activations = []
+        for entry in data:
+            if entry.get("status") == "Unresponsive":
+                continue
+
+            account = deserialize_account(entry["account"])
+            prospecting_metadata = deserialize_prospecting_metadata(
+                entry.get("prospecting_metadata", [])
+            )
+            opportunity = deserialize_opportunity(entry.get("opportunity"))
+            activation = Activation(
+                id=entry["id"],
+                account=account,
+                activated_date=datetime.fromisoformat(entry["activated_date"]),
+                active_contacts=entry["active_contacts"],
+                prospecting_metadata=prospecting_metadata,
+                days_activated=entry.get("days_activated"),
+                days_engaged=entry.get("days_engaged"),
+                engaged_date=(
+                    datetime.fromisoformat(entry["engaged_date"])
+                    if entry.get("engaged_date")
+                    else None
+                ),
+                last_outbound_engagement=(
+                    datetime.fromisoformat(entry["last_outbound_engagement"])
+                    if entry.get("last_outbound_engagement")
+                    else None
+                ),
+                first_prospecting_activity=datetime.fromisoformat(
+                    entry["first_prospecting_activity"]
+                ),
+                last_prospecting_activity=datetime.fromisoformat(
+                    entry["last_prospecting_activity"]
+                ),
+                opportunity=opportunity,
+                status=entry.get("status", "Activated"),
+            )
+            activations.append(activation)
+
+        # Order activations by first_prospecting_activity ascending
+        activations.sort(key=lambda x: x.first_prospecting_activity)
+        return activations

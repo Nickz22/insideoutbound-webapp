@@ -53,8 +53,8 @@ class Opportunity:
     id: str
     name: str
     amount: int
-    close_date: date
     created_date: date
+    status: str
 
 
 @dataclass
@@ -65,6 +65,13 @@ class Task:
     subject: str
     status: str
 
+@dataclass
+class Event:
+    id: str
+    created_date: date
+    who_id: str
+    subject: str
+    status: str
 
 @dataclass
 class Contact:
@@ -80,13 +87,15 @@ class Activation:
     id: str
     account: Account
     activated_date: date
-    active_contacts: int
+    active_contact_ids: set[str]
+    first_prospecting_activity: date
     last_prospecting_activity: date
+    task_ids: set[str]
     prospecting_metadata: Optional[List[ProspectingMetadata]] = None
     days_activated: Optional[int] = None
     days_engaged: Optional[int] = None
     engaged_date: Optional[date] = None
-    last_outbound_engagement: Optional[date] = None
+    last_outbound_engagement: Optional[date] = Nones
     opportunity: Optional[Opportunity] = None
     status: Optional[str] = "Activated"
 

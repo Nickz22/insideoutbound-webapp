@@ -1,23 +1,56 @@
 import uuid
 from dataclasses import is_dataclass
 from typing import Any, Set
+from datetime import timedelta
+from functools import reduce
+
+
+# list utils
+def get_nested_value(item, path):
+    """Helper function to safely get a nested value from a dict or dataclass based on a dot-separated path."""
+    keys = path.split(".")
+
+    def get_value(current_item, key):
+        # If the current part is a dictionary, use get
+        if isinstance(current_item, dict):
+            return current_item.get(key)
+        # If it's a dataclass or an object, use getattr
+        elif is_dataclass(current_item) or hasattr(current_item, key):
+            return getattr(current_item, key, None)
+        return None
+
+    return reduce(get_value, keys, item)
 
 
 def pluck(arr: list, param: str) -> Set[Any]:
     plucked = set()
     for item in arr:
-        # Check if item is a dictionary
-        if isinstance(item, dict):
-            value = item.get(param)
-        # Check if item is a dataclass instance
-        elif is_dataclass(item):
-            value = getattr(item, param, None)
-        # Assume item is an object with attributes
-        else:
-            value = getattr(item, param, None)
-        plucked.add(value)
+        value = get_nested_value(item, param)
+        if value is not None:  # Optionally skip None values
+            plucked.add(value)
     return plucked
 
+def group_by(arr: list, param: str) -> dict:
+    grouped = {}
+    for item in arr:
+        key = get_nested_value(item, param)
+        if key is not None:  # Optionally skip None values
+            if key not in grouped:
+                grouped[key] = []
+            grouped[key].append(item)
+    return grouped
 
+
+# id utils
 def generate_unique_id():
     return str(uuid.uuid4())
+
+
+# date utils
+def add_days(date, days):
+    return date + timedelta(days=days)
+
+
+def is_task_created_within_period(task, start_date, period_days):
+    end_date = start_date + timedelta(days=period_days)
+    return start_date <= task.created_date <= end_date

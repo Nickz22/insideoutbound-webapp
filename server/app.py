@@ -1,12 +1,23 @@
-from flask import Flask, jsonify, redirect, request, url_for
+from flask import Flask, jsonify, redirect, request
 from flask_cors import CORS
 import requests, os
-from engine.activation_engine import compute_activated_accounts
+from engine.activation_engine import (
+    compute_activated_accounts,
+    increment_existing_activations,
+)
 from api.salesforce import fetch_contact_tasks_by_criteria, fetch_contacts_by_ids
-from cache import save_code_verifier, load_code_verifier, save_tokens, load_settings
+from cache import (
+    save_code_verifier,
+    load_code_verifier,
+    save_tokens,
+    load_settings,
+    upsert_activations,
+    load_active_activations,
+)
 from constants import MISSING_ACCESS_TOKEN, WHO_ID
-from utils import pluck
+from utils import pluck, add_days
 from models import ApiResponse
+from datetime import datetime
 
 app = Flask(__name__)
 CORS(
@@ -85,28 +96,51 @@ def oauth_callback():
 @app.route("/load_prospecting_activities")
 def load_prospecting_activities():
 
+    api_response = ApiResponse(data=[], message="", success=False)
     settings = load_settings()
-    fetch_task_response = fetch_contact_tasks_by_criteria(settings["criteria"])
+    
+    # Set activations as unresponsive so I don't wastefully process them in increment_existing_activations
+
+    activations = increment_existing_activations(load_active_activations(), settings)
+    upsert_activations(activations)
+
+    last_task_date_with_cooloff_buffer = add_days(
+        datetime.strptime(settings["latest_date_queried"], "%Y-%m-%d").date(),
+        -(settings["cooloff_period"] + settings["tracking_period"]),
+    )
+
+    fetch_task_response = fetch_contact_tasks_by_criteria(
+        last_task_date_with_cooloff_buffer, f"T00:00:00Z"
+    )
 
     if (
         fetch_task_response.message == MISSING_ACCESS_TOKEN
         or "session expired" in fetch_task_response.message.lower()
     ):
-        return "session_expired", 400
+        api_response.message = "session_expired"
+        return jsonify(api_response.__dict__), 400
 
     if not fetch_task_response.success:
-        return fetch_task_response.message, 400
+        return fetch_task_response.message, 503
 
     contact_ids = []
     for criteria_name in fetch_task_response.data:
         contact_ids.extend(pluck(fetch_task_response.data[criteria_name], WHO_ID))
 
     contacts = fetch_contacts_by_ids(contact_ids)
-    activated_accounts = compute_activated_accounts(
+    activation_response = compute_activated_accounts(
         fetch_task_response.data, contacts.data, settings
     )
 
-    return "success", 200
+    upsert_activations(activation_response.data)
+
+    if not activation_response.success:
+        api_response.message = activation_response.message
+        return jsonify(api_response.__dict__), 503
+
+    api_response.data = activation_response.data
+    api_response.success = True
+    return jsonify(api_response.__dict__), 200
 
 
 if __name__ == "__main__":
