@@ -3,9 +3,9 @@ from flask_cors import CORS
 import requests, os
 
 from engine.activation_engine import update_activation_states
-
+from api.gpt_api import invoke_chained_commands_without_assistant
 from cache import save_code_verifier, load_code_verifier, save_tokens, load_settings
-from constants import MISSING_ACCESS_TOKEN
+from constants import MISSING_ACCESS_TOKEN, GPT_FILTER_GENERATION_PROMPT
 from models import ApiResponse
 
 app = Flask(__name__)
@@ -41,7 +41,17 @@ def store_code_verifier():
         return jsonify({"message": "Code verifier stored successfully"}), 200
     else:
         return jsonify({"error": "Code verifier not provided"}), 400
-
+    
+@app.route("/generate_filters", methods=["POST"])
+def generate_filters():
+    data = request.json
+    tasks = data.get("tasks")
+    if tasks and len(tasks) > 0:
+        commands = GPT_FILTER_GENERATION_PROMPT
+        commands[-1]["content"] = commands[-1]["content"].replace("__INSERT_TASKS__", str(tasks))
+        response = invoke_chained_commands_without_assistant(commands, "gpt-4o")
+        response["data"] = response["data"].replace("\n", "").replace("```javascript", "").replace("```", "")
+        return jsonify(response), 200
 
 @app.route("/oauth/callback")
 def oauth_callback():

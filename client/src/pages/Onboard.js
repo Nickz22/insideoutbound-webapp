@@ -1,17 +1,39 @@
 import React, { useState, useEffect } from "react";
-import {
-  Dialog,
-  DialogContent,
-  Box,
-  IconButton,
-  Typography,
-  Fade,
-} from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
+import { Dialog, DialogContent, Box, Typography, Fade } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
 import AnimatedIconButton from "../components/AnimatedIconButton/AnimatedIconButton";
 import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
 import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
+
+/**
+ * @param field - Salesforce SObject field to filter on
+ * @param operator - String ("contains" | "equals" | "not equals")
+ *                   Number ("less than" | "less than or equal to" | "greater than" | "greater than or equal to")
+ *                   Date ("equals" | "not equals" | "before" | "on or before" | "on or after" | "last n days" | "next n days" | "this month" | "last month" | "next month" | "this year" | "last year" | "next year")
+ * @param value - Value to filter on
+ * @param dataType - String ("string" | "number" | "date")
+ */
+class Filter {
+  constructor(field, operator, value, dataType) {
+    this.field = field;
+    this.operator = operator;
+    this.value = value;
+    this.dataType = dataType;
+  }
+}
+/**
+ * @param name - Name of the filter container
+ * @param filters - Array of Filter instances
+ * @param filterLogic - String (i.e. 1 AND (2 OR 3) AND 4)
+ */
+class FilterContainer {
+  constructor(name, filters, filterLogic) {
+    this.name = name;
+    this.filters = filters; // This should be an array of Filter instances
+    this.filterLogic = filterLogic;
+  }
+}
 
 const Onboard = () => {
   const navigate = useNavigate();
@@ -90,6 +112,19 @@ const Onboard = () => {
   };
 
   const handleDone = () => {
+    // hit http://localhost:8000/generate_filters
+    const filterContainers = [];
+    categories.forEach((tasks, category) => {
+      axios
+        .post("http://localhost:8000/generate_filters", {
+          tasks,
+        })
+        .then((response) => {
+          const filter = { ...response.data, name: category };
+          filterContainers.push(filter);
+        });
+    });
+
     handleNext(); // Move to the overview step
   };
 
@@ -109,6 +144,7 @@ const Onboard = () => {
               style={{
                 fontWeight: "lighter",
                 paddingRight: "5rem",
+                paddingLeft: "1rem",
                 marginBottom: ".5rem",
               }}
             >
