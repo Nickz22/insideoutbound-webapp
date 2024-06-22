@@ -1,17 +1,22 @@
 import React, { useState } from "react";
-import { TextField, Button } from "@mui/material";
+import { TextField, Button, Typography, Box } from "@mui/material";
 import CustomTable from "../CustomTable/CustomTable"; // Adjust the path as necessary
 
-const ProspectingCategoryForm = ({ tasks, onAddCategory, onDone }) => {
+const ProspectingCategoryForm = ({
+  tasks,
+  onAddCategory,
+  onDone,
+  placeholder,
+}) => {
   const [categoryName, setCategoryName] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
 
   const handleTaskToggle = (task) => {
     const newSelectedTaskIds = new Set(selectedTaskIds);
-    if (newSelectedTaskIds.has(task.id)) {
-      newSelectedTaskIds.delete(task.id);
+    if (newSelectedTaskIds.has(task.Id)) {
+      newSelectedTaskIds.delete(task.Id);
     } else {
-      newSelectedTaskIds.add(task.id);
+      newSelectedTaskIds.add(task.Id);
     }
     setSelectedTaskIds(newSelectedTaskIds);
   };
@@ -21,51 +26,56 @@ const ProspectingCategoryForm = ({ tasks, onAddCategory, onDone }) => {
       alert("Please enter a category name.");
       return;
     }
+    if (selectedTaskIds.size === 0) {
+      alert("Please select at least one task.");
+      return;
+    }
     onAddCategory(categoryName, selectedTaskIds);
     setCategoryName("");
     setSelectedTaskIds(new Set());
   };
 
   return (
-    <div>
+    <Box sx={{ p: 1 }}>
+      <Typography gutterBottom>
+        Create a prospecting category and select example tasks. We'll use these
+        to set up automatic detection for similar activities.
+      </Typography>
       <TextField
-        label="Category"
+        label="Category Name"
         value={categoryName}
         onChange={(e) => setCategoryName(e.target.value)}
-        placeholder="Outbound Calls"
+        placeholder={placeholder}
         fullWidth
         margin="normal"
       />
       <CustomTable
         columns={[
-          { id: "subject", label: "Subject" },
-          { id: "who", label: "Who" },
-          { id: "priority", label: "Priority" },
-          { id: "status", label: "Status" },
-          { id: "type", label: "Type" },
-          { id: "taskSubtype", label: "Task Subtype" },
-          { id: "select", label: "", selectedIds: selectedTaskIds },
+          { id: "Subject", label: "Subject" },
+          { id: "Who", label: "Who" },
+          { id: "Priority", label: "Priority" },
+          { id: "Status", label: "Status" },
+          { id: "Type", label: "Type" },
+          { id: "TaskSubtype", label: "Task Subtype" },
+          { id: "select", label: "Select", selectedIds: selectedTaskIds },
         ]}
         data={tasks}
         onToggle={handleTaskToggle}
       />
-      <Button
-        onClick={handleCreateCategory}
-        variant="contained"
-        color="primary"
-        style={{ marginTop: 20 }}
-      >
-        Create New
-      </Button>
-      <Button
-        onClick={onDone}
-        variant="outlined"
-        color="primary"
-        style={{ marginTop: 20, marginLeft: 20 }}
-      >
-        Done
-      </Button>
-    </div>
+      <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-start" }}>
+        <Button
+          onClick={handleCreateCategory}
+          variant="contained"
+          color="primary"
+          sx={{ mr: 2 }}
+        >
+          Create New
+        </Button>
+        <Button onClick={onDone} variant="outlined" color="primary">
+          Done
+        </Button>
+      </Box>
+    </Box>
   );
 };
 

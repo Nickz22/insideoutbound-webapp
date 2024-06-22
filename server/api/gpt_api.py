@@ -16,15 +16,17 @@ def list_models():
 
 
 def invoke_chained_commands_without_assistant(commands, model):
+    try:
+        client = OpenAIClient().client
+        models = client.models.list()
 
-    client = OpenAIClient().client
-    models = client.models.list()
-
-    completion = client.chat.completions.create(
-        model=model,
-        messages=commands,
-    )
-    return {"data": completion.choices[0].message.content}
+        completion = client.chat.completions.create(
+            model=model,
+            messages=commands,
+        )
+        return {"data": completion.choices[0].message.content}
+    except Exception as e:
+        return {"data": "error"}
 
 
 class OpenAIClient:

@@ -3,7 +3,12 @@ from dataclasses import is_dataclass
 from typing import Any, Set
 from datetime import timedelta
 from functools import reduce
+import re
 
+# filter utils
+def add_underscores_to_numbers(expression):
+    transformed_expression = re.sub(r'\b(\d+)\b', r'_\1_', expression)
+    return transformed_expression
 
 # list utils
 def get_nested_value(item, path):

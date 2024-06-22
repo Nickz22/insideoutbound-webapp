@@ -28,10 +28,32 @@ class Filter:
 
 
 @dataclass
+class FilterModel:
+    field: str
+    operator: str
+    value: str
+    dataType: str
+
+
+@dataclass
 class FilterContainer:
     name: str
     filters: List[Filter]
+    filter_logic: str
+
+
+@dataclass
+class FilterContainerModel:
+    name: str
+    filters: List[FilterModel]
     filterLogic: str
+
+
+@dataclass
+class CriteriaField:
+    name: str
+    type: str
+    options: List[str]
 
 
 @dataclass
@@ -64,6 +86,7 @@ class Task:
     who_id: str
     subject: str
     status: str
+    task_subtype: Optional[str] = None
 
 
 @dataclass
@@ -111,3 +134,17 @@ class ProspectingEffort:
     status: str
     date_entered: date
     tasks: List[Task]
+
+@dataclass
+class Settings:
+    inactivity_threshold: int
+    cooloff_period: int
+    criteria: List[FilterContainer]
+    meetings_criteria: FilterContainer
+    skip_account_criteria: FilterContainer
+    skip_opportunity_criteria: FilterContainer
+    activities_per_contact: int
+    contacts_per_account: int
+    tracking_period: int
+    activate_by_meeting: bool
+    activate_by_opportunity: bool

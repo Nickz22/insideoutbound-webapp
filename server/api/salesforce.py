@@ -4,6 +4,59 @@ from cache import load_tokens
 from constants import MISSING_ACCESS_TOKEN, FILTER_OPERATOR_MAPPING, WHO_ID
 from datetime import datetime
 from utils import pluck
+from typing import List, Dict
+from models import CriteriaField
+
+
+def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
+    """
+    Fetches the field describe info from Salesforce for the Task object and creates CriteriaField instances.
+
+    Returns:
+    - List[CriteriaField]: A list of CriteriaField instances representing fields of the Task object.
+    """
+    api_response = ApiResponse(data=[], message="", success=False)
+    access_token, instance_url = (
+        load_tokens()
+    )  # Assume load_tokens gets the necessary authentication tokens
+
+    if not access_token or not instance_url:
+        api_response.success = False
+        api_response.message = "Missing access token or instance URL"
+        return api_response
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+    fields_endpoint = f"{instance_url}/services/data/v55.0/sobjects/{sobject_type}/describe"  # Replace 'XX' with your actual API version
+
+    try:
+        response = requests.get(fields_endpoint, headers=headers)
+        if response.status_code == 200:
+            fields_data = response.json().get("fields", [])
+            criteria_fields = [
+                CriteriaField(
+                    name=field["name"],
+                    type=field["type"] if field["name"] != "Subject" else "string",
+                    options=(
+                        field["picklistValues"] if field["type"] == "picklist" else []
+                    ),
+                )
+                for field in fields_data
+            ]
+            api_response.data = criteria_fields
+            api_response.success = True
+        else:
+            api_response.success = False
+            api_response.message = (
+                f"Failed to fetch field descriptions: {response.text}"
+            )
+    except Exception as e:
+        api_response.success = False
+        api_response.message = f"Error fetching field info: {str(e)}"
+
+    return api_response
 
 
 def fetch_tasks_by_account_ids_from_date_not_in_ids(
@@ -91,8 +144,8 @@ def fetch_contact_tasks_by_criteria_from_date(
 
     Parameters:
     - criteria (list[FilterContainer]): A list of FilterContainer objects. Each FilterContainer object contains
-      a list of filters and a filterLogic string. The filters are used to construct the WHERE clause of the SOQL query,
-      and the filterLogic string specifies how these filters should be combined.
+      a list of filters and a filter_logic string. The filters are used to construct the WHERE clause of the SOQL query,
+      and the filter_logic string specifies how these filters should be combined.
     - from_datetime (string): An ISO string representing the createddate of the last task fetched. Crucial to minimizing the size of query results.
     - additional_filter (string): An optional additional filter to apply to the SOQL query.
 
@@ -398,7 +451,7 @@ def _construct_where_clause_from_filter(filter_container):
     Construct and apply filter logic for a given filter container.
 
     Parameters:
-        filter_container: The filter container object with filters and filterLogic.
+        filter_container: The filter container object with filters and filter_logic.
 
     Returns:
         A string representing the SOQL condition part.
@@ -410,7 +463,7 @@ def _construct_where_clause_from_filter(filter_container):
     }
 
     # Apply filter logic by replacing placeholders with actual conditions
-    combined_conditions = filter_container.filterLogic
+    combined_conditions = filter_container["filter_logic"]
     for index, condition in condition_by_index.items():
         combined_conditions = combined_conditions.replace(f"_{index}_", condition)
 

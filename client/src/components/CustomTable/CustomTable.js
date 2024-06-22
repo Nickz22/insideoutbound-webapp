@@ -18,20 +18,24 @@ const CustomTable = ({ columns, data, onToggle }) => {
     >
       <Table stickyHeader>
         <TableHead>
-          <TableRow>
+          <TableRow style={{ backgroundColor: "#f5f5f5" }}>
+            {" "}
             {columns.map((column) => (
-              <TableCell key={column.id}>{column.label}</TableCell>
+              <TableCell key={column.id} style={{ backgroundColor: "#f5f5f5" }}>
+                {" "}
+                {column.label}
+              </TableCell>
             ))}
           </TableRow>
         </TableHead>
         <TableBody>
           {data.map((item) => (
-            <TableRow key={item.id}>
+            <TableRow key={item.Id}>
               {columns.map((column) => (
-                <TableCell key={`${item.id}-${column.id}`}>
+                <TableCell key={`${item.Id}-${column.id}`}>
                   {column.id === "select" ? (
                     <Checkbox
-                      checked={column.selectedIds.has(item.id)}
+                      checked={column.selectedIds.has(item.Id)}
                       onChange={() => onToggle(item)}
                     />
                   ) : (

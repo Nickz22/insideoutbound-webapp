@@ -42,9 +42,9 @@ def load_tokens():
 
 
 def custom_decoder(obj):
-    if "filters" in obj and "name" in obj and "filterLogic" in obj:
+    if "filters" in obj and "name" in obj and "filter_logic" in obj:
         return FilterContainer(
-            name=obj["name"], filters=obj["filters"], filterLogic=obj["filterLogic"]
+            name=obj["name"], filters=obj["filters"], filter_logic=obj["filter_logic"]
         )
     if "field" in obj and "data_type" in obj and "operator" in obj and "value" in obj:
         return Filter(
