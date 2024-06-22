@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, Box, Typography, Fade } from "@mui/material";
+import { Dialog, DialogContent, Box, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
-import AnimatedIconButton from "../components/AnimatedIconButton/AnimatedIconButton";
 import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
 import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
@@ -30,11 +29,10 @@ const CategoryFormWithHeader = ({
 
 const Onboard = () => {
   const navigate = useNavigate();
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(1); // Start from step 1
   const [categories, setCategories] = useState(new Map());
   const [filters, setFilters] = useState([]);
   const [taskFilterFields, setTaskFilterFields] = useState();
-  const [gatheringSteps, setGatheringSteps] = useState([]);
   const [gatheringResponses, setGatheringResponses] = useState({});
   const [categoryFormKey, setCategoryFormKey] = useState(0);
   const placeholderIndexRef = useRef(0);
@@ -132,6 +130,22 @@ const Onboard = () => {
     },
   ];
 
+  const formatSettingsData = () => {
+    return {
+      inactivityThreshold: parseInt(gatheringResponses[0], 10), // Tracking Period
+      cooloffPeriod: parseInt(gatheringResponses[1], 10),
+      criteria: filters,
+      meetingsCriteria: {}, // This should be populated if you have specific meetings criteria
+      skipAccountCriteria: {}, // This should be populated if you have specific skip account criteria
+      skipOpportunityCriteria: {}, // This should be populated if you have specific skip opportunity criteria
+      activitiesPerContact: parseInt(gatheringResponses[3], 10),
+      contactsPerAccount: parseInt(gatheringResponses[2], 10),
+      trackingPeriod: parseInt(gatheringResponses[0], 10), // Same as inactivityThreshold
+      activateByMeeting: gatheringResponses[4],
+      activateByOpportunity: gatheringResponses[5],
+    };
+  };
+
   useEffect(() => {
     const fetchAndSetTaskFilterFields = async () => {
       const taskFilterFields = await axios.get(
@@ -145,10 +159,6 @@ const Onboard = () => {
     fetchAndSetTaskFilterFields();
   }, []);
 
-  const handleReturnToLogin = () => {
-    navigate("/"); // Navigate to the login route
-  };
-
   const handleInfoGatheringComplete = (response) => {
     setGatheringResponses((prev) => ({
       ...prev,
@@ -158,44 +168,17 @@ const Onboard = () => {
   };
 
   const handleNext = () => {
-    if (step === 0) {
-      setGatheringSteps(infoGatheringSteps);
-    }
     setStep(step + 1);
   };
 
   const renderStep = () => {
-    if (step === 0) {
-      return (
-        <Box
-          display="flex"
-          alignItems="center"
-          justifyContent="center"
-          minHeight="5rem"
-          width="30rem"
-        >
-          <Typography
-            variant="h6"
-            style={{
-              fontWeight: "lighter",
-              paddingRight: "5rem",
-              paddingLeft: "1rem",
-              marginBottom: ".5rem",
-            }}
-          >
-            Help us understand how you sell so we can correctly populate your
-            prospecting activity dashboard.
-          </Typography>
-          <AnimatedIconButton onClick={handleNext} />
-        </Box>
-      );
-    } else if (step <= infoGatheringSteps.length) {
+    if (step <= infoGatheringSteps.length) {
       return (
         <InfoGatheringStep
-          key={step} // Add this line to ensure a new instance is created for each step
+          key={step}
           stepData={infoGatheringSteps[step - 1]}
           onComplete={handleInfoGatheringComplete}
-          stepIndex={step - 1} // Pass the current step index
+          stepIndex={step - 1}
         />
       );
     } else if (step === infoGatheringSteps.length + 1) {
@@ -219,6 +202,10 @@ const Onboard = () => {
     } else {
       return <div>Invalid step</div>;
     }
+  };
+
+  const isLargeDialogStep = () => {
+    return step > infoGatheringSteps.length;
   };
 
   const handleClose = () => {
@@ -286,9 +273,11 @@ const Onboard = () => {
 
   const saveSettings = async () => {
     try {
-      await axios.post("http://localhost:8000/save_settings_criteria", {
-        filters,
-      });
+      const formattedSettings = formatSettingsData();
+      await axios.post(
+        "http://localhost:8000/save_settings",
+        formattedSettings
+      );
       navigate("/app");
     } catch (error) {
       console.error("Error saving settings:", error);
@@ -298,33 +287,31 @@ const Onboard = () => {
   return (
     <Dialog
       open
-      onClose={handleClose}
-      style={{ backgroundColor: "cyan" }}
+      onClose={() => {}} // You might want to handle closing differently now
       PaperProps={{
         style: {
           boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
           border: "1px solid #e0e0e0",
+          ...(isLargeDialogStep()
+            ? {
+                maxWidth: "90vw",
+                width: "90vw",
+                maxHeight: "90vh",
+                height: "90vh",
+              }
+            : {}),
         },
       }}
-      TransitionComponent={Fade}
+      fullWidth
+      maxWidth={isLargeDialogStep() ? "lg" : "sm"}
     >
-      {step === 0 && (
-        <Typography
-          variant="caption"
-          onClick={handleReturnToLogin}
-          style={{
-            position: "absolute",
-            left: 5,
-            bottom: 5,
-            color: "#aaa",
-            cursor: "pointer",
-            textDecoration: "underline",
-          }}
-        >
-          Return to login
-        </Typography>
-      )}
-      <DialogContent>{renderStep()}</DialogContent>
+      <DialogContent
+        style={{
+          padding: isLargeDialogStep() ? "24px" : "16px",
+        }}
+      >
+        {renderStep()}
+      </DialogContent>
     </Dialog>
   );
 };

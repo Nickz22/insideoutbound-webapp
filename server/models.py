@@ -135,6 +135,7 @@ class ProspectingEffort:
     date_entered: date
     tasks: List[Task]
 
+
 @dataclass
 class Settings:
     inactivity_threshold: int
@@ -148,3 +149,18 @@ class Settings:
     tracking_period: int
     activate_by_meeting: bool
     activate_by_opportunity: bool
+
+
+@dataclass
+class SettingsModel:
+    inactivityThreshold: int
+    cooloffPeriod: int
+    criteria: List[FilterContainerModel]
+    meetingsCriteria: FilterContainerModel
+    skipAccountCriteria: FilterContainerModel
+    skipOpportunityCriteria: FilterContainerModel
+    activitiesPerContact: int
+    contactsPerAccount: int
+    trackingPeriod: int
+    activateByMeeting: bool
+    activateByOpportunity: bool

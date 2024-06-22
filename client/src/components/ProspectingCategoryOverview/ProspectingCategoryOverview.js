@@ -6,21 +6,15 @@ import {
   TextField,
   Button,
   Box,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   ThemeProvider,
   createTheme,
   CssBaseline,
-  Divider,
   Grid,
-  IconButton,
-  Tooltip,
+  AppBar,
+  Toolbar,
 } from "@mui/material";
 import { styled } from "@mui/system";
-import DeleteIcon from "@mui/icons-material/Delete";
-import AddIcon from "@mui/icons-material/Add";
+import FilterContainer from "../FilterContainer/FilterContainer";
 
 const FILTER_OPERATOR_MAPPING = {
   string: {
@@ -76,28 +70,31 @@ const theme = createTheme({
 });
 
 const StyledCard = styled(Card)(({ theme }) => ({
-  marginBottom: theme.spacing(3),
+  marginBottom: theme.spacing(4),
   backgroundColor: "#ffffff",
   transition: "box-shadow 0.3s ease-in-out",
   "&:hover": {
     boxShadow: "0 6px 12px rgba(0, 0, 0, 0.15)",
   },
+  height: "500px", // Fixed height for the card
+  display: "flex",
+  flexDirection: "column",
 }));
 
-const FilterContainer = styled(Box)(({ theme }) => ({
-  marginBottom: theme.spacing(2),
-  padding: theme.spacing(2),
-  backgroundColor: "#f9f9f9",
-  borderRadius: "4px",
-}));
+const ScrollableFilters = styled(Box)({
+  flexGrow: 1,
+  overflowY: "auto",
+  display: "flex",
+  flexDirection: "column",
+});
 
 const ProspectingCategoryOverview = ({
   proposedFilterContainers,
   onSave,
   taskFilterFields,
 }) => {
-  const [filterContainers, setFilterContainers] = useState(undefined);
-  const [logicErrors, setLogicErrors] = useState({}); // Track logic errors by filterContainer index
+  const [filterContainers, setFilterContainers] = useState([]);
+  const [logicErrors, setLogicErrors] = useState({});
 
   useEffect(() => {
     if (proposedFilterContainers) {
@@ -178,6 +175,23 @@ const ProspectingCategoryOverview = ({
     return null;
   };
 
+  const handleAddFilter = (filterIndex) => {
+    setFilterContainers((currentFilters) => {
+      const newFilterContainers = [...currentFilters];
+      newFilterContainers[filterIndex].filters.push({
+        field: "",
+        operator: "",
+        value: "",
+        dataType: "string", // default data type
+      });
+      return newFilterContainers;
+    });
+  };
+
+  const handleSave = () => {
+    onSave(filterContainers);
+  };
+
   const handleDeleteFilter = (filterContainerIndex, filterIndex) => {
     setFilterContainers((currentFilters) => {
       const newFilterContainers = [...currentFilters];
@@ -196,167 +210,99 @@ const ProspectingCategoryOverview = ({
     }));
   };
 
+  const handleTitleChange = (filterContainerIndex, newTitle) => {
+    setFilterContainers((currentFilters) => {
+      const newFilterContainers = [...currentFilters];
+      newFilterContainers[filterContainerIndex].name = newTitle;
+      return newFilterContainers;
+    });
+  };
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ p: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Prospecting Categories
+      <Box sx={{ p: 4, pb: 10 }}>
+        <Typography
+          variant="h4"
+          fontFamily="Roboto"
+          fontWeight="lighter"
+          gutterBottom
+        >
+          Prospecting Activity Filters
         </Typography>
-        {filterContainers &&
-          filterContainers.map((filterContainer, filterIndex) => (
-            <StyledCard key={filterIndex}>
-              <CardContent>
-                <Typography variant="h6">{filterContainer.name}</Typography>
-                <Divider sx={{ my: 2 }} />
-                {filterContainer.filters.map((filter, idx) => {
-                  const fieldDefinition = taskFilterFields.find(
-                    (field) => field.name === filter.field
-                  );
-                  return (
-                    <FilterContainer key={idx}>
-                      <Grid container spacing={2} alignItems="center">
-                        <Grid item xs={12} sm={3}>
-                          <FormControl fullWidth size="small">
-                            <InputLabel>Field</InputLabel>
-                            <Select
-                              value={filter.field}
-                              label="Field"
-                              onChange={(event) =>
-                                handleFieldChange(
-                                  filterIndex,
-                                  event.target.value,
-                                  idx
-                                )
-                              }
-                            >
-                              {taskFilterFields.map((field) => (
-                                <MenuItem key={field.name} value={field.name}>
-                                  {field.name}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={3}>
-                          <FormControl fullWidth size="small">
-                            <InputLabel>Operator</InputLabel>
-                            <Select
-                              value={filter.operator}
-                              label="Operator"
-                              onChange={(event) =>
-                                handleOperatorChange(
-                                  filterIndex,
-                                  event.target.value,
-                                  idx
-                                )
-                              }
-                            >
-                              {Object.entries(
-                                FILTER_OPERATOR_MAPPING[filter.dataType] || {}
-                              ).map(([key, value]) => (
-                                <MenuItem key={key} value={key}>
-                                  {key}
-                                </MenuItem>
-                              ))}
-                            </Select>
-                          </FormControl>
-                        </Grid>
-                        <Grid item xs={12} sm={5}>
-                          {fieldDefinition &&
-                          fieldDefinition.type === "picklist" ? (
-                            <FormControl fullWidth size="small">
-                              <InputLabel>Value</InputLabel>
-                              <Select
-                                value={filter.value}
-                                label="Value"
-                                onChange={(event) =>
-                                  handleValueChange(
-                                    filterIndex,
-                                    event.target.value,
-                                    idx
-                                  )
-                                }
-                              >
-                                {fieldDefinition.options.map((option) => (
-                                  <MenuItem
-                                    key={option.value}
-                                    value={option.value}
-                                  >
-                                    {option.label}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            </FormControl>
-                          ) : (
-                            <TextField
-                              fullWidth
-                              label="Value"
-                              value={filter.value}
-                              variant="outlined"
-                              size="small"
-                              onChange={(event) =>
-                                handleValueChange(
-                                  filterIndex,
-                                  event.target.value,
-                                  idx
-                                )
-                              }
-                            />
-                          )}
-                        </Grid>
-                        <Grid item xs={12} sm={1}>
-                          <Tooltip title="Remove filter">
-                            <IconButton
-                              aria-label="delete"
-                              onClick={() =>
-                                handleDeleteFilter(filterIndex, idx)
-                              }
-                            >
-                              <DeleteIcon />
-                            </IconButton>
-                          </Tooltip>
-                        </Grid>
-                      </Grid>
-                    </FilterContainer>
-                  );
-                })}
-                <Box sx={{ mt: 2 }}>
-                  <Button
-                    startIcon={<AddIcon />}
-                    onClick={() => {
-                      /* Implement add filter logic */
-                    }}
-                  >
-                    Add Filter
-                  </Button>
-                </Box>
-                <TextField
-                  label="Logic"
-                  value={filterContainer.filterLogic}
-                  variant="outlined"
-                  fullWidth
-                  margin="normal"
-                  error={!!logicErrors[filterIndex]}
-                  helperText={logicErrors[filterIndex]}
-                  onChange={(event) =>
-                    handleLogicChange(filterIndex, event.target.value)
-                  }
-                />
-              </CardContent>
-            </StyledCard>
+        <Grid container spacing={3}>
+          {filterContainers.map((filterContainer, filterIndex) => (
+            <Grid item xs={12} lg={6} key={filterIndex}>
+              <StyledCard>
+                <CardContent
+                  sx={{
+                    height: "100%",
+                    display: "flex",
+                    flexDirection: "column",
+                  }}
+                >
+                  <Box mb={2}>
+                    <TextField
+                      fullWidth
+                      value={filterContainer.name}
+                      onChange={(e) =>
+                        handleTitleChange(filterIndex, e.target.value)
+                      }
+                      variant="outlined"
+                    />
+                  </Box>
+                  <ScrollableFilters>
+                    <FilterContainer
+                      filters={filterContainer.filters}
+                      taskFilterFields={taskFilterFields}
+                      FILTER_OPERATOR_MAPPING={FILTER_OPERATOR_MAPPING}
+                      onFieldChange={(value, idx) =>
+                        handleFieldChange(filterIndex, value, idx)
+                      }
+                      onOperatorChange={(value, idx) =>
+                        handleOperatorChange(filterIndex, value, idx)
+                      }
+                      onValueChange={(value, idx) =>
+                        handleValueChange(filterIndex, value, idx)
+                      }
+                      onDeleteFilter={(idx) =>
+                        handleDeleteFilter(filterIndex, idx)
+                      }
+                      onAddFilter={() => handleAddFilter(filterIndex)}
+                      onLogicChange={(value) =>
+                        handleLogicChange(filterIndex, value)
+                      }
+                      filterLogic={filterContainer.filterLogic}
+                      logicError={logicErrors[filterIndex]}
+                    />
+                  </ScrollableFilters>
+                </CardContent>
+              </StyledCard>
+            </Grid>
           ))}
-        <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 3 }}>
+        </Grid>
+      </Box>
+      <AppBar
+        position="fixed"
+        color="transparent"
+        sx={{
+          top: "auto",
+          bottom: 0,
+          backgroundColor: "rgba(255, 255, 255, 0.7)",
+        }}
+      >
+        <Toolbar>
+          <Box sx={{ flexGrow: 1 }} />
           <Button
             variant="contained"
-            color="primary"
+            color="info"
             size="large"
-            onClick={onSave}
+            onClick={() => onSave(filterContainers)}
           >
             Save Changes
           </Button>
-        </Box>
-      </Box>
+        </Toolbar>
+      </AppBar>
     </ThemeProvider>
   );
 };

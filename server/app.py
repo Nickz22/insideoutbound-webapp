@@ -15,7 +15,7 @@ from cache import (
 from constants import MISSING_ACCESS_TOKEN, FILTER_TASK_FIELDS
 from models import ApiResponse, Task
 from utils import add_underscores_to_numbers
-from mapper.mapper import convert_sobjects_to_task_models
+from mapper.mapper import convert_settings_model_to_settings
 
 app = Flask(__name__)
 CORS(
@@ -137,16 +137,10 @@ def load_prospecting_activities():
     return jsonify(api_response.__dict__), status_code
 
 
-@app.route("/save_settings_criteria", methods=["POST"])
+@app.route("/save_settings", methods=["POST"])
 def save_settings_criteria():
     data = request.json
-    for filter in data["filters"]:
-        filter["filter_logic"] = (
-            f"({add_underscores_to_numbers(filter['filter_logic'])})"
-        )
-    settings = load_settings()
-    settings["criteria"] = data["filters"]
-    save_settings(settings)
+    settings = convert_settings_model_to_settings(data)
     return jsonify({"message": "Settings saved successfully"}), 200
 
 
