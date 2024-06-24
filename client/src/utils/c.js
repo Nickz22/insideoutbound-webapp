@@ -1,3 +1,4 @@
+/** @type {{ [key: string]: {[key:string]: string} }}} */
 export const FILTER_OPERATOR_MAPPING = {
   string: {
     contains: "LIKE",
@@ -71,6 +72,11 @@ export const MOCK_TASK_DATA = [
   },
 ];
 
+/**
+ * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
+ */
+
+/** @type {Array<OnboardWizardStep | OnboardWizardStep[]>} */
 export const ONBOARD_WIZARD_STEPS = [
   {
     title: "Tracking Period",
@@ -120,13 +126,15 @@ export const ONBOARD_WIZARD_STEPS = [
       options: ["Task", "Event"],
     },
     {
+      title: "",
+      inputLabel: "",
       inputType: "filterContainer",
       setting: "meetingsCriteria",
       description: "Configure filters for meeting engagement",
       defaultFilterName: "Meeting Criteria",
-      isEditable: false,
     },
     {
+      title: "",
       description:
         "Should an Account be immediately considered as engaged when a meeting is booked with one of its Contacts?",
       setting: "activateByMeeting",
@@ -141,6 +149,5 @@ export const ONBOARD_WIZARD_STEPS = [
       "Should an Account be immediately considered as engaged when an Opportunity is created?",
     inputType: "boolean",
     inputLabel: "Automatically Engage via Opportunities",
-    needsFilter: false,
   },
 ];

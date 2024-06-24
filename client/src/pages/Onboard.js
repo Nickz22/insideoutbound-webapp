@@ -8,6 +8,9 @@ import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep
 
 /**
  * @typedef {import('types').Settings} Settings
+ * @typedef {import('types').CriteriaField} CriteriaField
+ * @typedef {import('types').ApiResponse} ApiResponse
+ * @typedef {import('types').Task} Task
  */
 
 import {
@@ -21,6 +24,9 @@ import {
   fetchTaskFilterFields,
 } from "../components/Api/Api";
 
+/**
+ * @param {{ tasks: Task[], onAddCategory: function, onDone: function, placeholder: string }} props
+ */
 const CategoryFormWithHeader = ({
   tasks,
   onAddCategory,
@@ -47,9 +53,12 @@ const Onboard = () => {
   const [step, setStep] = useState(1); // Start from step 1
   const [categories, setCategories] = useState(new Map());
   const [filters, setFilters] = useState([]);
+  /** @type {[CriteriaField[] | undefined, function]} */
   const [taskFilterFields, setTaskFilterFields] = useState();
+  /** @type {[CriteriaField[] | undefined, function]} */
   const [eventFilterFields, setEventFilterFields] = useState();
   const [meetingObject, setMeetingObject] = useState("Task");
+  /** @type {[{ [key: string]: any }, function]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
   const [categoryFormKey, setCategoryFormKey] = useState(0);
   const placeholderIndexRef = useRef(0);
@@ -87,11 +96,33 @@ const Onboard = () => {
   useEffect(() => {
     const fetchAndSetFilterFields = async () => {
       try {
+        /** @type {ApiResponse} */
         const taskFilterFields = await fetchTaskFilterFields();
+        /** @type {ApiResponse} */
         const eventFilterFields = await fetchEventFilterFields();
 
-        setTaskFilterFields(taskFilterFields.data.data);
-        setEventFilterFields(eventFilterFields.data.data);
+        if (
+          taskFilterFields?.statusCode !== 200 ||
+          eventFilterFields?.statusCode !== 200
+        ) {
+          switch (taskFilterFields.statusCode) {
+            case 400:
+              navigate("/");
+              break;
+            case 500:
+              console.error(
+                "Internal server error while fetching task filter fields"
+              );
+              break;
+            default:
+              console.error("Error fetching task filter fields");
+          }
+
+          return;
+        }
+
+        setTaskFilterFields(taskFilterFields.data);
+        setEventFilterFields(eventFilterFields.data);
       } catch (error) {
         console.error("Error fetching filter fields:", error);
       }
@@ -104,34 +135,37 @@ const Onboard = () => {
     setStep(step + 1);
   };
 
+  /**
+   * @description sets meeting object to "Task" or "Event" based on the input value
+   * @param {{label: string, value: string}} info
+   */
   const handleInfoGatheringInputChange = (info) => {
-    if (
-      info.label?.toLowerCase() === "meetings" &&
-      info.value?.toLowerCase() === "event"
-    ) {
-      setMeetingObject("Event");
-    } else if (
-      info.label?.toLowerCase() === "meetings" &&
-      info.value?.toLowerCase() === "task"
-    ) {
-      setMeetingObject("Task");
+    const isMeetingObjectInfo = info.label?.toLowerCase() === "meetingobject";
+    if (isMeetingObjectInfo) {
+      setMeetingObject(info.value);
     }
   };
 
+  /**
+   * Corresponds to the onboarding wizard step question, if the question is composed of an array of questions,
+   * `responses` will be an array of responses, else it will be a single response
+   * @param {[{label: string, value: string}]} response
+   * @returns {void}
+   */
   const handleInfoGatheringComplete = (response) => {
-    setGatheringResponses((prev) => {
-      const newResponses = { ...prev };
-      if (Array.isArray(response) && response[0].label === "meetingObject") {
+    setGatheringResponses(
+      /**
+       * @param {{ [key: string]: any }} prev
+       **/
+      (prev) => {
+        const newResponses = { ...prev };
         // Handle the case where we have multiple responses
         response.forEach((res) => {
           newResponses[res.label] = { value: res.value };
         });
-      } else {
-        // Handle the case where we just have a simple value
-        newResponses[response.label] = { value: response.value };
+        return newResponses;
       }
-      return newResponses;
-    });
+    );
     handleNext();
   };
 
@@ -146,10 +180,10 @@ const Onboard = () => {
           stepIndex={step - 1}
           filterFields={
             meetingObject.toLowerCase() === "task"
-              ? taskFilterFields
-              : eventFilterFields
+              ? taskFilterFields || []
+              : eventFilterFields || []
           }
-          FILTER_OPERATOR_MAPPING={FILTER_OPERATOR_MAPPING}
+          filterOperatorMapping={FILTER_OPERATOR_MAPPING}
         />
       );
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {

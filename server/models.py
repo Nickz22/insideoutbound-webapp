@@ -82,6 +82,16 @@ class Task:
 
 
 @dataclass
+class TaskModel:
+    id: str
+    createdDate: date
+    whoId: str
+    subject: str
+    status: str
+    taskSubtype: Optional[str] = None
+
+
+@dataclass
 class Event:
     id: str
     created_date: date

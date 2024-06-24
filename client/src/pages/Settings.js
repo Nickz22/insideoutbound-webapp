@@ -50,7 +50,7 @@ const Settings = () => {
         const taskFilterFields = await fetchTaskFilterFields();
         const eventFilterFields = await fetchEventFilterFields();
 
-        switch (taskFilterFields.status) {
+        switch (taskFilterFields.statusCode) {
           case 200:
             break;
           case 400:
@@ -69,8 +69,8 @@ const Settings = () => {
             break;
         }
 
-        setTaskFilterFields(taskFilterFields.data.data);
-        setEventFilterFields(eventFilterFields.data.data);
+        setTaskFilterFields(taskFilterFields.data);
+        setEventFilterFields(eventFilterFields.data);
       } catch (error) {
         console.error("Error fetching filter fields:", error);
       }

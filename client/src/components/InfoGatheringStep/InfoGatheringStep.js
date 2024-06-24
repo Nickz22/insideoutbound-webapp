@@ -11,32 +11,58 @@ import {
 } from "@mui/material";
 import FilterContainer from "../FilterContainer/FilterContainer";
 
+/**
+ * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
+ * @typedef {import('types').CriteriaField} CriteriaField
+ */
+
+/**
+ *
+ * @param {{stepData: OnboardWizardStep | OnboardWizardStep[], onComplete: function, onInputChange: function, stepIndex: number, filterFields: CriteriaField[], filterOperatorMapping: { [key: string]: {[key:string]: string} }}} props
+ * @returns
+ */
 const InfoGatheringStep = ({
   stepData,
   onComplete,
   onInputChange,
   stepIndex,
   filterFields,
-  FILTER_OPERATOR_MAPPING,
+  filterOperatorMapping,
 }) => {
   const isArrayStep = Array.isArray(stepData);
+  /**
+   * @type {[{label:string, value: any}[] | null, function]}
+   **/
   const [responses, setResponses] = useState(
-    isArrayStep ? new Array(stepData.length).fill(null) : null
+    isArrayStep ? new Array(stepData.length).fill(null) : [null]
   );
 
   useEffect(() => {
-    setResponses(isArrayStep ? new Array(stepData.length).fill(null) : null);
+    setResponses(
+      isArrayStep
+        ? stepData.map((step) => ({ label: step.setting, value: "" }))
+        : [{ label: stepData.setting, value: "" }]
+    );
   }, [stepIndex, isArrayStep]);
 
+  /**
+   *
+   * @param {number} index
+   * @param {string | boolean | number} value
+   * @param {string} title
+   */
   const handleInputChange = (index, value, title) => {
     if (isArrayStep) {
-      setResponses((prev) => {
-        const newResponses = [...prev];
-        newResponses[index] = { label: title, value: value };
-        return newResponses;
-      });
+      setResponses(
+        /** @param {{ label: string, value: any }[]} prev */
+        (prev) => {
+          const newResponses = [...prev];
+          newResponses[index] = { label: title, value: value };
+          return newResponses;
+        }
+      );
     } else {
-      setResponses({ label: title, value: value });
+      setResponses([{ label: title, value: value }]);
     }
     onInputChange({ label: title, value: value });
   };
@@ -45,6 +71,12 @@ const InfoGatheringStep = ({
     onComplete(responses);
   };
 
+  /**
+   *
+   * @param {OnboardWizardStep} inputData
+   * @param {number} index
+   * @returns
+   */
   const renderInput = (inputData, index) => {
     switch (inputData.inputType) {
       case "text":
@@ -55,11 +87,7 @@ const InfoGatheringStep = ({
             variant="outlined"
             label={inputData.inputLabel}
             type={inputData.inputType}
-            value={
-              isArrayStep
-                ? responses[index].value || ""
-                : responses?.value || ""
-            }
+            value={(responses && responses[index]?.value) || ""}
             onChange={(e) =>
               handleInputChange(index, e.target.value, inputData.setting)
             }
@@ -71,11 +99,7 @@ const InfoGatheringStep = ({
           <FormControlLabel
             control={
               <Switch
-                checked={
-                  isArrayStep
-                    ? responses[index]?.value || false
-                    : responses?.value || false
-                }
+                checked={(responses && responses[index]?.value) || false}
                 onChange={(e) =>
                   handleInputChange(index, e.target.checked, inputData.setting)
                 }
@@ -89,17 +113,13 @@ const InfoGatheringStep = ({
         return (
           <Select
             fullWidth
-            value={
-              isArrayStep
-                ? responses[index]?.value || ""
-                : responses?.value || ""
-            }
+            value={(responses && responses[index]?.value) || ""}
             onChange={(e) =>
               handleInputChange(index, e.target.value, inputData.setting)
             }
             label={inputData.inputLabel}
           >
-            {inputData.options.map((option) => (
+            {inputData.options?.map((option) => (
               <MenuItem key={option} value={option}>
                 {option}
               </MenuItem>
@@ -110,20 +130,14 @@ const InfoGatheringStep = ({
         return (
           <FilterContainer
             filterContainer={
-              isArrayStep
-                ? responses[index]?.value?.filterContainer || {
-                    filters: [],
-                    filterLogic: "",
-                    name: "",
-                  }
-                : responses?.filterContainer?.value || {
-                    filters: [],
-                    filterLogic: "",
-                    name: "",
-                  }
+              (responses && responses[index]?.value?.filterContainer) || {
+                filters: [],
+                filterLogic: "",
+                name: "",
+              }
             }
             filterFields={filterFields}
-            filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+            filterOperatorMapping={filterOperatorMapping}
             onLogicChange={(newData) =>
               handleInputChange(index, newData, inputData.setting)
             }
@@ -136,7 +150,8 @@ const InfoGatheringStep = ({
   };
 
   const renderArrayStep = () => {
-    return stepData.map((subStep, index) => (
+    const step = Array.isArray(stepData) ? stepData : [stepData];
+    return step.map((subStep, index) => (
       <Box
         key={index}
         mt={2}
@@ -159,34 +174,37 @@ const InfoGatheringStep = ({
   };
 
   const renderSingleStep = () => {
+    const step = Array.isArray(stepData) ? stepData[0] : stepData;
     return (
       <>
         <Typography variant="h6" gutterBottom>
-          {stepData.title}
+          {step.title}
         </Typography>
         <Typography variant="body1" paragraph>
-          {stepData.description}
+          {step.description}
         </Typography>
-        {renderInput(stepData, 0)}
+        {renderInput(step, 0)}
       </>
     );
   };
 
   return (
-    <Box display="flex" flexDirection="column" alignItems="stretch" p={3}>
-      {isArrayStep ? renderArrayStep() : renderSingleStep()}
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleComplete}
-        sx={{ mt: 2, alignSelf: "center" }}
-        disabled={
-          isArrayStep ? responses?.value?.some((r) => !r) : !responses?.value
-        }
-      >
-        Next
-      </Button>
-    </Box>
+    responses && (
+      <Box display="flex" flexDirection="column" alignItems="stretch" p={3}>
+        {isArrayStep ? renderArrayStep() : renderSingleStep()}
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleComplete}
+          sx={{ mt: 2, alignSelf: "center" }}
+          disabled={responses?.some(
+            (r) => !r?.value && r?.label !== "activateByMeeting"
+          )}
+        >
+          Next
+        </Button>
+      </Box>
+    )
   );
 };
 
