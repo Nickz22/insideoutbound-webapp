@@ -77,3 +77,7 @@ def format_error_message(e):
 # string utils
 def surround_numbers_with_underscores(text):
     return re.sub(r"(\d+)", r"_\1_", text)
+
+
+def remove_underscores_from_numbers(text):
+    return re.sub(r"_(\d+)_", r"\1", text)

@@ -8,7 +8,7 @@ from models import (
     SettingsModel,
 )
 from datetime import datetime
-from utils import surround_numbers_with_underscores
+from utils import surround_numbers_with_underscores, remove_underscores_from_numbers
 
 
 def convert_sobjects_to_task_models(tasks):
@@ -53,7 +53,7 @@ def convert_filter_container_model_to_filter_container(fcm: dict) -> FilterConta
     return FilterContainer(
         name=fcm["name"],
         filters=[convert_filter_model_to_filter(f) for f in fcm["filters"]],
-        filter_logic=fcm["filterLogic"],
+        filter_logic=surround_numbers_with_underscores(fcm["filterLogic"]),
     )
 
 
@@ -63,7 +63,7 @@ def convert_filter_container_to_filter_container_model(
     return FilterContainerModel(
         name=fc.name,
         filters=[convert_filter_to_filter_model(f) for f in fc.filters],
-        filterLogic=surround_numbers_with_underscores(fc.filter_logic),
+        filterLogic=remove_underscores_from_numbers(fc.filter_logic),
     )
 
 

@@ -21,7 +21,6 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     )  # Assume load_tokens gets the necessary authentication tokens
 
     if not access_token or not instance_url:
-        api_response.success = False
         api_response.message = SESSION_EXPIRED
         return api_response
 
@@ -48,13 +47,11 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
             api_response.data = criteria_fields
             api_response.success = True
         else:
-            api_response.success = False
-            api_response.message = (
-                f"Failed to fetch field descriptions: {response.text}"
-            )
+            api_response.message = f"Failed to fetch criteria fields ({response.status_code}): {get_http_error_message(response)}"
     except Exception as e:
-        api_response.success = False
-        api_response.message = f"Error fetching field info: {str(e)}"
+        api_response.message = (
+            f"While getting criteria fields {format_error_message(e)}"
+        )
 
     return api_response
 

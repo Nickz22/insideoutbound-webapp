@@ -16,6 +16,7 @@ import {
   MenuItem,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import { useNavigate } from "react-router-dom";
 import {
   fetchEventFilterFields,
   fetchTaskFilterFields,
@@ -24,6 +25,7 @@ import { FILTER_OPERATOR_MAPPING } from "../utils/c";
 import FilterContainer from "../components/FilterContainer/FilterContainer"; // Assuming you have this component
 
 const Settings = () => {
+  const navigate = useNavigate();
   const [settings, setSettings] = useState({
     inactivityThreshold: 0,
     cooloffPeriod: 0,
@@ -48,8 +50,27 @@ const Settings = () => {
         const taskFilterFields = await fetchTaskFilterFields();
         const eventFilterFields = await fetchEventFilterFields();
 
-        setTaskFilterFields(taskFilterFields.data);
-        setEventFilterFields(eventFilterFields.data);
+        switch (taskFilterFields.status) {
+          case 200:
+            break;
+          case 400:
+            if (
+              taskFilterFields.data?.message
+                .toLowerCase()
+                .includes("session expired")
+            ) {
+              navigate("/");
+            } else {
+              console.error(taskFilterFields.data.message);
+            }
+            break;
+          default:
+            console.error(taskFilterFields.data.message);
+            break;
+        }
+
+        setTaskFilterFields(taskFilterFields.data.data);
+        setEventFilterFields(eventFilterFields.data.data);
       } catch (error) {
         console.error("Error fetching filter fields:", error);
       }
@@ -245,9 +266,9 @@ const Settings = () => {
               </Grid>
             </Grid>
             <Box sx={{ mt: 2 }}>
-              {/* 
+              {/*
                * ensure filter value and logic change are saving the criteria
-              */}
+               */}
               <FilterContainer
                 filterContainer={settings.meetingsCriteria}
                 onLogicChange={(newContainer) =>

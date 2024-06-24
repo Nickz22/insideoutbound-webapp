@@ -6,6 +6,10 @@ import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCateg
 import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
 
+/**
+ * @typedef {import('types').Settings} Settings
+ */
+
 import {
   FILTER_OPERATOR_MAPPING,
   PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS,
@@ -52,6 +56,10 @@ const Onboard = () => {
 
   const [tasks, setTasks] = useState(MOCK_TASK_DATA);
 
+  /**
+   * Formats the settings data from the form responses.
+   * @returns {Settings} The formatted settings data.
+   */
   const formatSettingsData = () => {
     return {
       inactivityThreshold: parseInt(
@@ -60,6 +68,7 @@ const Onboard = () => {
       ), // Tracking Period
       cooloffPeriod: parseInt(gatheringResponses["cooloffPeriod"].value, 10), // Cooloff Period
       criteria: filters,
+      meetingObject: gatheringResponses["meetingObject"].value,
       meetingsCriteria: gatheringResponses["meetingsCriteria"].value,
       activitiesPerContact: parseInt(
         gatheringResponses["activitiesPerContact"].value,
@@ -81,8 +90,8 @@ const Onboard = () => {
         const taskFilterFields = await fetchTaskFilterFields();
         const eventFilterFields = await fetchEventFilterFields();
 
-        setTaskFilterFields(taskFilterFields.data);
-        setEventFilterFields(eventFilterFields.data);
+        setTaskFilterFields(taskFilterFields.data.data);
+        setEventFilterFields(eventFilterFields.data.data);
       } catch (error) {
         console.error("Error fetching filter fields:", error);
       }

@@ -57,25 +57,39 @@ def store_code_verifier():
 
 @app.route("/get_task_criteria_fields", methods=["GET"])
 def get_task_criteria_fields():
-    criteria_fields = get_criteria_fields(sobject_type="Task").data
-    criteria_fields = [
-        field for field in criteria_fields if field.name in FILTER_TASK_FIELDS
-    ]
+    response = ApiResponse(data=[], message="", success=False)
+    criteria_fields = get_criteria_fields(sobject_type="Task")
+
+    if not criteria_fields.success:
+        response.message = criteria_fields.message
+    else:
+        response.data = [
+            field for field in criteria_fields.data if field.name in FILTER_TASK_FIELDS
+        ]
+        response.success = True
+
     return (
-        jsonify(criteria_fields),
-        200,
+        jsonify(response.__dict__),
+        get_status_code(response),
     )
 
 
 @app.route("/get_event_criteria_fields", methods=["GET"])
 def get_event_criteria_fields():
-    criteria_fields = get_criteria_fields(sobject_type="Event").data
-    criteria_fields = [
-        field for field in criteria_fields if field.name in FILTER_EVENT_FIELDS
-    ]
+    response = ApiResponse(data=[], message="", success=False)
+    criteria_fields = get_criteria_fields(sobject_type="Event")
+
+    if not criteria_fields.success:
+        response.message = criteria_fields.message
+    else:
+        response.data = [
+            field for field in criteria_fields.data if field.name in FILTER_EVENT_FIELDS
+        ]
+        response.success = True
+
     return (
-        jsonify(criteria_fields),
-        200,
+        jsonify(response.__dict__),
+        get_status_code(response),
     )
 
 
@@ -83,9 +97,11 @@ def get_event_criteria_fields():
 def generate_filters():
     data = request.json
     tasks = data.get("tasks")
+    criteria = {}
     if tasks and len(tasks) > 0:
         criteria = define_criteria_from_tasks(tasks)
-        return jsonify(criteria), 200 if criteria["data"] != "error" else 500
+
+    return jsonify(criteria), 200 if criteria["data"] != "error" else 500
 
 
 @app.route("/oauth/callback")
@@ -143,11 +159,7 @@ def load_prospecting_activities():
     api_response.message = response.message
     api_response.data = response.data
 
-    status_code = (
-        200
-        if api_response.success
-        else 400 if SESSION_EXPIRED in api_response.message else 503
-    )
+    status_code = get_status_code(api_response)
 
     return jsonify(api_response.__dict__), status_code
 
@@ -169,3 +181,10 @@ def get_settings():
 
 if __name__ == "__main__":
     app.run(debug=True, host="localhost", port=8000)  # Updated to run on localhost
+
+
+# helpers
+def get_status_code(response):
+    return (
+        200 if response.success else 400 if SESSION_EXPIRED in response.message else 503
+    )
