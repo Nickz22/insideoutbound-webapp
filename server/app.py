@@ -12,10 +12,13 @@ from cache import (
     load_settings,
     save_settings,
 )
-from constants import MISSING_ACCESS_TOKEN, FILTER_TASK_FIELDS
+from constants import SESSION_EXPIRED, FILTER_TASK_FIELDS, FILTER_EVENT_FIELDS
 from models import ApiResponse, Task
 from utils import add_underscores_to_numbers
-from mapper.mapper import convert_settings_model_to_settings
+from mapper.mapper import (
+    convert_settings_model_to_settings,
+    convert_settings_to_settings_model,
+)
 
 app = Flask(__name__)
 CORS(
@@ -57,6 +60,18 @@ def get_task_criteria_fields():
     criteria_fields = get_criteria_fields(sobject_type="Task").data
     criteria_fields = [
         field for field in criteria_fields if field.name in FILTER_TASK_FIELDS
+    ]
+    return (
+        jsonify(criteria_fields),
+        200,
+    )
+
+
+@app.route("/get_event_criteria_fields", methods=["GET"])
+def get_event_criteria_fields():
+    criteria_fields = get_criteria_fields(sobject_type="Event").data
+    criteria_fields = [
+        field for field in criteria_fields if field.name in FILTER_EVENT_FIELDS
     ]
     return (
         jsonify(criteria_fields),
@@ -130,18 +145,26 @@ def load_prospecting_activities():
 
     status_code = (
         200
-        if response.success
-        else 400 if response.message.lower() == MISSING_ACCESS_TOKEN else 503
+        if api_response.success
+        else 400 if SESSION_EXPIRED in api_response.message else 503
     )
 
     return jsonify(api_response.__dict__), status_code
 
 
 @app.route("/save_settings", methods=["POST"])
-def save_settings_criteria():
+def commit_settings():
     data = request.json
     settings = convert_settings_model_to_settings(data)
+    save_settings(settings)
     return jsonify({"message": "Settings saved successfully"}), 200
+
+
+@app.route("/get_settings", methods=["GET"])
+def get_settings():
+    settings = load_settings()
+    settings_model = convert_settings_to_settings_model(settings)
+    return jsonify(settings_model.__dict__), 200
 
 
 if __name__ == "__main__":

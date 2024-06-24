@@ -5,14 +5,6 @@ from typing import List, Optional, Any
 
 
 @dataclass
-class ProcessResponse:
-    data: List[dict]
-    message: str
-    success: bool
-    metadata: Optional[dict] = None
-
-
-@dataclass
 class ApiResponse:
     data: Any
     message: str
@@ -142,13 +134,13 @@ class Settings:
     cooloff_period: int
     criteria: List[FilterContainer]
     meetings_criteria: FilterContainer
-    skip_account_criteria: FilterContainer
-    skip_opportunity_criteria: FilterContainer
     activities_per_contact: int
     contacts_per_account: int
     tracking_period: int
     activate_by_meeting: bool
     activate_by_opportunity: bool
+    skip_account_criteria: Optional[FilterContainer] = None
+    skip_opportunity_criteria: Optional[FilterContainer] = None
 
 
 @dataclass
@@ -156,6 +148,7 @@ class SettingsModel:
     inactivityThreshold: int
     cooloffPeriod: int
     criteria: List[FilterContainerModel]
+    meetingObject: str
     meetingsCriteria: FilterContainerModel
     skipAccountCriteria: FilterContainerModel
     skipOpportunityCriteria: FilterContainerModel

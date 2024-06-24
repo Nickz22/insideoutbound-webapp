@@ -6,13 +6,15 @@ from server.api.salesforce import (
     fetch_opportunities_by_account_ids_from_date,
     fetch_events_by_account_ids_from_date,
 )
-from server.models import ProcessResponse, Activation, Account
+from server.models import Activation, Account, ApiResponse
 from server.utils import (
     generate_unique_id,
     add_days,
     is_model_created_within_period,
     group_by,
     pluck,
+    format_error_message,
+    dt_to_iso_format,
 )
 from datetime import datetime
 
@@ -55,67 +57,81 @@ def find_unresponsive_activations(activations, settings):
         settings (dict): A dictionary containing settings that define the criteria for considering an activation as unresponsive. This includes the account inactivity threshold and criteria for fetching tasks.
 
     Returns:
-        A collection of activation objects that have been identified as unresponsive based on the lack of recent prospecting activity.
+        ApiResponse: `data` parameter is a collection of activation objects that have been identified as unresponsive based on the lack of recent prospecting activity.
     """
-    first_prospecting_activity = activations[0].first_prospecting_activity
-    activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
+    response = ApiResponse(data=[], message="", success=False)
 
-    today = datetime.now().date()
-    unresponsive_activation_candidates = [
-        activation
-        for activation in activations
-        if add_days(
-            activation.last_prospecting_activity.date(),
-            settings["account_inactivity_threshold"],
-        )
-        < today
-    ]
+    try:
+        first_prospecting_activity = activations[0].first_prospecting_activity
+        activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
 
-    account_ids = pluck(unresponsive_activation_candidates, "account.id")
-    already_counted_task_ids = [
-        task_id
-        for activation in unresponsive_activation_candidates
-        for task_id in activation.task_ids
-    ]
-    criteria_group_tasks_by_account_id = (
-        fetch_tasks_by_account_ids_from_date_not_in_ids(
-            account_ids,
-            first_prospecting_activity,
-            settings["criteria"],
-            already_counted_task_ids,
-        )
-    )
-
-    activations_by_account_id = {
-        activation.account.id: activation
-        for activation in unresponsive_activation_candidates
-    }
-    for account_id in criteria_group_tasks_by_account_id.data:
-        activation = activations_by_account_id.get(account_id)
-        criteria_name_by_task_id = {}
-        all_tasks = []
-
-        for criteria in criteria_group_tasks_by_account_id[account_id]:
-            for task in criteria_group_tasks_by_account_id[account_id][criteria]:
-                criteria_name_by_task_id[task.id] = criteria
-                all_tasks.append(task)
-
-        found_prospecting_activity = False
-        for task in all_tasks:
-            is_task_within_inactivity_threshold = is_model_created_within_period(
-                task,
-                activation.last_prospecting_activity,
-                settings["account_inactivity_threshold"],
+        today = datetime.now().date()
+        unresponsive_activation_candidates = [
+            activation
+            for activation in activations
+            if add_days(
+                activation.last_prospecting_activity.date(),
+                settings["inactivity_threshold"],
             )
-            if is_task_within_inactivity_threshold:
-                found_prospecting_activity = True
-                break
+            < today
+        ]
 
-        if not found_prospecting_activity:
-            activation.status = "Unresponsive"
-            activations_by_account_id[account_id] = activation
+        account_ids = pluck(unresponsive_activation_candidates, "account.id")
+        already_counted_task_ids = [
+            task_id
+            for activation in unresponsive_activation_candidates
+            for task_id in activation.task_ids
+        ]
+        criteria_group_tasks_by_account_id = (
+            fetch_tasks_by_account_ids_from_date_not_in_ids(
+                account_ids,
+                dt_to_iso_format(first_prospecting_activity),
+                settings["criteria"],
+                already_counted_task_ids,
+            )
+        )
 
-    return activations_by_account_id.values()
+        if not criteria_group_tasks_by_account_id.success:
+            response.message = criteria_group_tasks_by_account_id.message
+            return response
+
+        activations_by_account_id = {
+            activation.account.id: activation
+            for activation in unresponsive_activation_candidates
+        }
+        for account_id in criteria_group_tasks_by_account_id.data:
+            activation = activations_by_account_id.get(account_id)
+            criteria_name_by_task_id = {}
+            all_tasks = []
+
+            for criteria in criteria_group_tasks_by_account_id[account_id]:
+                for task in criteria_group_tasks_by_account_id[account_id][criteria]:
+                    criteria_name_by_task_id[task.id] = criteria
+                    all_tasks.append(task)
+
+            found_prospecting_activity = False
+            for task in all_tasks:
+                is_task_within_inactivity_threshold = is_model_created_within_period(
+                    task,
+                    activation.last_prospecting_activity,
+                    settings["account_inactivity_threshold"],
+                )
+                if is_task_within_inactivity_threshold:
+                    found_prospecting_activity = True
+                    break
+
+            if not found_prospecting_activity:
+                activation.status = "Unresponsive"
+                activations_by_account_id[account_id] = activation
+
+        response.data = activations_by_account_id.values()
+        response.success = True
+    except Exception as e:
+        response.message = (
+            "Failed to find unresponsive activations due to an error: {e}"
+        )
+
+    return response
 
 
 # Positive Testing steps:
@@ -156,93 +172,114 @@ def increment_existing_activations(activations, settings):
     - `settings` (dict): A dictionary containing various criteria used to determine how the activation objects should be updated.
 
     Returns:
-    - A collection of updated activation objects.
+    - ApiResponse: `data` param is a collection of updated activation objects.
     """
-    first_prospecting_activity = activations[0].first_prospecting_activity
-    activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
-    account_ids = pluck(activations, "account.id")
-    already_counted_task_ids = [
-        task_id for activation in activations for task_id in activation.task_ids
-    ]
-    criteria_group_tasks_by_account_id = (
-        fetch_tasks_by_account_ids_from_date_not_in_ids(
-            account_ids,
-            first_prospecting_activity,
-            settings["criteria"],
-            already_counted_task_ids,
-        )
-    )
-    opportunities = fetch_opportunities_by_account_ids_from_date(
-        account_ids, first_prospecting_activity
-    )
-    events_by_account_id = fetch_events_by_account_ids_from_date(
-        account_ids, first_prospecting_activity
-    )
-
-    activations_by_account_id = {
-        activation.account.id: activation for activation in activations
-    }
-
-    for account_id in criteria_group_tasks_by_account_id.data:
-        activation = activations_by_account_id.get(account_id)
-        criteria_name_by_task_id = {}
-        all_tasks = []
-
-        for criteria in criteria_group_tasks_by_account_id[account_id]:
-            for task in criteria_group_tasks_by_account_id[account_id][criteria]:
-                criteria_name_by_task_id[task.id] = criteria
-                all_tasks.append(task)
-
-        # opportunity for merge sort implementation
-        all_tasks = sorted(all_tasks, key=lambda x: x.created_date)
-        for task in all_tasks:
-            is_task_within_inactivity_threshold = is_model_created_within_period(
-                task,
-                activation.last_prospecting_activity,
-                settings["account_inactivity_threshold"],
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        first_prospecting_activity = activations[0].first_prospecting_activity
+        activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
+        account_ids = pluck(activations, "account.id")
+        already_counted_task_ids = [
+            task_id for activation in activations for task_id in activation.task_ids
+        ]
+        criteria_group_tasks_by_account_id = (
+            fetch_tasks_by_account_ids_from_date_not_in_ids(
+                account_ids,
+                first_prospecting_activity,
+                settings["criteria"],
+                already_counted_task_ids,
             )
-            if not is_task_within_inactivity_threshold:
-                break
-            activation.task_ids.add(task.id)
-            activation.last_prospecting_activity = task.created_date
-            activation.active_contact_ids.add(task.who_id)
-            activations_by_account_id[account_id] = activation
-            # rollup prospecting metadata via criteria_name_by_task_id
+        )
 
-    opportunities_by_account_id = group_by(opportunities.data, "account_id")
+        if not criteria_group_tasks_by_account_id.success:
+            response.message = criteria_group_tasks_by_account_id.message
+            return response
 
-    for account_id in activations_by_account_id:
-        activation = activations_by_account_id[account_id]
-        opportunities = opportunities_by_account_id.get(account_id, [])
-        events = events_by_account_id.data.get(account_id, [])
+        opportunities = fetch_opportunities_by_account_ids_from_date(
+            account_ids, first_prospecting_activity
+        )
 
-        if events:
-            for event in events:
-                if (
-                    is_model_created_within_period(
-                        event,
+        if not opportunities.success:
+            response.message = opportunities.message
+            return response
+
+        events_by_account_id = fetch_events_by_account_ids_from_date(
+            account_ids, first_prospecting_activity
+        )
+
+        if not events_by_account_id.success:
+            response.message = events_by_account_id.message
+            return response
+
+        activations_by_account_id = {
+            activation.account.id: activation for activation in activations
+        }
+
+        for account_id in criteria_group_tasks_by_account_id.data:
+            activation = activations_by_account_id.get(account_id)
+            criteria_name_by_task_id = {}
+            all_tasks = []
+
+            for criteria in criteria_group_tasks_by_account_id[account_id]:
+                for task in criteria_group_tasks_by_account_id[account_id][criteria]:
+                    criteria_name_by_task_id[task.id] = criteria
+                    all_tasks.append(task)
+
+            # opportunity for merge sort implementation
+            all_tasks = sorted(all_tasks, key=lambda x: x.created_date)
+            for task in all_tasks:
+                is_task_within_inactivity_threshold = is_model_created_within_period(
+                    task,
+                    activation.last_prospecting_activity,
+                    settings["account_inactivity_threshold"],
+                )
+                if not is_task_within_inactivity_threshold:
+                    break
+                activation.task_ids.add(task.id)
+                activation.last_prospecting_activity = task.created_date
+                activation.active_contact_ids.add(task.who_id)
+                activations_by_account_id[account_id] = activation
+                # rollup prospecting metadata via criteria_name_by_task_id
+
+        opportunities_by_account_id = group_by(opportunities.data, "account_id")
+
+        for account_id in activations_by_account_id:
+            activation = activations_by_account_id[account_id]
+            opportunities = opportunities_by_account_id.get(account_id, [])
+            events = events_by_account_id.data.get(account_id, [])
+
+            if events:
+                for event in events:
+                    if (
+                        is_model_created_within_period(
+                            event,
+                            activation.first_prospecting_activity,
+                            settings["account_inactivity_threshold"],
+                        )
+                        and activation.status == "Activated"
+                    ):
+                        activation.status = "Meeting Set"
+                        break
+
+            if opportunities:
+                for opportunity in opportunities:
+                    if is_model_created_within_period(
+                        opportunity,
                         activation.first_prospecting_activity,
                         settings["account_inactivity_threshold"],
-                    )
-                    and activation.status == "Activated"
-                ):
-                    activation.status = "Meeting Set"
-                    break
+                    ) and activation.status in ["Activated", "Meeting Set"]:
+                        activation.opportunity = opportunities[0]
+                        activation.status = "Opportunity Created"
+                        break
 
-        if opportunities:
-            for opportunity in opportunities:
-                if is_model_created_within_period(
-                    opportunity,
-                    activation.first_prospecting_activity,
-                    settings["account_inactivity_threshold"],
-                ) and activation.status in ["Activated", "Meeting Set"]:
-                    activation.opportunity = opportunities[0]
-                    activation.status = "Opportunity Created"
-                    break
+            activations_by_account_id[account_id] = activation
 
-        activations_by_account_id[account_id] = activation
+        response.data = activations_by_account_id.values()
+        response.success = True
+    except Exception as e:
+        response.message = format_error_message(e)
 
-    return activations_by_account_id.values()
+    return response
 
 
 def compute_activated_accounts(tasks_by_criteria, contacts, settings):
@@ -256,16 +293,9 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     - `settings` (dict): A dictionary containing various settings that influence the activation computation. This includes:
 
     Returns:
-    - `ProcessResponse`: An object containing the following attributes:
-
-    Overview of Process:
-    1. Organizes tasks by account and contact based on the input `tasks_by_criteria`.
-    2. Fetches opportunities and events related to these accounts from a specified start date, which is determined by the earliest task date.
-    3. For each account, evaluates all tasks, opportunities, and events to determine if the account meets the activation criteria within the tracking period.
-    4. Accounts that meet the criteria are considered activated, and an `Activation` object is created for each, detailing the activation date, involved contacts, and related tasks, opportunities, and events.
-    5. The function returns a `ProcessResponse` object containing all activations and any relevant messages.
+    - `ApiResponse`: `data` parameter contains all activations and any relevant messages.
     """
-    response = ProcessResponse(data=[], message="", success=True)
+    response = ApiResponse(data=[], message="", success=True)
     activities_per_contact = settings["activities_per_contact"]
     contacts_per_account = settings["contacts_per_account"]
     tracking_period = settings["tracking_period"]

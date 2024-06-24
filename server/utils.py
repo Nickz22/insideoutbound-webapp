@@ -1,14 +1,16 @@
-import uuid
+import uuid, traceback
 from dataclasses import is_dataclass
 from typing import Any, Set
-from datetime import timedelta
+from datetime import timedelta, datetime
 from functools import reduce
 import re
 
+
 # filter utils
 def add_underscores_to_numbers(expression):
-    transformed_expression = re.sub(r'\b(\d+)\b', r'_\1_', expression)
+    transformed_expression = re.sub(r"\b(\d+)\b", r"_\1_", expression)
     return transformed_expression
+
 
 # list utils
 def get_nested_value(item, path):
@@ -60,3 +62,18 @@ def add_days(date, days):
 def is_model_created_within_period(sobject_model, start_date, period_days):
     end_date = start_date + timedelta(days=period_days)
     return start_date <= sobject_model.created_date <= end_date
+
+
+def dt_to_iso_format(dt: datetime):
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+# error utils
+def format_error_message(e):
+    tb_str = traceback.format_exc()
+    return f"{tb_str} [{str(e)}]"
+
+
+# string utils
+def surround_numbers_with_underscores(text):
+    return re.sub(r"(\d+)", r"_\1_", text)

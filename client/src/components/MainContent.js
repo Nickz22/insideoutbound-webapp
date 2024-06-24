@@ -7,7 +7,6 @@ import Forecast from "../pages/Forecast";
 import Analysis from "../pages/Analysis";
 import Settings from "../pages/Settings";
 import Account from "../pages/Account";
-import Onboard from "../pages/Onboard";
 
 const MainContent = () => {
   return (

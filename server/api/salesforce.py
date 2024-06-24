@@ -1,9 +1,9 @@
 import requests, traceback
 from models import ApiResponse, Contact, Account, Task, Opportunity, Event
 from cache import load_tokens
-from constants import MISSING_ACCESS_TOKEN, FILTER_OPERATOR_MAPPING, WHO_ID
+from constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING, WHO_ID
 from datetime import datetime
-from utils import pluck
+from utils import pluck, format_error_message
 from typing import List, Dict
 from models import CriteriaField
 
@@ -22,7 +22,7 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
 
     if not access_token or not instance_url:
         api_response.success = False
-        api_response.message = "Missing access token or instance URL"
+        api_response.message = SESSION_EXPIRED
         return api_response
 
     headers = {
@@ -73,45 +73,51 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     - already_counted_task_ids (list[str]): A list of task IDs that have already been counted.
 
     Returns:
-    - dict: A dictionary where each key is an account ID and each value is another dictionary with
+    - ApiResponse: Response whose `data` is a dictionary where each key is an account ID and each value is another dictionary with
             keys as criteria names and values as lists of tasks fetched from Salesforce.
     """
     api_response = ApiResponse(data=[], message="", success=False)
-    access_token, instance_url = load_tokens()  # Load tokens from file
-
-    if not instance_url or not access_token:
-        api_response.success = False
-        api_response.message = MISSING_ACCESS_TOKEN
-        return api_response
-
-    contacts = fetch_contacts_by_account_ids(account_ids)
-    contact_by_id = {contact.id: contact for contact in contacts.data}
-    contact_ids = pluck(contacts.data, "id")
-
-    criteria_group_tasks_by_account_id = {}
-    additional_filter = f"WhoId IN ('{','.join(contact_ids)}') AND Id NOT IN ('{','.join(already_counted_task_ids)}')"
 
     try:
-        # Fetching contacts that belong to provided account IDs
-        contacts = fetch_contacts_by_account_ids(account_ids)
-        contact_by_id = {contact.id: contact for contact in contacts}
+        access_token, instance_url = load_tokens()  # Load tokens from file
 
-        # Constructing additional filter
-        additional_filter = f"AND WhoId IN ('{','.join(contact_by_id.keys())}')"
+        if not instance_url or not access_token:
+            api_response.message = SESSION_EXPIRED
+            return api_response
+
+        contacts = fetch_contacts_by_account_ids(account_ids)
+
+        if not contacts.success:
+            api_response.message = contacts.message
+            return api_response
+
+        contact_by_id = {contact.id: contact for contact in contacts.data}
+        contact_ids = pluck(contacts.data, "id")
+
+        criteria_group_tasks_by_account_id = {}
+        additional_filter = ""
+        if len(contact_ids) > 0:
+            additional_filter = f"WhoId IN ('{','.join(contact_ids)}')"
+        if len(already_counted_task_ids) > 0:
+            additional_filter += (
+                f"AND Id NOT IN ('{','.join(already_counted_task_ids)}')"
+                if additional_filter
+                else f"Id NOT IN ('{','.join(already_counted_task_ids)}')"
+            )
 
         # Fetch tasks by criteria
-        fetch_response = fetch_contact_tasks_by_criteria_from_date(
+        tasks = fetch_contact_tasks_by_criteria_from_date(
             criteria, start, additional_filter
         )
-        if not fetch_response.success:
-            api_response.message = fetch_response.message
+        if not tasks.success:
+            api_response.message = tasks.message
             return api_response
 
         # Organizing tasks by account and criteria
         criteria_group_tasks_by_account_id = {
             account_id: {} for account_id in account_ids
         }
-        for criteria_name, tasks in fetch_response.data.items():
+        for criteria_name, tasks in tasks.data.items():
             for task in tasks:
                 contact = contact_by_id.get(task.who_id)
                 if contact:
@@ -130,8 +136,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
         api_response.data = criteria_group_tasks_by_account_id
         api_response.success = True
     except Exception as e:
-        api_response.success = False
-        api_response.message = f"Error processing tasks: {str(e)}"
+        api_response.message = format_error_message(e)
 
     return api_response
 
@@ -159,7 +164,7 @@ def fetch_contact_tasks_by_criteria_from_date(
 
     if not instance_url or not access_token:
         api_response.success = False
-        api_response.message = MISSING_ACCESS_TOKEN
+        api_response.message = SESSION_EXPIRED
         return api_response
 
     soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate FROM Task WHERE CreatedDate >= {from_datetime} AND "
@@ -171,10 +176,6 @@ def fetch_contact_tasks_by_criteria_from_date(
         for filter_container in criteria:
             combined_conditions = _construct_where_clause_from_filter(filter_container)
 
-            print(
-                f"{filter_container.name} SOQL Query:",
-                f"{soql_query} {combined_conditions}",
-            )
             fetch_response = _fetch_sobjects(
                 f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC",
                 instance_url,
@@ -182,7 +183,9 @@ def fetch_contact_tasks_by_criteria_from_date(
             )
             if not fetch_response.success:
                 api_response.success = False
-                api_response.message = fetch_response.message
+                api_response.message = (
+                    f"While fetching tasks:  {fetch_response.message}"
+                )
                 return api_response
 
             contact_task_models = []
@@ -204,13 +207,13 @@ def fetch_contact_tasks_by_criteria_from_date(
                 )
 
             tasks_by_filter_name[filter_container.name] = contact_task_models
+
+        api_response.data = tasks_by_filter_name
+        api_response.success = True
     except Exception as e:
         api_response.success = False
-        api_response.message = f"{traceback.format_exc()} [{str(e)}]"
+        api_response.message = format_error_message(e)
         return api_response
-
-    api_response.data = tasks_by_filter_name
-    api_response.success = True
 
     return api_response
 
@@ -231,7 +234,7 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
 
     if not instance_url or not access_token:
         api_response.success = False
-        api_response.message = MISSING_ACCESS_TOKEN
+        api_response.message = SESSION_EXPIRED
         return api_response
 
     contacts = fetch_contacts_by_account_ids(account_ids)
@@ -244,8 +247,7 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
     try:
         fetch_response = _fetch_sobjects(soql_query, instance_url, access_token)
         if not fetch_response.success:
-            api_response.success = False
-            api_response.message = fetch_response.message
+            api_response.message = f"While fetching events: {fetch_response.message}"
             return api_response
 
         for event in fetch_response.data:
@@ -271,8 +273,7 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
         api_response.data = events_by_account_id
         api_response.success = True
     except Exception as e:
-        api_response.success = False
-        api_response.message = f"{traceback.format_exc()} [{str(e)}]"
+        api_response.message = format_error_message(e)
 
     return api_response
 
@@ -292,8 +293,7 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not instance_url or not access_token:
-        api_response.success = False
-        api_response.message = MISSING_ACCESS_TOKEN
+        api_response.message = SESSION_EXPIRED
         return api_response
 
     headers = {
@@ -326,11 +326,9 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
             api_response.success = True
             api_response.message = "Opportunities fetched successfully."
         else:
-            api_response.message = "Failed to fetch opportunities from Salesforce."
-            api_response.success = False
+            api_response.message = f"Failed to fetch opportunities ({response.status_code}): {get_http_error_message(response)}"
     except Exception as e:
-        api_response.message = str(e)
-        api_response.success = False
+        api_response.message = format_error_message(e)
 
     return api_response
 
@@ -349,8 +347,7 @@ def fetch_contacts_by_account_ids(account_ids):
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not instance_url or not access_token:
-        api_response.success = False
-        api_response.message = MISSING_ACCESS_TOKEN
+        api_response.message = SESSION_EXPIRED
         return api_response
 
     headers = {
@@ -384,13 +381,10 @@ def fetch_contacts_by_account_ids(account_ids):
                 )
             api_response.data = contact_models
             api_response.success = True
-            api_response.message = "Contacts fetched successfully."
         else:
-            api_response.message = "Failed to fetch contacts from Salesforce."
-            api_response.success = False
+            api_response.message = f"Failed to fetch contacts ({response.status_code}): {get_http_error_message(response)}"
     except Exception as e:
-        api_response.message = str(e)
-        api_response.success = False
+        api_response.message = format_error_message(e)
 
     return api_response
 
@@ -401,8 +395,8 @@ def fetch_contacts_by_ids(contact_ids):
 
     access_token, instance_url = load_tokens()  # Load tokens from file
     if not instance_url or not access_token:
-        api_response.success = False
-        api_response.message = MISSING_ACCESS_TOKEN
+        api_response.message = SESSION_EXPIRED
+        return api_response
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -436,11 +430,9 @@ def fetch_contacts_by_ids(contact_ids):
             api_response.success = True
             api_response.message = "Contacts fetched successfully."
         else:
-            api_response.message = "Failed to fetch contacts from Salesforce."
-            api_response.success = False
+            api_response.message = f"Failed to fetch contacts from Salesforce ({response.status_code}): {get_http_error_message(response)}"
     except Exception as e:
-        api_response.message = str(e)
-        api_response.success = False
+        api_response.message = format_error_message(e)
 
     return api_response
 
@@ -463,7 +455,7 @@ def _construct_where_clause_from_filter(filter_container):
     }
 
     # Apply filter logic by replacing placeholders with actual conditions
-    combined_conditions = filter_container["filter_logic"]
+    combined_conditions = filter_container.filter_logic
     for index, condition in condition_by_index.items():
         combined_conditions = combined_conditions.replace(f"_{index}_", condition)
 
@@ -486,10 +478,10 @@ def _fetch_sobjects(soql_query, instance_url, access_token):
             return ApiResponse(
                 success=False,
                 data=None,
-                message=f"Error fetching tasks: {response.status_code} {response.text}",
+                message=f"Error fetching SObjects: {response.status_code} {response.text}",
             )
     except Exception as e:
-        return ApiResponse(success=False, data=None, message=str(e))
+        return ApiResponse(success=False, data=None, message=format_error_message(e))
 
 
 def _map_operator(operator, data_type):
@@ -520,3 +512,10 @@ def _parse_date_with_timezone(date_str):
     iso_formatted_str = base_time + fixed_timezone
 
     return datetime.fromisoformat(iso_formatted_str)
+
+
+def get_http_error_message(response):
+    if response.status_code == 401:
+        return f"{SESSION_EXPIRED}"
+    else:
+        return response.json().get("message", "An error occurred")

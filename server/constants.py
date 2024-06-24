@@ -1,4 +1,4 @@
-MISSING_ACCESS_TOKEN = "missing access token"
+SESSION_EXPIRED = "session expired"
 WHO_ID = "who_id"
 FILTER_OPERATOR_MAPPING = {
     "string": {
@@ -113,3 +113,5 @@ FILTER_TASK_FIELDS = [
     "CallDurationInSeconds",
     "TaskSubtype",
 ]
+
+FILTER_EVENT_FIELDS = ["Subject", "EventSubtype"]

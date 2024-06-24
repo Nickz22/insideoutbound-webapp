@@ -6,6 +6,17 @@ import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCateg
 import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
 
+import {
+  FILTER_OPERATOR_MAPPING,
+  PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS,
+  MOCK_TASK_DATA,
+  ONBOARD_WIZARD_STEPS,
+} from "../utils/c";
+import {
+  fetchEventFilterFields,
+  fetchTaskFilterFields,
+} from "../components/Api/Api";
+
 const CategoryFormWithHeader = ({
   tasks,
   onAddCategory,
@@ -33,155 +44,106 @@ const Onboard = () => {
   const [categories, setCategories] = useState(new Map());
   const [filters, setFilters] = useState([]);
   const [taskFilterFields, setTaskFilterFields] = useState();
+  const [eventFilterFields, setEventFilterFields] = useState();
+  const [meetingObject, setMeetingObject] = useState("Task");
   const [gatheringResponses, setGatheringResponses] = useState({});
   const [categoryFormKey, setCategoryFormKey] = useState(0);
   const placeholderIndexRef = useRef(0);
-  const placeholders = [
-    "Outbound Calls",
-    "LinkedIn Messages",
-    "Inbound Calls",
-    "Gifts",
-    "Outbound Emails",
-    "Inbound Emails",
-    "LinkedIn Connections",
-    "Meetings",
-    "Webinars",
-    "Conferences",
-  ];
-  const [tasks, setTasks] = useState([
-    {
-      Id: 1,
-      Subject: "Call John Doe",
-      Who: "John Doe",
-      Priority: "High",
-      Status: "Not Started",
-      Type: "Call",
-      TaskSubtype: "Email",
-    },
-    {
-      Id: 2,
-      Subject: "Email Jane Doe",
-      Who: "Jane Doe",
-      Priority: "High",
-      Status: "Not Started",
-      Type: "Email",
-      TaskSubtype: "Email",
-    },
-    {
-      Id: 3,
-      Subject: "Call John Smith",
-      Who: "John Smith",
-      Priority: "Low",
-      Status: "Not Started",
-      Type: "Call",
-      TaskSubtype: "Call",
-    },
-    {
-      Id: 4,
-      Subject: "Email Jane Smith",
-      Who: "Jane Smith",
-      Priority: "High",
-      Status: "Not Started",
-      Type: "Email",
-      TaskSubtype: "Call",
-    },
-  ]);
 
-  const infoGatheringSteps = [
-    {
-      title: "Tracking Period",
-      description: "How long should an Account be actively pursued?",
-      inputType: "number",
-      inputLabel: "Number of days",
-    },
-    {
-      title: "Cooloff Period",
-      description: "How much time should pass before re-engaging?",
-      inputType: "number",
-      inputLabel: "Number of days",
-    },
-    {
-      title: "Contacts per Account",
-      description:
-        "How many Contacts under a single Account need to be prospected before the Account is considered to be engaged?",
-      inputType: "number",
-      inputLabel: "Number of Contacts",
-    },
-    {
-      title: "Acivities per Contact",
-      description:
-        "How many prospecting activities are needed under a single Contact before it can be considered prospected?",
-      inputType: "number",
-      inputLabel: "Number of Activities",
-    },
-    {
-      title: "Automatically Engage via Meetings",
-      description:
-        "Should an Account be immediately considered as engaged when a meeting is booked with one of its Contacts?",
-      inputType: "boolean",
-      inputLabel: "Automatically Engage via Meetings",
-    },
-    {
-      title: "Automatically Engage via Opportunities",
-      description:
-        "Should an Account be immediately considered as engaged when an Opportunity is created?",
-      inputType: "boolean",
-      inputLabel: "Automatically Engage via Opportunities",
-    },
-  ];
+  const [tasks, setTasks] = useState(MOCK_TASK_DATA);
 
   const formatSettingsData = () => {
     return {
-      inactivityThreshold: parseInt(gatheringResponses[0], 10), // Tracking Period
-      cooloffPeriod: parseInt(gatheringResponses[1], 10),
+      inactivityThreshold: parseInt(
+        gatheringResponses["inactivityThreshold"].value,
+        10
+      ), // Tracking Period
+      cooloffPeriod: parseInt(gatheringResponses["cooloffPeriod"].value, 10), // Cooloff Period
       criteria: filters,
-      meetingsCriteria: {}, // This should be populated if you have specific meetings criteria
-      skipAccountCriteria: {}, // This should be populated if you have specific skip account criteria
-      skipOpportunityCriteria: {}, // This should be populated if you have specific skip opportunity criteria
-      activitiesPerContact: parseInt(gatheringResponses[3], 10),
-      contactsPerAccount: parseInt(gatheringResponses[2], 10),
-      trackingPeriod: parseInt(gatheringResponses[0], 10), // Same as inactivityThreshold
-      activateByMeeting: gatheringResponses[4],
-      activateByOpportunity: gatheringResponses[5],
+      meetingsCriteria: gatheringResponses["meetingsCriteria"].value,
+      activitiesPerContact: parseInt(
+        gatheringResponses["activitiesPerContact"].value,
+        10
+      ),
+      contactsPerAccount: parseInt(
+        gatheringResponses["contactsPerAccount"].value,
+        10
+      ),
+      trackingPeriod: parseInt(gatheringResponses["trackingPeriod"].value, 10),
+      activateByMeeting: gatheringResponses["activateByMeeting"].value,
+      activateByOpportunity: gatheringResponses["activateByOpportunity"].value,
     };
   };
 
   useEffect(() => {
-    const fetchAndSetTaskFilterFields = async () => {
-      const taskFilterFields = await axios.get(
-        "http://localhost:8000/get_task_criteria_fields",
-        {
-          validateStatus: () => true,
-        }
-      );
-      setTaskFilterFields(taskFilterFields.data);
-    };
-    fetchAndSetTaskFilterFields();
-  }, []);
+    const fetchAndSetFilterFields = async () => {
+      try {
+        const taskFilterFields = await fetchTaskFilterFields();
+        const eventFilterFields = await fetchEventFilterFields();
 
-  const handleInfoGatheringComplete = (response) => {
-    setGatheringResponses((prev) => ({
-      ...prev,
-      [step - 1]: response,
-    }));
-    handleNext();
-  };
+        setTaskFilterFields(taskFilterFields.data);
+        setEventFilterFields(eventFilterFields.data);
+      } catch (error) {
+        console.error("Error fetching filter fields:", error);
+      }
+    };
+
+    fetchAndSetFilterFields();
+  }, []);
 
   const handleNext = () => {
     setStep(step + 1);
   };
 
+  const handleInfoGatheringInputChange = (info) => {
+    if (
+      info.label?.toLowerCase() === "meetings" &&
+      info.value?.toLowerCase() === "event"
+    ) {
+      setMeetingObject("Event");
+    } else if (
+      info.label?.toLowerCase() === "meetings" &&
+      info.value?.toLowerCase() === "task"
+    ) {
+      setMeetingObject("Task");
+    }
+  };
+
+  const handleInfoGatheringComplete = (response) => {
+    setGatheringResponses((prev) => {
+      const newResponses = { ...prev };
+      if (Array.isArray(response) && response[0].label === "meetingObject") {
+        // Handle the case where we have multiple responses
+        response.forEach((res) => {
+          newResponses[res.label] = { value: res.value };
+        });
+      } else {
+        // Handle the case where we just have a simple value
+        newResponses[response.label] = { value: response.value };
+      }
+      return newResponses;
+    });
+    handleNext();
+  };
+
   const renderStep = () => {
-    if (step <= infoGatheringSteps.length) {
+    if (step <= ONBOARD_WIZARD_STEPS.length) {
       return (
         <InfoGatheringStep
           key={step}
-          stepData={infoGatheringSteps[step - 1]}
+          stepData={ONBOARD_WIZARD_STEPS[step - 1]}
+          onInputChange={handleInfoGatheringInputChange}
           onComplete={handleInfoGatheringComplete}
           stepIndex={step - 1}
+          filterFields={
+            meetingObject.toLowerCase() === "task"
+              ? taskFilterFields
+              : eventFilterFields
+          }
+          FILTER_OPERATOR_MAPPING={FILTER_OPERATOR_MAPPING}
         />
       );
-    } else if (step === infoGatheringSteps.length + 1) {
+    } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
       return (
         <CategoryFormWithHeader
           key={categoryFormKey}
@@ -191,7 +153,7 @@ const Onboard = () => {
           placeholder={`Example: ${getPlaceholder()}`}
         />
       );
-    } else if (step === infoGatheringSteps.length + 2) {
+    } else if (step === ONBOARD_WIZARD_STEPS.length + 2) {
       return (
         <CategoryOverview
           proposedFilterContainers={filters}
@@ -205,7 +167,7 @@ const Onboard = () => {
   };
 
   const isLargeDialogStep = () => {
-    return step > infoGatheringSteps.length;
+    return step > ONBOARD_WIZARD_STEPS.length;
   };
 
   const handleClose = () => {
@@ -235,9 +197,13 @@ const Onboard = () => {
   };
 
   const getPlaceholder = () => {
-    const placeholder = placeholders[placeholderIndexRef.current];
+    const placeholder =
+      PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS[
+        placeholderIndexRef.current
+      ];
     placeholderIndexRef.current =
-      (placeholderIndexRef.current + 1) % placeholders.length;
+      (placeholderIndexRef.current + 1) %
+      PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS.length;
     return placeholder;
   };
 
@@ -278,7 +244,7 @@ const Onboard = () => {
         "http://localhost:8000/save_settings",
         formattedSettings
       );
-      navigate("/app");
+      navigate("/app/settings");
     } catch (error) {
       console.error("Error saving settings:", error);
     }

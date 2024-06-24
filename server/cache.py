@@ -6,6 +6,7 @@ from models import (
     ProspectingMetadata,
     Activation,
     Opportunity,
+    ApiResponse,
 )
 from datetime import datetime
 
@@ -147,54 +148,65 @@ def deserialize_opportunity(data):
 
 
 def load_active_activations_order_by_first_prospecting_activity_asc():
-    file_path = ACTIVATIONS_FILE
-    with open(file_path, "r") as file:
-        data = json.load(file)
-        activations = []
-        for entry in data:
-            if entry.get("status") == "Unresponsive":
-                continue
+    response = ApiResponse(data=[], message="", success=False)
+    try:
 
-            account = deserialize_account(entry["account"])
-            prospecting_metadata = deserialize_prospecting_metadata(
-                entry.get("prospecting_metadata", [])
-            )
-            opportunity = deserialize_opportunity(entry.get("opportunity"))
-            activation = Activation(
-                id=entry["id"],
-                account=account,
-                activated_date=datetime.fromisoformat(entry["activated_date"]),
-                active_contact_ids=entry["active_contact_ids"],
-                prospecting_metadata=prospecting_metadata,
-                days_activated=entry.get("days_activated"),
-                days_engaged=entry.get("days_engaged"),
-                engaged_date=(
-                    datetime.fromisoformat(entry["engaged_date"])
-                    if entry.get("engaged_date")
-                    else None
-                ),
-                last_outbound_engagement=(
-                    datetime.fromisoformat(entry["last_outbound_engagement"])
-                    if entry.get("last_outbound_engagement")
-                    else None
-                ),
-                first_prospecting_activity=(
-                    datetime.fromisoformat(entry["first_prospecting_activity"])
-                    if "first_prospecting_activity" in entry
-                    else None
-                ),
-                last_prospecting_activity=datetime.fromisoformat(
-                    entry["last_prospecting_activity"]
-                ),
-                task_ids=(entry["task_ids"] if "task_ids" in entry else None),
-                event_ids=(entry.get("event_ids") if "event_ids" in entry else None),
-                opportunity=(
-                    entry.get("opportunity") if "opportunity" in entry else None
-                ),
-                status=entry.get("status", "Activated"),
-            )
-            activations.append(activation)
+        file_path = ACTIVATIONS_FILE
+        with open(file_path, "r") as file:
+            data = json.load(file)
+            activations = []
+            for entry in data:
+                if entry.get("status") == "Unresponsive":
+                    continue
 
-        # Order activations by first_prospecting_activity ascending
-        activations.sort(key=lambda x: x.first_prospecting_activity)
-        return activations
+                account = deserialize_account(entry["account"])
+                prospecting_metadata = deserialize_prospecting_metadata(
+                    entry.get("prospecting_metadata", [])
+                )
+                opportunity = deserialize_opportunity(entry.get("opportunity"))
+                activation = Activation(
+                    id=entry["id"],
+                    account=account,
+                    activated_date=datetime.fromisoformat(entry["activated_date"]),
+                    active_contact_ids=entry["active_contact_ids"],
+                    prospecting_metadata=prospecting_metadata,
+                    days_activated=entry.get("days_activated"),
+                    days_engaged=entry.get("days_engaged"),
+                    engaged_date=(
+                        datetime.fromisoformat(entry["engaged_date"])
+                        if entry.get("engaged_date")
+                        else None
+                    ),
+                    last_outbound_engagement=(
+                        datetime.fromisoformat(entry["last_outbound_engagement"])
+                        if entry.get("last_outbound_engagement")
+                        else None
+                    ),
+                    first_prospecting_activity=(
+                        datetime.fromisoformat(entry["first_prospecting_activity"])
+                        if "first_prospecting_activity" in entry
+                        else None
+                    ),
+                    last_prospecting_activity=datetime.fromisoformat(
+                        entry["last_prospecting_activity"]
+                    ),
+                    task_ids=(entry["task_ids"] if "task_ids" in entry else None),
+                    event_ids=(
+                        entry.get("event_ids") if "event_ids" in entry else None
+                    ),
+                    opportunity=(
+                        entry.get("opportunity") if "opportunity" in entry else None
+                    ),
+                    status=entry.get("status", "Activated"),
+                )
+                activations.append(activation)
+
+            # Order activations by first_prospecting_activity ascending
+            activations.sort(key=lambda x: x.first_prospecting_activity)
+            response.data = activations
+            response.success = True
+
+    except Exception as e:
+        response.message = "Failed to load active activations"
+        response.success = False
+    return response

@@ -1,6 +1,6 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-import { Container, Box } from "@mui/material";
+import { Box } from "@mui/material";
 import Sidebar from "./components/Sidebar/Sidebar";
 import MainContent from "./components/MainContent";
 import Login from "./pages/Login";
@@ -16,12 +16,10 @@ function App() {
         <Route
           path="/app/*"
           element={
-            <Container maxWidth="lg">
-              <Box display="flex">
-                <Sidebar />
-                <MainContent />
-              </Box>
-            </Container>
+            <Box display="flex">
+              <Sidebar />
+              <MainContent />
+            </Box>
           }
         />
       </Routes>

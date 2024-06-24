@@ -6,52 +6,63 @@ import {
   Button,
   Switch,
   FormControlLabel,
+  Select,
+  MenuItem,
 } from "@mui/material";
+import FilterContainer from "../FilterContainer/FilterContainer";
 
-const InfoGatheringStep = ({ stepData, onComplete, stepIndex }) => {
-  const [inputValue, setInputValue] = useState(() => {
-    switch (stepData.inputType) {
-      case "boolean":
-        return false;
-      case "number":
-        return ""; // Changed to empty string
-      default:
-        return "";
-    }
-  });
+const InfoGatheringStep = ({
+  stepData,
+  onComplete,
+  onInputChange,
+  stepIndex,
+  filterFields,
+  FILTER_OPERATOR_MAPPING,
+}) => {
+  const isArrayStep = Array.isArray(stepData);
+  const [responses, setResponses] = useState(
+    isArrayStep ? new Array(stepData.length).fill(null) : null
+  );
 
   useEffect(() => {
-    // Reset input value when stepIndex changes
-    setInputValue(() => {
-      switch (stepData.inputType) {
-        case "boolean":
-          return false;
-        case "number":
-          return ""; // Changed to empty string
-        default:
-          return "";
-      }
-    });
-  }, [stepIndex, stepData.inputType]);
+    setResponses(isArrayStep ? new Array(stepData.length).fill(null) : null);
+  }, [stepIndex, isArrayStep]);
 
-  const handleComplete = () => {
-    // For number inputs, convert empty string to null or undefined
-    const valueToSubmit =
-      stepData.inputType === "number" && inputValue === "" ? null : inputValue;
-    onComplete(valueToSubmit);
-    // Reset is handled by useEffect when stepIndex changes
+  const handleInputChange = (index, value, title) => {
+    if (isArrayStep) {
+      setResponses((prev) => {
+        const newResponses = [...prev];
+        newResponses[index] = { label: title, value: value };
+        return newResponses;
+      });
+    } else {
+      setResponses({ label: title, value: value });
+    }
+    onInputChange({ label: title, value: value });
   };
 
-  const renderInput = () => {
-    switch (stepData.inputType) {
+  const handleComplete = () => {
+    onComplete(responses);
+  };
+
+  const renderInput = (inputData, index) => {
+    switch (inputData.inputType) {
       case "text":
+      case "number":
         return (
           <TextField
             fullWidth
             variant="outlined"
-            label={stepData.inputLabel}
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            label={inputData.inputLabel}
+            type={inputData.inputType}
+            value={
+              isArrayStep
+                ? responses[index].value || ""
+                : responses?.value || ""
+            }
+            onChange={(e) =>
+              handleInputChange(index, e.target.value, inputData.setting)
+            }
             margin="normal"
           />
         );
@@ -60,24 +71,63 @@ const InfoGatheringStep = ({ stepData, onComplete, stepIndex }) => {
           <FormControlLabel
             control={
               <Switch
-                checked={inputValue}
-                onChange={(e) => setInputValue(e.target.checked)}
+                checked={
+                  isArrayStep
+                    ? responses[index]?.value || false
+                    : responses?.value || false
+                }
+                onChange={(e) =>
+                  handleInputChange(index, e.target.checked, inputData.setting)
+                }
                 color="primary"
               />
             }
-            label={stepData.inputLabel}
+            label={inputData.inputLabel}
           />
         );
-      case "number":
+      case "picklist":
         return (
-          <TextField
+          <Select
             fullWidth
-            variant="outlined"
-            label={stepData.inputLabel}
-            type="number"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)} // Changed to directly use string value
-            margin="normal"
+            value={
+              isArrayStep
+                ? responses[index]?.value || ""
+                : responses?.value || ""
+            }
+            onChange={(e) =>
+              handleInputChange(index, e.target.value, inputData.setting)
+            }
+            label={inputData.inputLabel}
+          >
+            {inputData.options.map((option) => (
+              <MenuItem key={option} value={option}>
+                {option}
+              </MenuItem>
+            ))}
+          </Select>
+        );
+      case "filterContainer":
+        return (
+          <FilterContainer
+            filterContainer={
+              isArrayStep
+                ? responses[index]?.value?.filterContainer || {
+                    filters: [],
+                    filterLogic: "",
+                    name: "",
+                  }
+                : responses?.filterContainer?.value || {
+                    filters: [],
+                    filterLogic: "",
+                    name: "",
+                  }
+            }
+            filterFields={filterFields}
+            filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+            onLogicChange={(newData) =>
+              handleInputChange(index, newData, inputData.setting)
+            }
+            hasNameField={false}
           />
         );
       default:
@@ -85,20 +135,54 @@ const InfoGatheringStep = ({ stepData, onComplete, stepIndex }) => {
     }
   };
 
+  const renderArrayStep = () => {
+    return stepData.map((subStep, index) => (
+      <Box
+        key={index}
+        mt={2}
+        style={{
+          display:
+            index === 0 || responses[index - 1]?.value !== null
+              ? "block"
+              : "none",
+        }}
+      >
+        <Typography variant="subtitle1" gutterBottom>
+          {subStep.title}
+        </Typography>
+        <Typography variant="body2" paragraph>
+          {subStep.description}
+        </Typography>
+        {renderInput(subStep, index)}
+      </Box>
+    ));
+  };
+
+  const renderSingleStep = () => {
+    return (
+      <>
+        <Typography variant="h6" gutterBottom>
+          {stepData.title}
+        </Typography>
+        <Typography variant="body1" paragraph>
+          {stepData.description}
+        </Typography>
+        {renderInput(stepData, 0)}
+      </>
+    );
+  };
+
   return (
-    <Box display="flex" flexDirection="column" alignItems="center" p={3}>
-      <Typography variant="h6" gutterBottom>
-        {stepData.title}
-      </Typography>
-      <Typography variant="body1" paragraph>
-        {stepData.description}
-      </Typography>
-      {renderInput()}
+    <Box display="flex" flexDirection="column" alignItems="stretch" p={3}>
+      {isArrayStep ? renderArrayStep() : renderSingleStep()}
       <Button
         variant="contained"
         color="primary"
         onClick={handleComplete}
-        sx={{ mt: 2 }}
+        sx={{ mt: 2, alignSelf: "center" }}
+        disabled={
+          isArrayStep ? responses?.value?.some((r) => !r) : !responses?.value
+        }
       >
         Next
       </Button>

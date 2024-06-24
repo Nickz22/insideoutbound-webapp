@@ -40,7 +40,9 @@ const Prospecting = () => {
           console.log(response.data);
           break;
         case 400:
-          if (response.data?.message === "missing access token") {
+          if (
+            response.data?.message.toLowerCase().includes("session expired")
+          ) {
             navigate("/");
           } else {
             setError(response.data.message);

@@ -8,6 +8,7 @@ from models import (
     SettingsModel,
 )
 from datetime import datetime
+from utils import surround_numbers_with_underscores
 
 
 def convert_sobjects_to_task_models(tasks):
@@ -36,6 +37,15 @@ def convert_filter_model_to_filter(fm: dict) -> Filter:
     )
 
 
+def convert_filter_to_filter_model(f: dict) -> FilterModel:
+    return FilterModel(
+        field=f.field,
+        operator=f.operator,
+        value=f.value,
+        dataType=f.data_type,
+    )
+
+
 def convert_filter_container_model_to_filter_container(fcm: dict) -> FilterContainer:
     if fcm is None or (isinstance(fcm, dict) and not fcm):
         return FilterContainer(name="", filters=[], filter_logic="")
@@ -44,6 +54,16 @@ def convert_filter_container_model_to_filter_container(fcm: dict) -> FilterConta
         name=fcm["name"],
         filters=[convert_filter_model_to_filter(f) for f in fcm["filters"]],
         filter_logic=fcm["filterLogic"],
+    )
+
+
+def convert_filter_container_to_filter_container_model(
+    fc: dict,
+) -> FilterContainerModel:
+    return FilterContainerModel(
+        name=fc.name,
+        filters=[convert_filter_to_filter_model(f) for f in fc.filters],
+        filterLogic=surround_numbers_with_underscores(fc.filter_logic),
     )
 
 
@@ -64,12 +84,6 @@ def convert_settings_model_to_settings(sm: dict) -> Settings:
         meetings_criteria=convert_filter_container_model_to_filter_container(
             sm["meetingsCriteria"]
         ),
-        skip_account_criteria=convert_filter_container_model_to_filter_container(
-            sm["skipAccountCriteria"]
-        ),
-        skip_opportunity_criteria=convert_filter_container_model_to_filter_container(
-            sm["skipOpportunityCriteria"]
-        ),
         activities_per_contact=(
             sm["activitiesPerContact"] if "activitiesPerContact" in sm else 0
         ),
@@ -79,4 +93,38 @@ def convert_settings_model_to_settings(sm: dict) -> Settings:
         tracking_period=sm["trackingPeriod"] if "trackingPeriod" in sm else 0,
         activate_by_meeting=sm["activateByMeeting"],
         activate_by_opportunity=sm["activateByOpportunity"],
+    )
+
+
+def convert_settings_to_settings_model(settings: Settings) -> SettingsModel:
+    return SettingsModel(
+        inactivityThreshold=settings["inactivity_threshold"],
+        cooloffPeriod=settings["cooloff_period"],
+        criteria=[
+            convert_filter_container_to_filter_container_model(fc)
+            for fc in settings["criteria"]
+        ],
+        meetingObject="Task",
+        meetingsCriteria=convert_filter_container_to_filter_container_model(
+            settings["meetings_criteria"]
+        ),
+        skipAccountCriteria=(
+            convert_filter_container_to_filter_container_model(
+                settings["skip_account_criteria"]
+            )
+            if settings["skip_account_criteria"]
+            else FilterContainerModel(name="", filters=[], filterLogic="")
+        ),
+        skipOpportunityCriteria=(
+            convert_filter_container_to_filter_container_model(
+                settings["skip_opportunity_criteria"]
+            )
+            if settings["skip_opportunity_criteria"]
+            else FilterContainerModel(name="", filters=[], filterLogic="")
+        ),
+        activitiesPerContact=settings["activities_per_contact"],
+        contactsPerAccount=settings["contacts_per_account"],
+        trackingPeriod=settings["tracking_period"],
+        activateByMeeting=settings["activate_by_meeting"],
+        activateByOpportunity=settings["activate_by_opportunity"],
     )
