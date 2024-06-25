@@ -116,6 +116,9 @@ const Settings = () => {
       <Box sx={{ width: "100%", mt: 2 }}>
         <Card sx={{ mb: 2 }}>
           <CardContent sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom marginBottom={2}>
+              General Settings
+            </Typography>
             <Grid container spacing={2}>
               <Grid item xs={12} sm={6} md={4}>
                 <TextField
@@ -178,6 +181,8 @@ const Settings = () => {
                   }
                 />
               </Grid>
+            </Grid>
+            <Grid container spacing={2} marginTop={2}>
               <Grid item xs={12} sm={6} md={4}>
                 <FormControlLabel
                   control={

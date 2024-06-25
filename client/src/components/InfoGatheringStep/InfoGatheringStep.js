@@ -16,6 +16,8 @@ import FilterContainer from "../FilterContainer/FilterContainer";
  * @typedef {import('types').CriteriaField} CriteriaField
  */
 
+const nextValidityWhitelist = ["activateByMeeting", "activateByOpportunity"];
+
 /**
  *
  * @param {{stepData: OnboardWizardStep | OnboardWizardStep[], onComplete: function, onInputChange: function, stepIndex: number, filterFields: CriteriaField[], filterOperatorMapping: { [key: string]: {[key:string]: string} }}} props
@@ -198,7 +200,7 @@ const InfoGatheringStep = ({
           onClick={handleComplete}
           sx={{ mt: 2, alignSelf: "center" }}
           disabled={responses?.some(
-            (r) => !r?.value && r?.label !== "activateByMeeting"
+            (r) => !r?.value && !nextValidityWhitelist.includes(r?.label)
           )}
         >
           Next

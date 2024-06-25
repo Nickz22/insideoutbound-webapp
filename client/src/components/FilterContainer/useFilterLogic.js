@@ -51,13 +51,11 @@ export const useFilterLogic = (initialFilterContainer, filterFields) => {
   const handleLogicChange = useCallback(
     (value, onLogicChange) => {
       const error = validateFilterLogic(filterContainer.filters, value);
-      setFilterContainer((prevContainer) => ({
-        ...prevContainer,
-        filterLogic: value,
-      }));
+      const newFilterContainer = { ...filterContainer, filterLogic: value };
+      setFilterContainer((prevContainer) => newFilterContainer);
       setLogicErrors({ 0: error });
       if (!error && onLogicChange) {
-        onLogicChange(filterContainer);
+        onLogicChange(newFilterContainer);
       }
     },
     [filterContainer.filters]
