@@ -1,3 +1,4 @@
+import json
 from models import (
     Task,
     Settings,
@@ -127,4 +128,21 @@ def convert_settings_to_settings_model(settings: Settings) -> SettingsModel:
         trackingPeriod=settings["tracking_period"],
         activateByMeeting=settings["activate_by_meeting"],
         activateByOpportunity=settings["activate_by_opportunity"],
+    )
+
+
+def convert_settings_table_row_to_settings(data) -> Settings:
+    return Settings(
+        inactivity_threshold=data.get("inactivity_threshold"),
+        cooloff_period=data.get("cooloff_period"),
+        criteria=data.get("criteria"),
+        meetings_criteria=data.get("meetings_criteria"),
+        activities_per_contact=data.get("activities_per_contact"),
+        contacts_per_account=data.get("contacts_per_account"),
+        latest_date_queried=data.get("latest_date_queried"),
+        tracking_period=data.get("tracking_period"),
+        activate_by_meeting=data.get("activate_by_meeting"),
+        activate_by_opportunity=bool(data.get("activate_by_opportunity", False)),
+        skip_account_criteria=data.get("skip_account_criteria"),
+        skip_opportunity_criteria=data.get("skip_opportunity_criteria"),
     )

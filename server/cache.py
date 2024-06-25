@@ -8,6 +8,7 @@ from models import (
     Opportunity,
     ApiResponse,
 )
+from mapper.mapper import convert_settings_table_row_to_settings
 from datetime import datetime
 
 CODE_VERIFIER_FILE = "code_verifier.json"
@@ -61,6 +62,7 @@ def load_settings():
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, "r") as file:
             settings = json.load(file, object_hook=custom_decoder)
+            settings = convert_settings_table_row_to_settings(settings)
             return settings
     return None
 
@@ -163,7 +165,7 @@ def load_active_activations_order_by_first_prospecting_activity_asc():
                 prospecting_metadata = deserialize_prospecting_metadata(
                     entry.get("prospecting_metadata", [])
                 )
-                opportunity = deserialize_opportunity(entry.get("opportunity"))
+                
                 activation = Activation(
                     id=entry["id"],
                     account=account,

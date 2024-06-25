@@ -1,11 +1,11 @@
 import requests, traceback
 from models import ApiResponse, Contact, Account, Task, Opportunity, Event
 from cache import load_tokens
-from constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING, WHO_ID
+from constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 from datetime import datetime
 from utils import pluck, format_error_message
 from typing import List, Dict
-from models import CriteriaField
+from models import CriteriaField, Task
 
 
 def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
@@ -95,27 +95,27 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
         additional_filter = ""
         if len(contact_ids) > 0:
             additional_filter = f"WhoId IN ('{','.join(contact_ids)}')"
-        if len(already_counted_task_ids) > 0:
-            additional_filter += (
-                f"AND Id NOT IN ('{','.join(already_counted_task_ids)}')"
-                if additional_filter
-                else f"Id NOT IN ('{','.join(already_counted_task_ids)}')"
-            )
 
         # Fetch tasks by criteria
-        tasks = fetch_contact_tasks_by_criteria_from_date(
+        tasks_by_criteria_name = fetch_contact_tasks_by_criteria_from_date(
             criteria, start, additional_filter
         )
-        if not tasks.success:
-            api_response.message = tasks.message
+
+        if not tasks_by_criteria_name.success:
+            api_response.message = tasks_by_criteria_name.message
             return api_response
 
-        # Organizing tasks by account and criteria
+        # Organizing tasks_by_criteria_name by account and criteria
         criteria_group_tasks_by_account_id = {
             account_id: {} for account_id in account_ids
         }
-        for criteria_name, tasks in tasks.data.items():
+
+        for criteria_name, tasks in tasks_by_criteria_name.data.items():
+            # remove tasks_by_criteria_name that have already been counted
+            ## we can't filter the query because the query string has max 4k length
             for task in tasks:
+                if task.id in already_counted_task_ids:
+                    continue
                 contact = contact_by_id.get(task.who_id)
                 if contact:
                     account_id = contact.account_id
@@ -140,7 +140,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
 
 def fetch_contact_tasks_by_criteria_from_date(
     criteria, from_datetime, additional_filter=None
-):
+) -> Dict[str, List[Task]]:
     """
     Fetches tasks from Salesforce based on a list of filtering criteria.
 
@@ -152,9 +152,7 @@ def fetch_contact_tasks_by_criteria_from_date(
     - additional_filter (string): An optional additional filter to apply to the SOQL query.
 
     Returns:
-    - dict: A dictionary where each key is the name of a filter (as specified in the FilterContainer) and each value
-      is the list of tasks fetched from Salesforce that match the filter criteria. The tasks are represented as
-      dictionaries with keys corresponding to the fields selected in the SOQL query.
+    - dict: A dictionary where each key is the name of a filter container and each value is a list of Task objects fetched from Salesforce.
     """
     api_response = ApiResponse(data=[], message="", success=False)
     access_token, instance_url = load_tokens()  # Load tokens from file
@@ -427,7 +425,9 @@ def fetch_contacts_by_ids(contact_ids):
             api_response.success = True
             api_response.message = "Contacts fetched successfully."
         else:
-            api_response.message = f"Failed to fetch contacts from Salesforce ({response.status_code}): {get_http_error_message(response)}"
+            raise Exception(
+                f"Failed to fetch contacts from Salesforce ({response.status_code}): {get_http_error_message(response)}"
+            )
     except Exception as e:
         api_response.message = format_error_message(e)
 
@@ -515,4 +515,4 @@ def get_http_error_message(response):
     if response.status_code == 401:
         return f"{SESSION_EXPIRED}"
     else:
-        return response.json().get("message", "An error occurred")
+        return response.json()[0].get("message", "An error occurred")

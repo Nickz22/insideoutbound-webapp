@@ -1,4 +1,5 @@
 import os, sys
+from models import Settings
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from server.api.salesforce import (
@@ -24,7 +25,7 @@ from datetime import datetime
 #     3. Assert activations are returned with Unresponsive status
 
 # Negative Testing steps:
-#     1. Mock activations with a last_prospecting_activity of settings["account_inactivity_threshold"] - 1 days ago.
+#     1. Mock activations with a last_prospecting_activity of       ["account_inactivity_threshold"] - 1 days ago.
 #     2. Mock api return results to return 0 tasks
 #     3. Assert activations are returned with Activated status
 
@@ -40,7 +41,7 @@ from datetime import datetime
 #    2. Mock api return results to return 0 tasks
 #    3. Mock api return results to return 1 event
 #    4. Assert activations are returned with Meeting Set status
-def find_unresponsive_activations(activations, settings):
+def find_unresponsive_activations(activations, settings: Settings):
     """
     This function processes a list of activation objects and a settings dictionary to determine which activations are unresponsive.
     An activation is considered unresponsive if it has not had any prospecting activity within a specified threshold period.
@@ -71,7 +72,7 @@ def find_unresponsive_activations(activations, settings):
             for activation in activations
             if add_days(
                 activation.last_prospecting_activity.date(),
-                settings["inactivity_threshold"],
+                settings.inactivity_threshold,
             )
             < today
         ]
@@ -86,7 +87,7 @@ def find_unresponsive_activations(activations, settings):
             fetch_tasks_by_account_ids_from_date_not_in_ids(
                 account_ids,
                 dt_to_iso_format(first_prospecting_activity),
-                settings["criteria"],
+                settings.criteria,
                 already_counted_task_ids,
             )
         )
@@ -104,8 +105,10 @@ def find_unresponsive_activations(activations, settings):
             criteria_name_by_task_id = {}
             all_tasks = []
 
-            for criteria in criteria_group_tasks_by_account_id[account_id]:
-                for task in criteria_group_tasks_by_account_id[account_id][criteria]:
+            for criteria in criteria_group_tasks_by_account_id.data[account_id]:
+                for task in criteria_group_tasks_by_account_id.data[account_id][
+                    criteria
+                ]:
                     criteria_name_by_task_id[task.id] = criteria
                     all_tasks.append(task)
 
@@ -127,9 +130,7 @@ def find_unresponsive_activations(activations, settings):
         response.data = activations_by_account_id.values()
         response.success = True
     except Exception as e:
-        response.message = (
-            "Failed to find unresponsive activations due to an error: {e}"
-        )
+        response.message = f"Failed to find unresponsive activations due to an error: {format_error_message(e)}"
 
     return response
 
@@ -296,10 +297,10 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     - `ApiResponse`: `data` parameter contains all activations and any relevant messages.
     """
     response = ApiResponse(data=[], message="", success=True)
-    activities_per_contact = settings["activities_per_contact"]
-    contacts_per_account = settings["contacts_per_account"]
-    tracking_period = settings["tracking_period"]
-    cooloff_period = settings["cooloff_period"]
+    activities_per_contact = settings.activities_per_contact
+    contacts_per_account = settings.contacts_per_account
+    tracking_period = settings.tracking_period
+    cooloff_period = settings.cooloff_period
 
     tasks_by_account = {}
     contact_by_id = {contact.id: contact for contact in contacts}

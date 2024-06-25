@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List
-from datetime import date
+from datetime import date,datetime
 from typing import List, Optional, Any
 
 
@@ -149,6 +149,7 @@ class Settings:
     tracking_period: int
     activate_by_meeting: bool
     activate_by_opportunity: bool
+    latest_date_queried: Optional[datetime] = None
     skip_account_criteria: Optional[FilterContainer] = None
     skip_opportunity_criteria: Optional[FilterContainer] = None
 

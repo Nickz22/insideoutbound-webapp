@@ -43,12 +43,6 @@ const Sidebar = () => {
       <List>
         <CustomNavLink to="/app/prospecting" label="Prospecting" />
         <Divider />
-        <CustomNavLink to="/app/performance" label="Performance" />
-        <Divider />
-        <CustomNavLink to="/app/forecast" label="Forecast" />
-        <Divider />
-        <CustomNavLink to="/app/analysis" label="Analysis" />
-        <Divider />
         <CustomNavLink to="/app/settings" label="Settings" />
         <Divider />
         <CustomNavLink to="/app/account" label="Account" />

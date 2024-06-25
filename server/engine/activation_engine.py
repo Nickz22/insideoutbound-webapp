@@ -40,7 +40,7 @@ def update_activation_states():
 
         active_activations = activation_query_response.data
 
-        unresponsive_activations = []
+        unresponsive_activations = None
         if len(active_activations) > 0:
             unresponsive_activations = find_unresponsive_activations(
                 active_activations, settings
@@ -49,25 +49,32 @@ def update_activation_states():
                 api_response.message = unresponsive_activations.message
                 return api_response
 
-        if len(unresponsive_activations) > 0:
-            upsert_activations(unresponsive_activations)
+        if unresponsive_activations and len(unresponsive_activations.data) > 0:
+            upsert_activations(unresponsive_activations.data)
 
         active_activations = [
-            a for a in active_activations if a.id not in unresponsive_activations
+            a for a in active_activations if a.id not in unresponsive_activations.data
         ]
 
         if len(active_activations) > 0:
             activations = increment_existing_activations(active_activations, settings)
-            upsert_activations(activations)
+            upsert_activations(activations.data)
 
         last_task_date_with_cooloff_buffer = add_days(
-            datetime.strptime(settings["latest_date_queried"], "%Y-%m-%d").date(),
-            -(settings["cooloff_period"] + settings["tracking_period"]),
+            datetime.strptime(
+                settings.latest_date_queried or datetime.now().strftime("%Y-%m-%d"),
+                "%Y-%m-%d",
+            ).date(),
+            -(settings.cooloff_period + settings.tracking_period),
         )
 
         account_ids = pluck(active_activations, "account.id")
 
-        account_contacts = fetch_contacts_by_account_ids(account_ids)
+        account_contacts = (
+            fetch_contacts_by_account_ids(account_ids)
+            if len(account_ids) > 0
+            else ApiResponse(data=[], message="", success=True)
+        )
 
         if not account_contacts.success:
             api_response.message = account_contacts.message
@@ -76,7 +83,7 @@ def update_activation_states():
         activated_account_contact_ids = pluck(account_contacts.data, "id")
 
         fetch_task_response = fetch_contact_tasks_by_criteria_from_date(
-            settings["criteria"],
+            settings.criteria,
             f"{last_task_date_with_cooloff_buffer}T00:00:00Z",
             (
                 f"WHERE WhoId NOT IN ('{','.join(activated_account_contact_ids)}')"
@@ -93,7 +100,11 @@ def update_activation_states():
         for criteria_name in fetch_task_response.data:
             contact_ids.extend(pluck(fetch_task_response.data[criteria_name], WHO_ID))
 
-        contacts = fetch_contacts_by_ids(contact_ids)
+        contacts = (
+            fetch_contacts_by_ids(contact_ids)
+            if len(contact_ids) > 0
+            else ApiResponse(data=[], message="", success=True)
+        )
 
         if not contacts.success:
             api_response.message = contacts.message
@@ -110,7 +121,7 @@ def update_activation_states():
         upsert_activations(activation_response.data)
 
         today = datetime.now().date()
-        settings["latest_date_queried"] = today.strftime("%Y-%m-%d")
+        settings.latest_date_queried = today.strftime("%Y-%m-%d")
         save_settings(settings)
 
         api_response.data = (
