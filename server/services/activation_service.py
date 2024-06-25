@@ -19,28 +19,7 @@ from server.utils import (
 )
 from datetime import datetime
 
-# Positive Testing steps:
-#     1. Mock activations with a last_prospecting_activity of settings["account_inactivity_threshold"] + 1 days ago.
-#     2. Mock api return results to return 0 tasks
-#     3. Assert activations are returned with Unresponsive status
 
-# Negative Testing steps:
-#     1. Mock activations with a last_prospecting_activity of       ["account_inactivity_threshold"] - 1 days ago.
-#     2. Mock api return results to return 0 tasks
-#     3. Assert activations are returned with Activated status
-
-# Edge Testing steps (Opportunity exists):
-#    1. Mock activations with a last_prospecting_activity of settings["account_inactivity_threshold"] + 1 days ago.
-#    2. Mock api return results to return 0 tasks
-#    3. Mock api return results to return 1 opportunity
-#    4. Assert activations are returned with Opportunity Created status
-
-
-# Edge Testing steps (Event exists):
-#    1. Mock activations with a last_prospecting_activity of settings["account_inactivity_threshold"] + 1 days ago.
-#    2. Mock api return results to return 0 tasks
-#    3. Mock api return results to return 1 event
-#    4. Assert activations are returned with Meeting Set status
 def find_unresponsive_activations(activations, settings: Settings):
     """
     This function processes a list of activation objects and a settings dictionary to determine which activations are unresponsive.
@@ -89,26 +68,21 @@ def find_unresponsive_activations(activations, settings: Settings):
                 dt_to_iso_format(first_prospecting_activity),
                 settings.criteria,
                 already_counted_task_ids,
-            )
+            ).data
         )
-
-        if not criteria_group_tasks_by_account_id.success:
-            response.message = criteria_group_tasks_by_account_id.message
-            return response
 
         activations_by_account_id = {
             activation.account.id: activation
             for activation in unresponsive_activation_candidates
         }
-        for account_id in criteria_group_tasks_by_account_id.data:
+
+        for account_id in criteria_group_tasks_by_account_id:
             activation = activations_by_account_id.get(account_id)
             criteria_name_by_task_id = {}
             all_tasks = []
 
-            for criteria in criteria_group_tasks_by_account_id.data[account_id]:
-                for task in criteria_group_tasks_by_account_id.data[account_id][
-                    criteria
-                ]:
+            for criteria in criteria_group_tasks_by_account_id[account_id]:
+                for task in criteria_group_tasks_by_account_id[account_id][criteria]:
                     criteria_name_by_task_id[task.id] = criteria
                     all_tasks.append(task)
 
@@ -130,7 +104,7 @@ def find_unresponsive_activations(activations, settings: Settings):
         response.data = activations_by_account_id.values()
         response.success = True
     except Exception as e:
-        response.message = f"Failed to find unresponsive activations due to an error: {format_error_message(e)}"
+        raise Exception(format_error_message(e))
 
     return response
 
@@ -189,34 +163,22 @@ def increment_existing_activations(activations, settings):
                 first_prospecting_activity,
                 settings["criteria"],
                 already_counted_task_ids,
-            )
+            ).data
         )
-
-        if not criteria_group_tasks_by_account_id.success:
-            response.message = criteria_group_tasks_by_account_id.message
-            return response
 
         opportunities = fetch_opportunities_by_account_ids_from_date(
             account_ids, first_prospecting_activity
-        )
-
-        if not opportunities.success:
-            response.message = opportunities.message
-            return response
+        ).data
 
         events_by_account_id = fetch_events_by_account_ids_from_date(
             account_ids, first_prospecting_activity
-        )
-
-        if not events_by_account_id.success:
-            response.message = events_by_account_id.message
-            return response
+        ).data
 
         activations_by_account_id = {
             activation.account.id: activation for activation in activations
         }
 
-        for account_id in criteria_group_tasks_by_account_id.data:
+        for account_id in criteria_group_tasks_by_account_id:
             activation = activations_by_account_id.get(account_id)
             criteria_name_by_task_id = {}
             all_tasks = []
@@ -242,12 +204,12 @@ def increment_existing_activations(activations, settings):
                 activations_by_account_id[account_id] = activation
                 # rollup prospecting metadata via criteria_name_by_task_id
 
-        opportunities_by_account_id = group_by(opportunities.data, "account_id")
+        opportunities_by_account_id = group_by(opportunities, "account_id")
 
         for account_id in activations_by_account_id:
             activation = activations_by_account_id[account_id]
             opportunities = opportunities_by_account_id.get(account_id, [])
-            events = events_by_account_id.data.get(account_id, [])
+            events = events_by_account_id.get(account_id, [])
 
             if events:
                 for event in events:
@@ -278,7 +240,7 @@ def increment_existing_activations(activations, settings):
         response.data = activations_by_account_id.values()
         response.success = True
     except Exception as e:
-        response.message = format_error_message(e)
+        raise Exception(format_error_message(e))
 
     return response
 
@@ -325,6 +287,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 tasks_by_account[account_id][task.who_id][criteria_key] = []
             tasks_by_account[account_id][task.who_id][criteria_key].append(task)
 
+    first_prospecting_activity = dt_to_iso_format(first_prospecting_activity)
     opportunity_by_account_id = group_by(
         fetch_opportunities_by_account_ids_from_date(
             tasks_by_account.keys(), first_prospecting_activity

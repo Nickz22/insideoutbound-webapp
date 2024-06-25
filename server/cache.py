@@ -10,6 +10,7 @@ from models import (
 )
 from mapper.mapper import convert_settings_table_row_to_settings
 from datetime import datetime
+from utils import format_error_message
 
 CODE_VERIFIER_FILE = "code_verifier.json"
 TOKEN_FILE = "tokens.json"
@@ -149,7 +150,22 @@ def deserialize_opportunity(data):
     return None
 
 
-def load_active_activations_order_by_first_prospecting_activity_asc():
+def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResponse:
+    """
+    Loads active activations from a JSON file, orders them by the date of the first prospecting activity in ascending order,
+    and returns them as a list of Activation objects wrapped in an ApiResponse object.
+
+    Signature:
+        None -> ApiResponse
+
+    Returns:
+        ApiResponse: An object containing a list of Activation objects (data), a message, and a success flag.
+                     The success flag is True if the data was loaded and processed successfully, False otherwise.
+
+    Throws:
+        Exception: Raises an exception with a formatted error message if any error occurs during file reading,
+                   JSON parsing, or data processing.
+    """
     response = ApiResponse(data=[], message="", success=False)
     try:
 
@@ -165,7 +181,7 @@ def load_active_activations_order_by_first_prospecting_activity_asc():
                 prospecting_metadata = deserialize_prospecting_metadata(
                     entry.get("prospecting_metadata", [])
                 )
-                
+
                 activation = Activation(
                     id=entry["id"],
                     account=account,
@@ -209,6 +225,5 @@ def load_active_activations_order_by_first_prospecting_activity_asc():
             response.success = True
 
     except Exception as e:
-        response.message = "Failed to load active activations"
-        response.success = False
+        raise Exception(format_error_message(e))
     return response

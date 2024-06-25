@@ -72,6 +72,9 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     Returns:
     - ApiResponse: Response whose `data` is a dictionary where each key is an account ID and each value is another dictionary with
             keys as criteria names and values as lists of tasks fetched from Salesforce.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
     """
     api_response = ApiResponse(data=[], message="", success=False)
 
@@ -79,15 +82,9 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
         access_token, instance_url = load_tokens()  # Load tokens from file
 
         if not instance_url or not access_token:
-            api_response.message = SESSION_EXPIRED
-            return api_response
+            raise Exception(SESSION_EXPIRED)
 
         contacts = fetch_contacts_by_account_ids(account_ids)
-
-        if not contacts.success:
-            api_response.message = contacts.message
-            return api_response
-
         contact_by_id = {contact.id: contact for contact in contacts.data}
         contact_ids = pluck(contacts.data, "id")
 
@@ -100,10 +97,6 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
         tasks_by_criteria_name = fetch_contact_tasks_by_criteria_from_date(
             criteria, start, additional_filter
         )
-
-        if not tasks_by_criteria_name.success:
-            api_response.message = tasks_by_criteria_name.message
-            return api_response
 
         # Organizing tasks_by_criteria_name by account and criteria
         criteria_group_tasks_by_account_id = {
@@ -133,7 +126,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
         api_response.data = criteria_group_tasks_by_account_id
         api_response.success = True
     except Exception as e:
-        api_response.message = format_error_message(e)
+        raise Exception(format_error_message(e))
 
     return api_response
 
@@ -153,14 +146,15 @@ def fetch_contact_tasks_by_criteria_from_date(
 
     Returns:
     - dict: A dictionary where each key is the name of a filter container and each value is a list of Task objects fetched from Salesforce.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
     """
     api_response = ApiResponse(data=[], message="", success=False)
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not instance_url or not access_token:
-        api_response.success = False
-        api_response.message = SESSION_EXPIRED
-        return api_response
+        raise Exception(SESSION_EXPIRED)
 
     soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate FROM Task WHERE CreatedDate >= {from_datetime} AND "
     if additional_filter:
@@ -176,12 +170,6 @@ def fetch_contact_tasks_by_criteria_from_date(
                 instance_url,
                 access_token,
             )
-            if not fetch_response.success:
-                api_response.success = False
-                api_response.message = (
-                    f"While fetching tasks:  {fetch_response.message}"
-                )
-                return api_response
 
             contact_task_models = []
             for task in fetch_response.data:
@@ -206,9 +194,7 @@ def fetch_contact_tasks_by_criteria_from_date(
         api_response.data = tasks_by_filter_name
         api_response.success = True
     except Exception as e:
-        api_response.success = False
-        api_response.message = format_error_message(e)
-        return api_response
+        raise Exception(format_error_message(e))
 
     return api_response
 
@@ -223,27 +209,25 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
     Returns:
     - dict: A dictionary where each key is an account ID and each value is the list of events fetched from Salesforce
       for that account. The events are represented as dictionaries with keys corresponding to the fields selected in the SOQL query.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch
     """
     api_response = ApiResponse(data={}, message="", success=False)
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not instance_url or not access_token:
-        api_response.success = False
-        api_response.message = SESSION_EXPIRED
-        return api_response
+        raise Exception(SESSION_EXPIRED)
 
     contacts = fetch_contacts_by_account_ids(account_ids)
     contact_by_id = {contact.id: contact for contact in contacts.data}
     contact_ids = pluck(contacts.data, "id")
 
-    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{','.join(contact_ids)}') AND CreatedDate >= {start} ORDER BY StartDateTime ASC"
+    soql_query = f"SELECT Id, WhoId, WhatId, Subject, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{','.join(contact_ids)}') AND CreatedDate >= {start} ORDER BY StartDateTime ASC"
     events_by_account_id = {}
 
     try:
         fetch_response = _fetch_sobjects(soql_query, instance_url, access_token)
-        if not fetch_response.success:
-            api_response.message = f"While fetching events: {fetch_response.message}"
-            return api_response
 
         for event in fetch_response.data:
             account_id = contact_by_id.get(event.get("WhoId")).account_id
@@ -255,7 +239,6 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
                     who_id=event.get("WhoId"),
                     what_id=event.get("WhatId"),
                     subject=event.get("Subject"),
-                    status=event.get("Status"),
                     start_date_time=_parse_date_with_timezone(
                         event["StartDateTime"].replace("Z", "+00:00")
                     ),
@@ -268,7 +251,7 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
         api_response.data = events_by_account_id
         api_response.success = True
     except Exception as e:
-        api_response.message = format_error_message(e)
+        raise Exception(format_error_message(e))
 
     return api_response
 
@@ -288,8 +271,7 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not instance_url or not access_token:
-        api_response.message = SESSION_EXPIRED
-        return api_response
+        raise Exception(SESSION_EXPIRED)
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -298,7 +280,7 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
 
     try:
         joined_ids = ",".join([f"'{id}'" for id in account_ids])
-        soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, Status FROM Opportunity WHERE CreatedDate >= {start}  AccountId IN ({joined_ids})"
+        soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids})"
         request_url = f"{instance_url}/services/data/v55.0/query?q={soql_query}"
         opportunity_models = []
 
@@ -321,9 +303,11 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
             api_response.success = True
             api_response.message = "Opportunities fetched successfully."
         else:
-            api_response.message = f"Failed to fetch opportunities ({response.status_code}): {get_http_error_message(response)}"
+            raise Exception(
+                f"Failed to fetch opportunities ({response.status_code}): {get_http_error_message(response)}"
+            )
     except Exception as e:
-        api_response.message = format_error_message(e)
+        raise Exception(format_error_message(e))
 
     return api_response
 
@@ -337,13 +321,15 @@ def fetch_contacts_by_account_ids(account_ids):
 
     Returns:
     - ApiResponse: An ApiResponse object containing the fetched contacts as a list of Contact objects.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
     """
     api_response = ApiResponse(data=[], message="", success=False)
     access_token, instance_url = load_tokens()  # Load tokens from file
 
     if not instance_url or not access_token:
-        api_response.message = SESSION_EXPIRED
-        return api_response
+        raise Exception(SESSION_EXPIRED)
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -377,7 +363,9 @@ def fetch_contacts_by_account_ids(account_ids):
             api_response.data = contact_models
             api_response.success = True
         else:
-            api_response.message = f"Failed to fetch contacts ({response.status_code}): {get_http_error_message(response)}"
+            raise Exception(
+                f"Failed to fetch contacts ({response.status_code}): {get_http_error_message(response)}"
+            )
     except Exception as e:
         api_response.message = format_error_message(e)
 
@@ -390,8 +378,7 @@ def fetch_contacts_by_ids(contact_ids):
 
     access_token, instance_url = load_tokens()  # Load tokens from file
     if not instance_url or not access_token:
-        api_response.message = SESSION_EXPIRED
-        return api_response
+        raise Exception(SESSION_EXPIRED)
 
     headers = {
         "Authorization": f"Bearer {access_token}",
@@ -429,7 +416,7 @@ def fetch_contacts_by_ids(contact_ids):
                 f"Failed to fetch contacts from Salesforce ({response.status_code}): {get_http_error_message(response)}"
             )
     except Exception as e:
-        api_response.message = format_error_message(e)
+        raise Exception(format_error_message(e))
 
     return api_response
 
@@ -472,13 +459,11 @@ def _fetch_sobjects(soql_query, instance_url, access_token):
                 success=True, data=response.json()["records"], message=None
             )
         else:
-            return ApiResponse(
-                success=False,
-                data=None,
-                message=f"Error fetching SObjects: {response.status_code} {response.text}",
+            raise Exception(
+                f"Failed to fetch sobjects ({response.status_code}): {get_http_error_message(response)}"
             )
     except Exception as e:
-        return ApiResponse(success=False, data=None, message=format_error_message(e))
+        raise Exception(format_error_message(e))
 
 
 def _map_operator(operator, data_type):

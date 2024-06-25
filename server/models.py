@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from typing import List
-from datetime import date,datetime
+from datetime import date, datetime
 from typing import List, Optional, Any
 
 
@@ -97,7 +97,6 @@ class Event:
     created_date: date
     who_id: str
     subject: str
-    status: str
 
 
 @dataclass

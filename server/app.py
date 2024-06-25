@@ -152,14 +152,19 @@ def oauth_callback():
 
 @app.route("/load_prospecting_activities")
 def load_prospecting_activities():
-    response = update_activation_states()
-
     api_response = ApiResponse(data=[], message="", success=False)
-    api_response.success = response.success
-    api_response.message = response.message
-    api_response.data = response.data
+    try:
 
-    status_code = get_status_code(api_response)
+        response = update_activation_states()
+
+        api_response.success = response.success
+        api_response.message = response.message
+        api_response.data = response.data
+
+        status_code = get_status_code(api_response)
+    except Exception as e:
+        api_response.message = f"Failed to load prospecting activities: {str(e)}"
+        status_code = get_status_code(api_response)
 
     return jsonify(api_response.__dict__), status_code
 
