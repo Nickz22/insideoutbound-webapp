@@ -1,5 +1,5 @@
 import os, sys
-from models import Settings
+from server.models import Settings
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from server.api.salesforce import (
@@ -259,111 +259,85 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     - `ApiResponse`: `data` parameter contains all activations and any relevant messages.
     """
     response = ApiResponse(data=[], message="", success=True)
-    activities_per_contact = settings.activities_per_contact
-    contacts_per_account = settings.contacts_per_account
-    tracking_period = settings.tracking_period
-    cooloff_period = settings.cooloff_period
 
-    tasks_by_account = {}
-    contact_by_id = {contact.id: contact for contact in contacts}
-    first_prospecting_activity = None
-    for criteria_key, tasks in tasks_by_criteria.items():
-        for task in tasks:
-            first_prospecting_activity = (
-                task.created_date
-                if not first_prospecting_activity
-                else min(first_prospecting_activity, task.created_date)
-            )
-            contact = contact_by_id.get(task.who_id)
-            if not contact:
-                response.message += f"Contact with id {task.who_id} for Task with id {task.id} not found. \n"
-                continue
-            account_id = contact.account_id
-            if account_id not in tasks_by_account.keys():
-                tasks_by_account[account_id] = {}
-            if task.who_id not in tasks_by_account[account_id]:
-                tasks_by_account[account_id][task.who_id] = {}
-            if criteria_key not in tasks_by_account[account_id][task.who_id]:
-                tasks_by_account[account_id][task.who_id][criteria_key] = []
-            tasks_by_account[account_id][task.who_id][criteria_key].append(task)
-
-    first_prospecting_activity = dt_to_iso_format(first_prospecting_activity)
+    tasks_by_account_id = get_tasks_by_account_id(tasks_by_criteria, contacts)
+    first_prospecting_activity = get_first_prospecting_activity_date(tasks_by_criteria)
     opportunity_by_account_id = group_by(
         fetch_opportunities_by_account_ids_from_date(
-            tasks_by_account.keys(), first_prospecting_activity
+            tasks_by_account_id.keys(), first_prospecting_activity
         ).data,
         "account_id",
     )
     events_by_account_id = fetch_events_by_account_ids_from_date(
-        tasks_by_account.keys(), first_prospecting_activity
+        tasks_by_account_id.keys(), first_prospecting_activity
     )
-    for account_id, tasks_by_criteria_by_who_id in tasks_by_account.items():
-        all_tasks_under_account = []
-        task_ids_by_criteria_name = {}
-        activations = []
 
-        for contact_id, tasks_by_criteria in tasks_by_criteria_by_who_id.items():
-            for criteria, tasks in tasks_by_criteria.items():
-                if criteria not in task_ids_by_criteria_name:
-                    task_ids_by_criteria_name[criteria] = set()
-                all_tasks_under_account.extend(tasks)
-                task_ids_by_criteria_name[criteria].update([task.id for task in tasks])
+    task_ids_by_criteria_name = get_task_ids_by_criteria_name(tasks_by_account_id)
+    contact_by_id = {contact.id: contact for contact in contacts}
+    for account_id, tasks_by_criteria_by_who_id in tasks_by_account_id.items():
+        all_tasks_under_account = get_all_tasks_under_account(
+            tasks_by_criteria_by_who_id
+        )
 
         if len(all_tasks_under_account) == 0:
             continue
 
+        activations = []
+
         # although the Task API query is sorted already, grouping them potentially breaks a perfect sort
-        ## so we'll sort again here to be safe...opportunity for optimization
+        ## so we'll sort again here to be safe...opportunity for optimization via merge sort
         all_tasks_under_account = sorted(
             all_tasks_under_account, key=lambda x: x.created_date
         )
 
         start_tracking_period = all_tasks_under_account[0].created_date
 
-        qualifying_event = None
-        for event in events_by_account_id.data.get(account_id, []):
-            if is_model_created_within_period(
-                event, start_tracking_period, tracking_period
-            ):
-                qualifying_event = event
-                break
+        qualifying_event = get_qualifying_event(
+            events_by_account_id.get(account_id, []),
+            start_tracking_period,
+            settings.tracking_period,
+        )
 
-        qualifying_opportunity = None
-        for opportunity in opportunity_by_account_id.get(account_id, []):
-            if is_model_created_within_period(
-                opportunity, start_tracking_period, tracking_period
-            ):
-                qualifying_opportunity = opportunity
-                break
+        qualifying_opportunity = get_qualifying_opportunity(
+            opportunity_by_account_id.get(account_id, []),
+            start_tracking_period,
+            settings.tracking_period,
+        )
 
         valid_task_ids_by_who_id = {}
         task_ids = []
 
         for task in all_tasks_under_account:
+            is_task_in_tracking_period = is_model_created_within_period(
+                task, start_tracking_period, settings.tracking_period
+            )
+            if is_task_in_tracking_period:
+                if task.who_id not in valid_task_ids_by_who_id:
+                    valid_task_ids_by_who_id[task.who_id] = []
+                    first_prospecting_activity = task.created_date
+                valid_task_ids_by_who_id[task.who_id].append(task.id)
+                task_ids.append(task.id)
 
-            if not is_model_created_within_period(
-                task, start_tracking_period, tracking_period
-            ):
-                active_contact_ids = []
-                for who_id, valid_task_ids in valid_task_ids_by_who_id.items():
-                    is_contact_active = len(valid_task_ids) >= activities_per_contact
-                    if is_contact_active:
-                        active_contact_ids.append(who_id)
+            if not is_task_in_tracking_period:
+                active_contact_ids = get_active_contact_ids(
+                    valid_task_ids_by_who_id, settings.activities_per_contact
+                )
 
                 is_account_active_for_tracking_period = (
-                    len(active_contact_ids) >= contacts_per_account
+                    len(active_contact_ids) >= settings.contacts_per_account
                     or qualifying_event
                     or qualifying_opportunity
                 )
                 if not is_account_active_for_tracking_period:
                     start_tracking_period = add_days(
-                        start_tracking_period, tracking_period + cooloff_period
+                        start_tracking_period,
+                        settings.tracking_period + settings.inactivity_threshold,
                     )
-                    valid_task_ids_by_who_id = {}
+                    valid_task_ids_by_who_id.clear()
                     first_prospecting_activity = None
-                    task_ids = []
+                    task_ids.clear()
                     if is_model_created_within_period(
-                        task, start_tracking_period, tracking_period
+                        task, start_tracking_period, settings.tracking_period
                     ):
                         valid_task_ids_by_who_id[task.who_id] = [task.id]
                         first_prospecting_activity = task.created_date
@@ -395,22 +369,14 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         ),
                     )
                 )
-                # ensure that no Task within account_inactivity_threshold before incrementing start_tracking_period to the next period
-
-            if task.who_id not in valid_task_ids_by_who_id:
-                valid_task_ids_by_who_id[task.who_id] = []
-                first_prospecting_activity = task.created_date
-            valid_task_ids_by_who_id[task.who_id].append(task.id)
-            task_ids.append(task.id)
 
         # this account's tasks have ended, check for activation
-        active_contact_ids = []
-        for who_id, valid_task_ids in valid_task_ids_by_who_id.items():
-            is_contact_active = len(valid_task_ids) >= activities_per_contact
-            if is_contact_active:
-                active_contact_ids.append(who_id)
+        active_contact_ids = get_active_contact_ids(
+            valid_task_ids_by_who_id, settings.activities_per_contact
+        )
+
         is_account_active_for_tracking_period = (
-            len(active_contact_ids) >= contacts_per_account
+            len(active_contact_ids) >= settings.contacts_per_account
             or qualifying_event
             or qualifying_opportunity
         )
@@ -443,3 +409,85 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
         response.data.extend(activations)
 
     return response
+
+
+# helpers
+
+
+def get_task_ids_by_criteria_name(tasks_by_account_id):
+    task_ids_by_criteria_name = {}
+    for account_id, tasks_by_criteria_by_who_id in tasks_by_account_id.items():
+        for contact_id, tasks_by_criteria in tasks_by_criteria_by_who_id.items():
+            for criteria, tasks in tasks_by_criteria.items():
+                if criteria not in task_ids_by_criteria_name:
+                    task_ids_by_criteria_name[criteria] = set()
+                task_ids_by_criteria_name[criteria].update([task.id for task in tasks])
+
+    return task_ids_by_criteria_name
+
+
+def get_all_tasks_under_account(tasks_by_criteria_by_who_id):
+    all_tasks_under_account = []
+    for contact_id, tasks_by_criteria in tasks_by_criteria_by_who_id.items():
+        for criteria, tasks in tasks_by_criteria.items():
+            all_tasks_under_account.extend(tasks)
+    return all_tasks_under_account
+
+
+def get_first_prospecting_activity_date(tasks_by_criteria):
+    first_prospecting_activity = None
+    for criteria_key, tasks in tasks_by_criteria.items():
+        for task in tasks:
+            first_prospecting_activity = (
+                task.created_date
+                if not first_prospecting_activity
+                else min(first_prospecting_activity, task.created_date)
+            )
+    first_prospecting_activity = dt_to_iso_format(
+        first_prospecting_activity if first_prospecting_activity else datetime.now()
+    )
+
+
+def get_tasks_by_account_id(tasks_by_criteria, contacts):
+    tasks_by_account_id = {}
+    contact_by_id = {contact.id: contact for contact in contacts}
+    for criteria_key, tasks in tasks_by_criteria.items():
+        for task in tasks:
+            contact = contact_by_id.get(task.who_id)
+            if not contact:
+                continue
+            account_id = contact.account_id
+            if account_id not in tasks_by_account_id.keys():
+                tasks_by_account_id[account_id] = {}
+            if task.who_id not in tasks_by_account_id[account_id]:
+                tasks_by_account_id[account_id][task.who_id] = {}
+            if criteria_key not in tasks_by_account_id[account_id][task.who_id]:
+                tasks_by_account_id[account_id][task.who_id][criteria_key] = []
+            tasks_by_account_id[account_id][task.who_id][criteria_key].append(task)
+
+
+def get_qualifying_event(events, start_date, tracking_period):
+    qualifying_event = None
+    for event in events:
+        if is_model_created_within_period(event, start_date, tracking_period):
+            qualifying_event = event
+            break
+    return qualifying_event
+
+
+def get_qualifying_opportunity(opportunities, start_date, tracking_period):
+    qualifying_opportunity = None
+    for opportunity in opportunities:
+        if is_model_created_within_period(opportunity, start_date, tracking_period):
+            qualifying_opportunity = opportunity
+            break
+    return qualifying_opportunity
+
+
+def get_active_contact_ids(task_ids_by_who_id, activities_per_contact):
+    active_contact_ids = []
+    for who_id, valid_task_ids in task_ids_by_who_id.items():
+        is_contact_active = len(valid_task_ids) >= activities_per_contact
+        if is_contact_active:
+            active_contact_ids.append(who_id)
+    return active_contact_ids

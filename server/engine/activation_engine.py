@@ -1,27 +1,24 @@
-from services.activation_service import (
+from datetime import datetime
+
+from server.services.activation_service import (
     compute_activated_accounts,
     increment_existing_activations,
     find_unresponsive_activations,
 )
-
-from api.salesforce import (
+from server.api.salesforce import (
     fetch_contact_tasks_by_criteria_from_date,
     fetch_contacts_by_account_ids,
     fetch_contacts_by_ids,
 )
-
-from constants import SESSION_EXPIRED, WHO_ID
-
-from cache import save_settings
-
-from models import ApiResponse
-from cache import (
+from server.constants import WHO_ID
+from server.cache import (
+    save_settings,
     load_settings,
     load_active_activations_order_by_first_prospecting_activity_asc,
     upsert_activations,
 )
-from utils import add_days, pluck, format_error_message
-from datetime import datetime
+from server.models import ApiResponse, Settings
+from server.utils import add_days, pluck, format_error_message
 
 
 def update_activation_states():
@@ -53,14 +50,6 @@ def update_activation_states():
             ).data
             upsert_activations(activations)
 
-        last_task_date_with_cooloff_buffer = add_days(
-            datetime.strptime(
-                settings.latest_date_queried or datetime.now().strftime("%Y-%m-%d"),
-                "%Y-%m-%d",
-            ).date(),
-            -(settings.cooloff_period + settings.tracking_period),
-        )
-
         account_ids = pluck(active_activations, "account.id")
 
         account_contacts = (
@@ -71,9 +60,9 @@ def update_activation_states():
 
         activated_account_contact_ids = pluck(account_contacts.data, "id")
 
-        fetch_task_response = fetch_contact_tasks_by_criteria_from_date(
+        tasks_by_filter_name = fetch_contact_tasks_by_criteria_from_date(
             settings.criteria,
-            f"{last_task_date_with_cooloff_buffer}T00:00:00Z",
+            f"{get_threshold_date_for_activatable_tasks()}T00:00:00Z",
             (
                 f"WHERE WhoId NOT IN ('{','.join(activated_account_contact_ids)}')"
                 if len(activated_account_contact_ids) > 0
@@ -82,8 +71,8 @@ def update_activation_states():
         ).data
 
         contact_ids = []
-        for criteria_name in fetch_task_response:
-            contact_ids.extend(pluck(fetch_task_response[criteria_name], WHO_ID))
+        for criteria_name in tasks_by_filter_name:
+            contact_ids.extend(pluck(tasks_by_filter_name[criteria_name], WHO_ID))
 
         contacts = (
             fetch_contacts_by_ids(contact_ids).data
@@ -92,7 +81,7 @@ def update_activation_states():
         )
 
         new_activations = compute_activated_accounts(
-            fetch_task_response, contacts, settings
+            tasks_by_filter_name, contacts, settings
         ).data
 
         upsert_activations(new_activations)
@@ -109,3 +98,28 @@ def update_activation_states():
         raise Exception(format_error_message(e))
 
     return api_response
+
+
+# helpers
+
+
+def get_threshold_date_for_activatable_tasks(settings: Settings):
+    """
+    Returns the threshold date for activatable tasks which is the last date
+    we checked for activatable tasks minus the cooloff period and tracking period.
+
+    i.e. Given an inactivity threshold of 30 days, and a tracking period of 10 days,
+    if we check for Tasks today the Tasks that could activate our Account have to be created within the last 10 days...
+    and any of those Tasks have to  be at least 30 days away from the last Task under the Account.
+    So querying for the last 40 days of Tasks will enable our algorithm to find a Task created 29 days ago, determine that
+    that single Task isn't sufficient to activate the Account, and then bump the activation window 30 days so that the `compute_activated_accounts` algorithm
+    only activates based on Tasks created 30 days after the Task that was created 29 days ago.
+
+    """
+    return add_days(
+        datetime.strptime(
+            settings.latest_date_queried or datetime.now().strftime("%Y-%m-%d"),
+            "%Y-%m-%d",
+        ).date(),
+        -(settings.inactivity_threshold + settings.tracking_period),
+    )

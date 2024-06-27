@@ -3,42 +3,14 @@ from typing import List
 from datetime import date, datetime
 from typing import List, Optional, Any
 
+from server.utils import remove_underscores_from_numbers
+
 
 @dataclass
 class ApiResponse:
     data: Any
     message: str
     success: bool
-
-
-@dataclass
-class Filter:
-    field: str
-    operator: str
-    value: str
-    data_type: str
-
-
-@dataclass
-class FilterModel:
-    field: str
-    operator: str
-    value: str
-    dataType: str
-
-
-@dataclass
-class FilterContainer:
-    name: str
-    filters: List[Filter]
-    filter_logic: str
-
-
-@dataclass
-class FilterContainerModel:
-    name: str
-    filters: List[FilterModel]
-    filterLogic: str
 
 
 @dataclass
@@ -138,11 +110,26 @@ class ProspectingEffort:
 
 
 @dataclass
+class Filter:
+    field: str
+    operator: str
+    value: str
+    data_type: str
+
+
+@dataclass
+class FilterContainer:
+    name: str
+    filters: List[Filter]
+    filter_logic: str
+
+
+@dataclass
 class Settings:
     inactivity_threshold: int
-    cooloff_period: int
     criteria: List[FilterContainer]
     meetings_criteria: FilterContainer
+    meeting_object: str
     activities_per_contact: int
     contacts_per_account: int
     tracking_period: int
@@ -153,17 +140,129 @@ class Settings:
     skip_opportunity_criteria: Optional[FilterContainer] = None
 
 
-@dataclass
+class FilterModel:
+    def __init__(
+        self, field=None, dataType=None, operator=None, value=None, filter_=None
+    ):
+        if filter_ is not None:
+            # Initialize from Filter object
+            self.field = filter_.field
+            self.dataType = filter_.data_type
+            self.operator = filter_.operator
+            self.value = filter_.value
+        else:
+            # Initialize from individual attributes
+            self.field = field
+            self.dataType = dataType
+            self.operator = operator
+            self.value = value
+
+    def to_dict(self):
+        return {
+            "field": self.field,
+            "dataType": self.dataType,
+            "operator": self.operator,
+            "value": self.value,
+        }
+
+
+class FilterContainerModel:
+    def __init__(
+        self, name=None, filters=None, filterLogic=None, filter_container=None
+    ):
+        if filter_container is not None:
+            self.name = filter_container.name
+            self.filters = [
+                FilterModel(filter_=filter_) for filter_ in filter_container.filters
+            ]
+            self.filterLogic = remove_underscores_from_numbers(
+                filter_container.filter_logic
+            )
+        else:
+            self.name = name
+            self.filters = filters
+            self.filterLogic = remove_underscores_from_numbers(filterLogic)
+
+    def to_dict(self):
+        return {
+            "name": self.name,
+            "filters": [filter_.to_dict() for filter_ in self.filters],
+            "filterLogic": self.filterLogic,
+        }
+
+
 class SettingsModel:
-    inactivityThreshold: int
-    cooloffPeriod: int
-    criteria: List[FilterContainerModel]
-    meetingObject: str
-    meetingsCriteria: FilterContainerModel
-    skipAccountCriteria: FilterContainerModel
-    skipOpportunityCriteria: FilterContainerModel
-    activitiesPerContact: int
-    contactsPerAccount: int
-    trackingPeriod: int
-    activateByMeeting: bool
-    activateByOpportunity: bool
+    def __init__(
+        self,
+        activateByMeeting=None,
+        activateByOpportunity=None,
+        activitiesPerContact=None,
+        contactsPerAccount=None,
+        criteria=None,
+        inactivityThreshold=None,
+        meetingObject=None,
+        meetingsCriteria=None,
+        trackingPeriod=None,
+        skipAccountCriteria=None,
+        skipOpportunityCriteria=None,
+        settings=None,
+    ):
+        if settings:
+            self.activateByMeeting = settings.activate_by_meeting
+            self.activateByOpportunity = settings.activate_by_opportunity
+            self.activitiesPerContact = settings.activities_per_contact
+            self.contactsPerAccount = settings.contacts_per_account
+            self.criteria = [
+                FilterContainerModel(filter_container=fc) for fc in settings.criteria
+            ]
+            self.inactivityThreshold = settings.inactivity_threshold
+            self.meetingObject = settings.meeting_object
+            self.meetingsCriteria = FilterContainerModel(
+                filter_container=settings.meetings_criteria
+            )
+            self.trackingPeriod = settings.tracking_period
+            self.skipAccountCriteria = (
+                FilterContainerModel(filter_container=settings.skip_account_criteria)
+                if settings.skip_account_criteria
+                else None
+            )
+            self.skipOpportunityCriteria = (
+                FilterContainerModel(
+                    filter_container=settings.skip_opportunity_criteria
+                )
+                if settings.skip_opportunity_criteria
+                else None
+            )
+        else:
+            self.activateByMeeting = activateByMeeting
+            self.activateByOpportunity = activateByOpportunity
+            self.activitiesPerContact = activitiesPerContact
+            self.contactsPerAccount = contactsPerAccount
+            self.criteria = criteria
+            self.inactivityThreshold = inactivityThreshold
+            self.meetingObject = meetingObject
+            self.meetingsCriteria = meetingsCriteria
+            self.trackingPeriod = trackingPeriod
+            self.skipAccountCriteria = skipAccountCriteria
+            self.skipOpportunityCriteria = skipOpportunityCriteria
+
+    def to_dict(self):
+        return {
+            "activateByMeeting": self.activateByMeeting,
+            "activateByOpportunity": self.activateByOpportunity,
+            "activitiesPerContact": self.activitiesPerContact,
+            "contactsPerAccount": self.contactsPerAccount,
+            "criteria": [criterion.to_dict() for criterion in self.criteria],
+            "inactivityThreshold": self.inactivityThreshold,
+            "meetingObject": self.meetingObject,
+            "meetingsCriteria": self.meetingsCriteria.to_dict(),
+            "trackingPeriod": self.trackingPeriod,
+            "skipAccountCriteria": (
+                self.skipAccountCriteria.to_dict() if self.skipAccountCriteria else None
+            ),
+            "skipOpportunityCriteria": (
+                self.skipOpportunityCriteria.to_dict()
+                if self.skipOpportunityCriteria
+                else None
+            ),
+        }

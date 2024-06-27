@@ -2,23 +2,19 @@ from flask import Flask, jsonify, redirect, request
 from flask_cors import CORS
 import requests, os
 
-from engine.activation_engine import update_activation_states
-from services.setting_service import define_criteria_from_tasks
-from api.salesforce import get_criteria_fields
-from cache import (
+from server.engine.activation_engine import update_activation_states
+from server.services.setting_service import define_criteria_from_tasks
+from server.api.salesforce import get_criteria_fields
+from server.cache import (
     save_code_verifier,
     load_code_verifier,
     save_tokens,
     load_settings,
     save_settings,
 )
-from constants import SESSION_EXPIRED, FILTER_TASK_FIELDS, FILTER_EVENT_FIELDS
-from models import ApiResponse, Task
-from utils import add_underscores_to_numbers
-from mapper.mapper import (
-    convert_settings_model_to_settings,
-    convert_settings_to_settings_model,
-)
+from server.constants import SESSION_EXPIRED, FILTER_TASK_FIELDS, FILTER_EVENT_FIELDS
+from server.models import ApiResponse, SettingsModel, Settings
+from server.mapper.mapper import convert_settings_model_to_settings
 
 app = Flask(__name__)
 CORS(
@@ -133,12 +129,11 @@ def oauth_callback():
             token_data["access_token"], token_data["instance_url"]
         )  # Save tokens to file
 
-        redirect_url = "http://localhost:3000/onboard"
-        # redirect_url = (
-        #     "http://localhost:3000/onboard"
-        #     if len(load_settings()["criteria"]) == 0
-        #     else "http://localhost:3000/app"
-        # )
+        redirect_url = (
+            "http://localhost:3000/onboard"
+            if len(load_settings()["criteria"]) == 0
+            else "http://localhost:3000/app/prospecting"
+        )
         return redirect(redirect_url)
     else:
         error_details = {
@@ -146,7 +141,7 @@ def oauth_callback():
             "status_code": response.status_code,
             "response_text": response.text,
         }
-        print(error_details)
+
         return jsonify(error_details), 500
 
 
@@ -171,17 +166,22 @@ def load_prospecting_activities():
 
 @app.route("/save_settings", methods=["POST"])
 def commit_settings():
-    data = request.json
-    settings = convert_settings_model_to_settings(data)
-    save_settings(settings)
-    return jsonify({"message": "Settings saved successfully"}), 200
+    try:
+        data = request.json
+        settings = convert_settings_model_to_settings(SettingsModel(**data))
+        save_settings(settings)
+        return jsonify({"message": "Settings saved successfully"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/get_settings", methods=["GET"])
 def get_settings():
-    settings = load_settings()
-    settings_model = convert_settings_to_settings_model(settings)
-    return jsonify(settings_model.__dict__), 200
+    try:
+        settings_model = SettingsModel(settings=load_settings())
+        return jsonify(settings_model.to_dict()), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":

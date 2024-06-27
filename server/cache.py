@@ -1,5 +1,9 @@
 import os, json
-from models import (
+
+APP_ENV = "production"
+if "APP_ENV" in os.environ:
+    APP_ENV = os.environ["APP_ENV"]
+from server.models import (
     Filter,
     FilterContainer,
     Account,
@@ -7,15 +11,17 @@ from models import (
     Activation,
     Opportunity,
     ApiResponse,
+    Settings,
 )
-from mapper.mapper import convert_settings_table_row_to_settings
 from datetime import datetime
-from utils import format_error_message
+from server.utils import format_error_message
 
-CODE_VERIFIER_FILE = "code_verifier.json"
-TOKEN_FILE = "tokens.json"
-SETTINGS_FILE = "settings.json"
-ACTIVATIONS_FILE = "activations.json"
+CODE_VERIFIER_FILE = (
+    "code_verifier.json" if APP_ENV != "test" else "test_code_verifier.json"
+)
+TOKEN_FILE = "tokens.json" if APP_ENV != "test" else "test_tokens.json"
+SETTINGS_FILE = "settings.json" if APP_ENV != "test" else "test_settings.json"
+ACTIVATIONS_FILE = "activations.json" if APP_ENV != "test" else "test_activations.json"
 
 
 def save_code_verifier(code_verifier):
@@ -63,7 +69,7 @@ def load_settings():
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, "r") as file:
             settings = json.load(file, object_hook=custom_decoder)
-            settings = convert_settings_table_row_to_settings(settings)
+            settings = Settings(**settings)
             return settings
     return None
 
@@ -73,7 +79,7 @@ def save_settings(settings):
         json.dump(settings, file, indent=4, default=lambda x: x.__dict__)
 
 
-def upsert_activations(new_activations):
+def upsert_activations(new_activations: list[Activation]):
     # Load existing activations from the file if it exists
     if os.path.exists(ACTIVATIONS_FILE):
         with open(ACTIVATIONS_FILE, "r") as file:
@@ -89,45 +95,23 @@ def upsert_activations(new_activations):
 
     # Update existing or add new activations
     for activation in new_activations:
-        activation_data = {
-            "id": activation.id,
-            "account": {"id": activation.account.id, "name": activation.account.name},
-            "activated_date": activation.activated_date.isoformat(),
-            "active_contact_ids": activation.active_contact_ids,
-            "first_prospecting_activity": (
-                activation.first_prospecting_activity.isoformat()
-                if activation.first_prospecting_activity
-                else None
-            ),
-            "last_prospecting_activity": (
-                activation.last_prospecting_activity.isoformat()
-                if activation.last_prospecting_activity
-                else None
-            ),
-            "prospecting_metadata": [
-                meta.__dict__ for meta in (activation.prospecting_metadata or [])
-            ],
-            "days_activated": (
-                activation.days_activated if activation.days_activated else 0
-            ),
-            "days_engaged": activation.days_engaged if activation.days_engaged else 0,
-            "engaged_date": (
-                activation.engaged_date.isoformat() if activation.engaged_date else None
-            ),
-            "last_outbound_engagement": (
-                activation.last_outbound_engagement.isoformat()
-                if activation.last_outbound_engagement
-                else None
-            ),
-            "opportunity": (
-                {"id": activation.opportunity.id, "name": activation.opportunity.name}
-                if activation.opportunity
-                else None
-            ),
-            "task_ids": activation.task_ids if activation.task_ids else None,
-            "event_ids": activation.event_ids if activation.event_ids else None,
-            "status": activation.status,
-        }
+        activation_data = Activation(
+            id=activation.id,
+            account=activation.account,
+            activated_date=activation.activated_date,
+            active_contact_ids=activation.active_contact_ids,
+            prospecting_metadata=activation.prospecting_metadata,
+            days_activated=activation.days_activated,
+            days_engaged=activation.days_engaged,
+            engaged_date=activation.engaged_date,
+            last_outbound_engagement=activation.last_outbound_engagement,
+            first_prospecting_activity=activation.first_prospecting_activity,
+            last_prospecting_activity=activation.last_prospecting_activity,
+            task_ids=activation.task_ids,
+            event_ids=activation.event_ids,
+            opportunity=activation.opportunity,
+            status=activation.status,
+        )
         # Upsert the activation data
         activation_dict[activation.id] = activation_data
 
