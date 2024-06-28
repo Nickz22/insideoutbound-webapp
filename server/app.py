@@ -13,8 +13,9 @@ from server.cache import (
     save_settings,
 )
 from server.constants import SESSION_EXPIRED, FILTER_TASK_FIELDS, FILTER_EVENT_FIELDS
-from server.models import ApiResponse, SettingsModel, Settings
+from server.models import ApiResponse, SettingsModel, TaskSObject
 from server.mapper.mapper import convert_settings_model_to_settings
+from server.utils import format_error_message
 
 app = Flask(__name__)
 CORS(
@@ -72,16 +73,24 @@ def get_task_criteria_fields():
 
 @app.route("/get_event_criteria_fields", methods=["GET"])
 def get_event_criteria_fields():
-    response = ApiResponse(data=[], message="", success=False)
-    criteria_fields = get_criteria_fields(sobject_type="Event")
+    try:
+        response = ApiResponse(data=[], message="", success=False)
+        criteria_fields = get_criteria_fields(sobject_type="Event")
 
-    if not criteria_fields.success:
-        response.message = criteria_fields.message
-    else:
-        response.data = [
-            field for field in criteria_fields.data if field.name in FILTER_EVENT_FIELDS
-        ]
-        response.success = True
+        if not criteria_fields.success:
+            response.message = criteria_fields.message
+        else:
+            response.data = [
+                field
+                for field in criteria_fields.data
+                if field.name in FILTER_EVENT_FIELDS
+            ]
+            response.success = True
+    except Exception as e:
+        response.success = False
+        response.message = (
+            f"Failed to retrieve event criteria fields: {format_error_message(e)}"
+        )
 
     return (
         jsonify(response.__dict__),
@@ -91,13 +100,24 @@ def get_event_criteria_fields():
 
 @app.route("/generate_filters", methods=["POST"])
 def generate_filters():
-    data = request.json
-    tasks = data.get("tasks")
-    criteria = {}
-    if tasks and len(tasks) > 0:
-        criteria = define_criteria_from_tasks(tasks)
+    response = ApiResponse(data=[], message="", success=True)
+    final_response = None
+    try:
+        data = request.json
+        tasks = [TaskSObject(**task) for task in data.get("tasks")]
+        if not tasks or len(tasks) == 0:
+            response.success = False
+            response.message = "No tasks provided"
+        else:
+            response.data = define_criteria_from_tasks(tasks)
 
-    return jsonify(criteria), 200 if criteria["data"] != "error" else 500
+        final_response = jsonify(response.to_dict()), 200 if response.success else 400
+    except Exception as e:
+        response.success = False
+        response.message = f"Failed to generate filters: {format_error_message(e)}"
+        final_response = jsonify(response.__dict__), 500
+
+    return final_response
 
 
 @app.route("/oauth/callback")
@@ -106,7 +126,6 @@ def oauth_callback():
     code_verifier = load_code_verifier()  # Retrieve the code verifier from the file
 
     if not code or not code_verifier:
-        print("Missing code or code_verifier")  # Debug log
         return jsonify({"error": "Missing authorization code or verifier"}), 400
 
     is_sandbox = "test" in request.referrer or "scratch" in request.referrer
@@ -125,13 +144,11 @@ def oauth_callback():
     response = requests.post(token_url, headers=headers, data=payload)
     if response.status_code == 200:
         token_data = response.json()
-        save_tokens(
-            token_data["access_token"], token_data["instance_url"]
-        )  # Save tokens to file
+        save_tokens(token_data["access_token"], token_data["instance_url"])
 
         redirect_url = (
             "http://localhost:3000/onboard"
-            if len(load_settings()["criteria"]) == 0
+            if len(load_settings().criteria) == 0
             else "http://localhost:3000/app/prospecting"
         )
         return redirect(redirect_url)

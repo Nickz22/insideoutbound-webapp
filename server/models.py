@@ -12,6 +12,13 @@ class ApiResponse:
     message: str
     success: bool
 
+    def to_dict(self):
+        return {
+            "data": self.data.to_dict() if self.data else None,
+            "message": self.message,
+            "success": self.success,
+        }
+
 
 @dataclass
 class CriteriaField:
@@ -54,13 +61,23 @@ class Task:
 
 
 @dataclass
-class TaskModel:
-    id: str
-    createdDate: date
-    whoId: str
-    subject: str
-    status: str
-    taskSubtype: Optional[str] = None
+class TaskSObject:
+    Id: str
+    CreatedDate: date
+    WhoId: str
+    Subject: str
+    Status: str
+    TaskSubtype: Optional[str] = None
+
+    def to_dict(self):
+        return {
+            "Id": self.Id,
+            "CreatedDate": self.CreatedDate,
+            "WhoId": self.WhoId,
+            "Subject": self.Subject,
+            "Status": self.Status,
+            "TaskSubtype": self.TaskSubtype,
+        }
 
 
 @dataclass

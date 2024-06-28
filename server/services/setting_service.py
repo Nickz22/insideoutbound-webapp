@@ -1,22 +1,22 @@
-from server.models import FilterContainerModel, FilterModel
+from server.models import FilterContainerModel, FilterModel, TaskSObject
+from server.utils import format_error_message
+from typing import List
 
-filter_blacklist = ["Id", "CreatedDate", "Who"]
+
+filter_blacklist = ["Id", "CreatedDate", "WhoId"]
 
 
-def define_criteria_from_tasks(tasks):
+def define_criteria_from_tasks(tasks: List[TaskSObject]) -> FilterContainerModel:
     try:
-        if not tasks:
-            return {"data": None}
-
-        common_keys = set(tasks[0].keys())
+        common_keys = set(tasks[0].to_dict().keys())
         for task in tasks[1:]:
-            common_keys.intersection_update(task.keys())
+            common_keys.intersection_update(task.to_dict().keys())
 
         common_keys = common_keys - set(filter_blacklist)
 
         filters = []
         for key in common_keys:
-            values = [task[key] for task in tasks]
+            values = [task.to_dict()[key] for task in tasks]
             unique_values = set(values)
 
             if all(isinstance(v, str) for v in values):
@@ -81,10 +81,8 @@ def define_criteria_from_tasks(tasks):
                         )
 
         filter_logic = " AND ".join([f"{i+1}" for i in range(len(filters))])
-        return {
-            "data": FilterContainerModel(
-                name="Common Task Criteria", filters=filters, filterLogic=filter_logic
-            )
-        }
+        return FilterContainerModel(
+            name="Common Task Criteria", filters=filters, filterLogic=filter_logic
+        )
     except Exception as e:
-        return {"data": str(e)}
+        raise Exception(format_error_message(e))
