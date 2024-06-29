@@ -1,4 +1,5 @@
 import os, json
+from server.constants import SESSION_EXPIRED
 
 APP_ENV = "production"
 if "APP_ENV" in os.environ:
@@ -43,11 +44,12 @@ def save_tokens(access_token, instance_url):
 
 
 def load_tokens():
+    response = None, None
     if os.path.exists(TOKEN_FILE):
         with open(TOKEN_FILE, "r") as f:
             data = json.load(f)
-            return data.get("access_token"), data.get("instance_url")
-    return None, None
+            response = data.get("access_token"), data.get("instance_url")
+    return response
 
 
 def custom_decoder(obj):

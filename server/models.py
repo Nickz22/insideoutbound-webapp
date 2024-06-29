@@ -11,12 +11,14 @@ class ApiResponse:
     data: Any
     message: str
     success: bool
+    status_code: Optional[int] = 200
 
     def to_dict(self):
         return {
             "data": self.data.to_dict() if self.data else None,
             "message": self.message,
             "success": self.success,
+            "status_code": self.status_code,
         }
 
 

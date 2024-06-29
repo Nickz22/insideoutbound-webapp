@@ -11,8 +11,11 @@ from server.models import (
     Event,
     CriteriaField,
 )
-from server.cache import load_tokens
+
 from server.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
+from server.cache import load_tokens
+
+access_token, instance_url = load_tokens()
 
 
 def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
@@ -23,38 +26,23 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     - List[CriteriaField]: A list of CriteriaField instances representing fields of the Task object.
     """
     api_response = ApiResponse(data=[], message="", success=False)
-    access_token, instance_url = (
-        load_tokens()
-    )  # Assume load_tokens gets the necessary authentication tokens
 
-    if not access_token or not instance_url:
-        api_response.message = SESSION_EXPIRED
-        return api_response
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    }
     fields_endpoint = f"{instance_url}/services/data/v55.0/sobjects/{sobject_type}/describe"  # Replace 'XX' with your actual API version
 
     try:
-        response = requests.get(fields_endpoint, headers=headers)
-        if response.status_code == 200:
-            fields_data = response.json().get("fields", [])
-            criteria_fields = [
-                CriteriaField(
-                    name=field["name"],
-                    type=field["type"] if field["name"] != "Subject" else "string",
-                    options=(
-                        field["picklistValues"] if field["type"] == "picklist" else []
-                    ),
-                )
-                for field in fields_data
-            ]
-            api_response.data = criteria_fields
-            api_response.success = True
-        else:
-            api_response.message = f"Failed to fetch criteria fields ({response.status_code}): {get_http_error_message(response)}"
+        fields_data = _fetch_sobjects(fields_endpoint, instance_url, access_token).data
+        criteria_fields = [
+            CriteriaField(
+                name=field["name"],
+                type=field["type"] if field["name"] != "Subject" else "string",
+                options=(
+                    field["picklistValues"] if field["type"] == "picklist" else []
+                ),
+            )
+            for field in fields_data
+        ]
+        api_response.data = criteria_fields
+        api_response.success = True
     except Exception as e:
         api_response.message = (
             f"While getting criteria fields {format_error_message(e)}"
@@ -69,6 +57,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     """
     Fetches tasks from Salesforce based on a list of account IDs, starting from a specific date,
     organized by criteria names for tasks related to contacts belonging to the specified accounts.
+    This version batches queries by contact IDs to handle large datasets.
 
     Parameters:
     - account_ids (list[str]): A list of account IDs to fetch tasks for.
@@ -86,33 +75,35 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        access_token, instance_url = load_tokens()  # Load tokens from file
-
-        if not instance_url or not access_token:
-            raise Exception(SESSION_EXPIRED)
-
         contacts = fetch_contacts_by_account_ids(account_ids)
         contact_by_id = {contact.id: contact for contact in contacts.data}
         contact_ids = pluck(contacts.data, "id")
 
-        criteria_group_tasks_by_account_id = {}
-        additional_filter = ""
-        if len(contact_ids) > 0:
-            additional_filter = f"WhoId IN ('{','.join(contact_ids)}')"
+        batch_size = 150
+        tasks_by_criteria_name = {}  # To accumulate tasks across batches
 
-        # Fetch tasks by criteria
-        tasks_by_criteria_name = fetch_contact_tasks_by_criteria_from_date(
-            criteria, start, additional_filter
-        )
+        # Process in batches
+        for i in range(0, len(contact_ids), batch_size):
+            batch_contact_ids = contact_ids[i : i + batch_size]
+            additional_filter = f"WhoId IN ('{','.join(batch_contact_ids)}')"
 
-        # Organizing tasks_by_criteria_name by account and criteria
+            # Fetch tasks by criteria for the current batch
+            batch_tasks = fetch_contact_tasks_by_criteria_from_date(
+                criteria, start, additional_filter
+            )
+
+            # Merge batch_tasks into tasks_by_criteria_name
+            for criteria_name, tasks in batch_tasks.data.items():
+                if criteria_name not in tasks_by_criteria_name:
+                    tasks_by_criteria_name[criteria_name] = []
+                tasks_by_criteria_name[criteria_name].extend(tasks)
+
+        # Organize tasks_by_criteria_name by account and criteria
         criteria_group_tasks_by_account_id = {
             account_id: {} for account_id in account_ids
         }
 
-        for criteria_name, tasks in tasks_by_criteria_name.data.items():
-            # remove tasks_by_criteria_name that have already been counted
-            ## we can't filter the query because the query string has max 4k length
+        for criteria_name, tasks in tasks_by_criteria_name.items():
             for task in tasks:
                 if task.id in already_counted_task_ids:
                     continue
@@ -132,8 +123,11 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
 
         api_response.data = criteria_group_tasks_by_account_id
         api_response.success = True
+        api_response.message = "Tasks fetched and organized successfully."
     except Exception as e:
-        raise Exception(format_error_message(e))
+        api_response.success = False
+        api_response.message = format_error_message(e)
+        raise Exception(api_response.message)
 
     return api_response
 
@@ -158,10 +152,6 @@ def fetch_contact_tasks_by_criteria_from_date(
     - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
     """
     api_response = ApiResponse(data=[], message="", success=False)
-    access_token, instance_url = load_tokens()  # Load tokens from file
-
-    if not instance_url or not access_token:
-        raise Exception(SESSION_EXPIRED)
 
     soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate FROM Task WHERE CreatedDate >= {from_datetime} AND "
     if additional_filter:
@@ -172,17 +162,15 @@ def fetch_contact_tasks_by_criteria_from_date(
         for filter_container in criteria:
             combined_conditions = _construct_where_clause_from_filter(filter_container)
 
-            fetch_response = _fetch_sobjects(
+            contact_task_models = []
+            for task in _fetch_sobjects(
                 f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC",
                 instance_url,
                 access_token,
-            )
-
-            contact_task_models = []
-            for task in fetch_response.data:
-                if not (
-                    task.get("WhoId", "") and task.get("WhoId", "").startswith("003")
-                ):
+            ).data:
+                if not task.get("WhoId", "") or task.get(
+                    "WhoId", ""
+                ).upper().startswith("00Q"):
                     continue
                 contact_task_models.append(
                     Task(
@@ -220,108 +208,105 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
     Throws:
     - Exception: Raises an exception with a formatted error message if any error occurs during the fetch
     """
-    api_response = ApiResponse(data={}, message="", success=False)
-    access_token, instance_url = load_tokens()  # Load tokens from file
-
-    if not instance_url or not access_token:
-        raise Exception(SESSION_EXPIRED)
+    api_response = ApiResponse(data={}, message="", success=True)
+    batch_size = 150
 
     contacts = fetch_contacts_by_account_ids(account_ids)
     contact_by_id = {contact.id: contact for contact in contacts.data}
-    contact_ids = pluck(contacts.data, "id")
+    contact_ids = list(contact_by_id.keys())
 
-    soql_query = f"SELECT Id, WhoId, WhatId, Subject, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{','.join(contact_ids)}') AND CreatedDate >= {start} ORDER BY StartDateTime ASC"
     events_by_account_id = {}
 
     try:
-        fetch_response = _fetch_sobjects(soql_query, instance_url, access_token)
+        # Process the contact IDs in batches of 150
+        for i in range(0, len(contact_ids), batch_size):
+            batch_contact_ids = contact_ids[i : i + batch_size]
+            joined_contact_ids = "','".join(batch_contact_ids)
+            soql_query = f"SELECT Id, WhoId, WhatId, Subject, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= '{start}' ORDER BY StartDateTime ASC"
 
-        for event in fetch_response.data:
-            account_id = contact_by_id.get(event.get("WhoId")).account_id
-            if account_id not in events_by_account_id:
-                events_by_account_id[account_id] = []
-            events_by_account_id[account_id].append(
-                Event(
-                    id=event.get("Id"),
-                    who_id=event.get("WhoId"),
-                    what_id=event.get("WhatId"),
-                    subject=event.get("Subject"),
-                    start_date_time=_parse_date_with_timezone(
-                        event["StartDateTime"].replace("Z", "+00:00")
-                    ),
-                    end_date_time=_parse_date_with_timezone(
-                        event["EndDateTime"].replace("Z", "+00:00")
-                    ),
+            # Assuming _fetch_sobjects is set up to handle the query
+            response = _fetch_sobjects(soql_query, instance_url, access_token)
+            for event in response.data:
+                account_id = contact_by_id.get(event.get("WhoId")).account_id
+                if account_id not in events_by_account_id:
+                    events_by_account_id[account_id] = []
+                events_by_account_id[account_id].append(
+                    {
+                        "id": event.get("Id"),
+                        "who_id": event.get("WhoId"),
+                        "what_id": event.get("WhatId"),
+                        "subject": event.get("Subject"),
+                        "start_date_time": _parse_date_with_timezone(
+                            event["StartDateTime"].replace("Z", "+00:00")
+                        ),
+                        "end_date_time": _parse_date_with_timezone(
+                            event["EndDateTime"].replace("Z", "+00:00")
+                        ),
+                    }
                 )
-            )
 
         api_response.data = events_by_account_id
-        api_response.success = True
+        api_response.message = "Events fetched successfully."
     except Exception as e:
-        raise Exception(format_error_message(e))
+        api_response.success = False
+        api_response.message = format_error_message(e)
+        raise Exception(api_response.message)
 
     return api_response
 
 
 def fetch_opportunities_by_account_ids_from_date(account_ids, start):
     """
-    Fetches opportunities from Salesforce based on a list of account IDs.
+    Fetches opportunities from Salesforce based on a list of account IDs, querying in batches of 150.
 
     Parameters:
     - account_ids (list[str]): A list of account IDs to fetch opportunities for.
+    - start (str): The start date for filtering opportunities, in ISO format.
 
     Returns:
-    - dict: A dictionary where each key is an account ID and each value is the list of opportunities fetched from Salesforce
-      for that account. The opportunities are represented as dictionaries with keys corresponding to the fields selected in the SOQL query.
+    - ApiResponse: An ApiResponse object containing the fetched opportunities as a list of Opportunity objects.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
     """
-    api_response = ApiResponse(data={}, message="", success=False)
-    access_token, instance_url = load_tokens()  # Load tokens from file
-
-    if not instance_url or not access_token:
-        raise Exception(SESSION_EXPIRED)
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    }
+    api_response = ApiResponse(data=[], message="", success=True)
+    batch_size = 150
 
     try:
-        joined_ids = ",".join([f"'{id}'" for id in account_ids])
-        soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids})"
-        request_url = f"{instance_url}/services/data/v55.0/query?q={soql_query}"
-        opportunity_models = []
+        # Process the account IDs in batches of 150
+        for i in range(0, len(account_ids), batch_size):
+            batch_ids = account_ids[i : i + batch_size]
+            joined_ids = ",".join([f"'{id}'" for id in batch_ids])
+            soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= '{start}' AND AccountId IN ({joined_ids})"
 
-        response = requests.get(request_url, headers=headers)
-        if response.status_code == 200:
-            opportunities = response.json().get("records", [])
-            for opportunity in opportunities:
-                opportunity_models.append(
-                    Opportunity(
-                        id=opportunity.get("Id"),
-                        account_id=opportunity.get("AccountId"),
-                        amount=opportunity.get("Amount"),
-                        created_date=_parse_date_with_timezone(
+            # Assuming _fetch_sobjects is set up to handle the query
+            response = _fetch_sobjects(soql_query, instance_url, access_token)
+            for opportunity in response.data:
+                api_response.data.append(
+                    {
+                        "id": opportunity.get("Id"),
+                        "account_id": opportunity.get("AccountId"),
+                        "amount": opportunity.get("Amount"),
+                        "created_date": _parse_date_with_timezone(
                             opportunity["CreatedDate"].replace("Z", "+00:00")
                         ),
-                        status=opportunity.get("Status"),
-                    )
+                        "stage_name": opportunity.get("StageName"),
+                    }
                 )
-            api_response.data = opportunity_models
-            api_response.success = True
-            api_response.message = "Opportunities fetched successfully."
-        else:
-            raise Exception(
-                f"Failed to fetch opportunities ({response.status_code}): {get_http_error_message(response)}"
-            )
+
+        api_response.success = True
+        api_response.message = "Opportunities fetched successfully."
     except Exception as e:
-        raise Exception(format_error_message(e))
+        api_response.success = False
+        api_response.message = format_error_message(e)
+        raise Exception(api_response.message)
 
     return api_response
 
 
 def fetch_contacts_by_account_ids(account_ids):
     """
-    Fetches contacts from Salesforce based on a list of account IDs.
+    Fetches contacts from Salesforce based on a list of account IDs, querying in batches of 150.
 
     Parameters:
     - account_ids (list[str]): A list of account IDs to fetch contacts for.
@@ -332,29 +317,20 @@ def fetch_contacts_by_account_ids(account_ids):
     Throws:
     - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
     """
-    api_response = ApiResponse(data=[], message="", success=False)
-    access_token, instance_url = load_tokens()  # Load tokens from file
-
-    if not instance_url or not access_token:
-        raise Exception(SESSION_EXPIRED)
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    }
+    api_response = ApiResponse(data=[], message="", success=True)
+    batch_size = 150
+    contact_models = []
 
     try:
-        joined_ids = ",".join([f"'{id}'" for id in account_ids])
-        soql_query = (
-            f"SELECT Id, AccountId FROM Contact WHERE AccountId IN ({joined_ids})"
-        )
-        request_url = f"{instance_url}/services/data/v55.0/query?q={soql_query}"
-        contact_models = []
+        # Process the account IDs in batches of 150
+        for i in range(0, len(account_ids), batch_size):
+            batch_ids = account_ids[i : i + batch_size]
+            joined_ids = ",".join([f"'{id}'" for id in batch_ids])
+            soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE AccountId IN ({joined_ids})"
 
-        response = requests.get(request_url, headers=headers)
-        if response.status_code == 200:
-            contacts = response.json().get("records", [])
-            for contact in contacts:
+            # Assuming _fetch_sobjects is set up to handle the query
+            response = _fetch_sobjects(soql_query, instance_url, access_token)
+            for contact in response.data:
                 contact_models.append(
                     Contact(
                         id=contact.get("Id"),
@@ -367,61 +343,60 @@ def fetch_contacts_by_account_ids(account_ids):
                         ),
                     )
                 )
-            api_response.data = contact_models
-            api_response.success = True
-        else:
-            raise Exception(
-                f"Failed to fetch contacts ({response.status_code}): {get_http_error_message(response)}"
-            )
+
+        api_response.data = contact_models
     except Exception as e:
+        api_response.success = False
         api_response.message = format_error_message(e)
 
     return api_response
 
 
 def fetch_contacts_by_ids(contact_ids):
+    """
+    Fetches contacts by their IDs from Salesforce and returns them as Contact model instances.
 
-    api_response = ApiResponse(data=[], message="", success=False)
+    This function takes a list of contact IDs, constructs a SOQL query to fetch contacts with those IDs from Salesforce,
+    and returns a structured ApiResponse containing the contacts. Each contact is returned as a Contact model instance,
+    including their first name, last name, account ID, and associated account name. It requires valid access tokens
+    to communicate with Salesforce's API.
 
-    access_token, instance_url = load_tokens()  # Load tokens from file
-    if not instance_url or not access_token:
-        raise Exception(SESSION_EXPIRED)
+    Parameters:
+    - contact_ids (list of str): A list of contact ID strings to fetch from Salesforce.
 
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    }
+    Returns:
+    - ApiResponse: An ApiResponse object containing a list of Contact model instances if the fetch is successful,
+      or an error message if not. The ApiResponse's `success` attribute indicates the operation's success.
+
+    Raises:
+    - Exception: If the access tokens are missing or expired, or if an error occurs during the API request or data processing.
+
+    Note:
+    - This function assumes the existence of a valid session with Salesforce, as it requires access tokens.
+    - The function internally handles the construction of the SOQL query and the API request.
+    """
+    api_response = ApiResponse(data=[], message="", success=True)
 
     try:
-
         joined_ids = ",".join([f"'{id}'" for id in contact_ids])
         soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
-        request_url = f"{instance_url}/services/data/v55.0/query?q={soql_query}"
         contact_models = []
 
-        response = requests.get(request_url, headers=headers)
-        if response.status_code == 200:
-            contacts = response.json().get("records", [])
-            for contact in contacts:
-                contact_models.append(
-                    Contact(
-                        id=contact.get("Id"),
-                        first_name=contact.get("FirstName"),
-                        last_name=contact.get("LastName"),
-                        account_id=contact.get("AccountId"),
-                        account=Account(
-                            id=contact.get("AccountId"),
-                            name=contact.get("Account").get("Name"),
-                        ),
-                    )
+        for contact in _fetch_sobjects(soql_query, instance_url, access_token).data:
+            contact_models.append(
+                Contact(
+                    id=contact.get("Id"),
+                    first_name=contact.get("FirstName"),
+                    last_name=contact.get("LastName"),
+                    account_id=contact.get("AccountId"),
+                    account=Account(
+                        id=contact.get("AccountId"),
+                        name=contact.get("Account").get("Name"),
+                    ),
                 )
-            api_response.data = contact_models
-            api_response.success = True
-            api_response.message = "Contacts fetched successfully."
-        else:
-            raise Exception(
-                f"Failed to fetch contacts from Salesforce ({response.status_code}): {get_http_error_message(response)}"
             )
+        api_response.data = contact_models
+        api_response.message = "Contacts fetched successfully."
     except Exception as e:
         raise Exception(format_error_message(e))
 
@@ -454,8 +429,10 @@ def _construct_where_clause_from_filter(filter_container):
 
 
 def _fetch_sobjects(soql_query, instance_url, access_token):
-    headers = {"Authorization": f"Bearer {access_token}"}
     try:
+        if not access_token or not instance_url:
+            raise Exception(SESSION_EXPIRED)
+        headers = {"Authorization": f"Bearer {access_token}"}
         response = requests.get(
             f"{instance_url}/services/data/v55.0/query",
             headers=headers,
@@ -463,7 +440,10 @@ def _fetch_sobjects(soql_query, instance_url, access_token):
         )
         if response.status_code == 200:
             return ApiResponse(
-                success=True, data=response.json()["records"], message=None
+                success=True,
+                data=response.json()["records"],
+                message=None,
+                status_code=200,
             )
         else:
             raise Exception(

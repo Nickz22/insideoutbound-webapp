@@ -62,7 +62,7 @@ def update_activation_states():
 
         tasks_by_filter_name = fetch_contact_tasks_by_criteria_from_date(
             settings.criteria,
-            f"{get_threshold_date_for_activatable_tasks()}T00:00:00Z",
+            f"{get_threshold_date_for_activatable_tasks(settings)}T00:00:00Z",
             (
                 f"WHERE WhoId NOT IN ('{','.join(activated_account_contact_ids)}')"
                 if len(activated_account_contact_ids) > 0

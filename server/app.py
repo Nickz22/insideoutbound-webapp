@@ -162,7 +162,7 @@ def oauth_callback():
         return jsonify(error_details), 500
 
 
-@app.route("/load_prospecting_activities")
+@app.route("/load_prospecting_activities", methods=["GET"])
 def load_prospecting_activities():
     api_response = ApiResponse(data=[], message="", success=False)
     try:
