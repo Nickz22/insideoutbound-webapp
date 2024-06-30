@@ -1,14 +1,16 @@
 import requests
 from datetime import datetime
 from typing import List, Dict
-from server.utils import pluck, format_error_message
+from server.utils import pluck, format_error_message, parse_date_with_timezone
 from server.models import (
     ApiResponse,
     Contact,
     Account,
     Task,
     Opportunity,
+    OpportunitySObject,
     Event,
+    EventSObject,
     CriteriaField,
 )
 
@@ -178,7 +180,7 @@ def fetch_contact_tasks_by_criteria_from_date(
                         who_id=task.get("WhoId"),
                         subject=task.get("Subject"),
                         status=task.get("Status"),
-                        created_date=_parse_date_with_timezone(
+                        created_date=parse_date_with_timezone(
                             task["CreatedDate"].replace("Z", "+00:00")
                         ),
                     )
@@ -231,26 +233,13 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
                 if account_id not in events_by_account_id:
                     events_by_account_id[account_id] = []
                 events_by_account_id[account_id].append(
-                    {
-                        "id": event.get("Id"),
-                        "who_id": event.get("WhoId"),
-                        "what_id": event.get("WhatId"),
-                        "subject": event.get("Subject"),
-                        "start_date_time": _parse_date_with_timezone(
-                            event["StartDateTime"].replace("Z", "+00:00")
-                        ),
-                        "end_date_time": _parse_date_with_timezone(
-                            event["EndDateTime"].replace("Z", "+00:00")
-                        ),
-                    }
+                    Event.from_sobject(EventSObject(**event))
                 )
 
         api_response.data = events_by_account_id
         api_response.message = "Events fetched successfully."
     except Exception as e:
-        api_response.success = False
-        api_response.message = format_error_message(e)
-        raise Exception(api_response.message)
+        raise Exception(format_error_message(e))
 
     return api_response
 
@@ -283,15 +272,7 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
             response = _fetch_sobjects(soql_query, instance_url, access_token)
             for opportunity in response.data:
                 api_response.data.append(
-                    {
-                        "id": opportunity.get("Id"),
-                        "account_id": opportunity.get("AccountId"),
-                        "amount": opportunity.get("Amount"),
-                        "created_date": _parse_date_with_timezone(
-                            opportunity["CreatedDate"].replace("Z", "+00:00")
-                        ),
-                        "stage_name": opportunity.get("StageName"),
-                    }
+                    Opportunity.from_sobject(OpportunitySObject(**opportunity))
                 )
 
         api_response.success = True
@@ -346,20 +327,14 @@ def fetch_contacts_by_account_ids(account_ids):
 
         api_response.data = contact_models
     except Exception as e:
-        api_response.success = False
-        api_response.message = format_error_message(e)
+        raise Exception(format_error_message(e))
 
     return api_response
 
 
-def fetch_contacts_by_ids(contact_ids):
+def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
     """
     Fetches contacts by their IDs from Salesforce and returns them as Contact model instances.
-
-    This function takes a list of contact IDs, constructs a SOQL query to fetch contacts with those IDs from Salesforce,
-    and returns a structured ApiResponse containing the contacts. Each contact is returned as a Contact model instance,
-    including their first name, last name, account ID, and associated account name. It requires valid access tokens
-    to communicate with Salesforce's API.
 
     Parameters:
     - contact_ids (list of str): A list of contact ID strings to fetch from Salesforce.
@@ -370,33 +345,36 @@ def fetch_contacts_by_ids(contact_ids):
 
     Raises:
     - Exception: If the access tokens are missing or expired, or if an error occurs during the API request or data processing.
-
-    Note:
-    - This function assumes the existence of a valid session with Salesforce, as it requires access tokens.
-    - The function internally handles the construction of the SOQL query and the API request.
     """
     api_response = ApiResponse(data=[], message="", success=True)
+    batch_size = 150
+    contact_models = []
 
     try:
-        joined_ids = ",".join([f"'{id}'" for id in contact_ids])
-        soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
-        contact_models = []
+        # Process the contact IDs in batches of 150
+        for i in range(0, len(contact_ids), batch_size):
+            batch_ids = contact_ids[i : i + batch_size]
+            joined_ids = ",".join([f"'{id}'" for id in batch_ids])
+            soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
 
-        for contact in _fetch_sobjects(soql_query, instance_url, access_token).data:
-            contact_models.append(
-                Contact(
-                    id=contact.get("Id"),
-                    first_name=contact.get("FirstName"),
-                    last_name=contact.get("LastName"),
-                    account_id=contact.get("AccountId"),
-                    account=Account(
-                        id=contact.get("AccountId"),
-                        name=contact.get("Account").get("Name"),
-                    ),
+            # Assuming _fetch_sobjects is set up to handle the query
+            for contact in _fetch_sobjects(soql_query, instance_url, access_token).data:
+                contact_models.append(
+                    Contact(
+                        id=contact.get("Id"),
+                        first_name=contact.get("FirstName"),
+                        last_name=contact.get("LastName"),
+                        account_id=contact.get("AccountId"),
+                        account=Account(
+                            id=contact.get("AccountId"),
+                            name=contact.get("Account").get("Name"),
+                        ),
+                    )
                 )
-            )
+
         api_response.data = contact_models
         api_response.message = "Contacts fetched successfully."
+        api_response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))
 
@@ -471,16 +449,6 @@ def _construct_condition(filter_obj):
         value = f"{value}"
 
     return f"{field} {operator}{value}"
-
-
-def _parse_date_with_timezone(date_str):
-    base_time = date_str[:-9]
-    timezone = date_str[-5:]
-    fixed_timezone = timezone[:3] + ":" + timezone[3:]
-
-    iso_formatted_str = base_time + fixed_timezone
-
-    return datetime.fromisoformat(iso_formatted_str)
 
 
 def get_http_error_message(response):

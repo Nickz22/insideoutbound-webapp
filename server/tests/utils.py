@@ -1,9 +1,4 @@
-import re, json, copy
-from server.models import TaskSObject
-from server.tests.c import (
-    mock_tasks_for_criteria_with_contains_content,
-    mock_tasks_for_criteria_with_unique_values_content,
-)
+import re
 
 
 def is_valid_salesforce_query(query: str) -> bool:
@@ -92,35 +87,25 @@ def validate_where_part(where_part: str) -> bool:
     order_by_parts = where_part.split(" ORDER BY ")
     where_part = order_by_parts[0]
 
-    # Check for valid operators
+    # Check for valid operators - order is important
     valid_operators = [
-        "=",
         "!=",
-        "<",
+        "=",
         "<=",
-        ">",
         ">=",
-        "IN",
+        "<",
+        ">",
         "NOT IN",
+        "IN",
         "INCLUDES",
         "EXCLUDES",
+        "LIKE",
     ]
     for op in valid_operators:
-        where_part = where_part.replace(op, "")
+        where_part = where_part.replace(op, " ")
 
-    # Handle LIKE operator separately
-    like_parts = re.split(r"\bLIKE\b", where_part)
-    where_part = like_parts[0]
-    for part in like_parts[1:]:
-        # Remove the string literal part of LIKE clause
-        string_literal = re.search(r"'[^']*'", part)
-        if string_literal:
-            where_part += part.replace(string_literal.group(), "")
-        else:
-            where_part += part
-
-    # Check for AND, OR
-    where_part = where_part.replace(" AND ", "").replace(" OR ", "")
+    # Remove AND, OR
+    where_part = where_part.replace(" AND ", " ").replace(" OR ", " ")
 
     # Remove any valid date literals
     date_literals = [
@@ -143,37 +128,25 @@ def validate_where_part(where_part: str) -> bool:
         "NEXT_YEAR",
     ]
     for literal in date_literals:
-        where_part = where_part.replace(literal, "")
+        where_part = where_part.replace(literal, " ")
 
     # Remove any ISO8601 date strings
-    where_part = re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", "", where_part)
+    where_part = re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", " ", where_part)
 
-    # If we've removed all valid parts and there's still content, it's likely invalid
-    if re.search(r"[^a-zA-Z0-9_\s\'\"\.\(\)]", where_part):
+    # Remove string literals
+    where_part = re.sub(r"'[^']*'", " ", where_part)
+
+    # Remove numeric literals
+    where_part = re.sub(r"\b\d+\b", " ", where_part)
+
+    # Remove null
+    where_part = where_part.replace("null", " ")
+
+    # Remove extra spaces
+    where_part = " ".join(where_part.split())
+
+    # If we've removed all valid parts, what remains should only be field names, parentheses and commas
+    if re.search(r"[^a-zA-Z0-9_\s\(\),]", where_part):
         return False
 
     return True
-
-
-def get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query():
-    cloned_tasks = []
-    # 3 tasks per contact (total 10 WhoIds)
-    for i in range(10):
-        for task in mock_tasks_for_criteria_with_contains_content:
-            task_copy = TaskSObject(**task)
-            task_copy.WhoId = f"{task_copy.WhoId}{i}"  # Append `i` to `WhoId`
-            cloned_tasks.append(task_copy.to_dict())
-
-    return cloned_tasks
-
-def get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query():
-    cloned_tasks = []
-    # 3 tasks per contact (total 10 WhoIds)
-    for i in range(10):
-        for task in mock_tasks_for_criteria_with_unique_values_content:
-            task_copy = TaskSObject(**task)
-            task_copy.WhoId = f"{task_copy.WhoId}{i}"  # Append `i` to `WhoId`
-            task_copy.Status = f"{task_copy.Status}_Unique_{i}"
-            cloned_tasks.append(task_copy.to_dict())
-
-    return cloned_tasks

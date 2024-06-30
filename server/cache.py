@@ -113,7 +113,7 @@ def upsert_activations(new_activations: list[Activation]):
             event_ids=activation.event_ids,
             opportunity=activation.opportunity,
             status=activation.status,
-        )
+        ).to_dict()
         # Upsert the activation data
         activation_dict[activation.id] = activation_data
 
@@ -164,9 +164,11 @@ def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResp
                     continue
 
                 account = deserialize_account(entry["account"])
-                prospecting_metadata = deserialize_prospecting_metadata(
-                    entry.get("prospecting_metadata", [])
-                )
+                prospecting_metadata = None
+                if entry.get("prospecting_metadata"):
+                    prospecting_metadata = deserialize_prospecting_metadata(
+                        entry.get("prospecting_metadata", [])
+                    )
 
                 activation = Activation(
                     id=entry["id"],

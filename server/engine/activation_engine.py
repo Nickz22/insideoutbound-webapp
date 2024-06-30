@@ -8,7 +8,7 @@ from server.services.activation_service import (
 from server.api.salesforce import (
     fetch_contact_tasks_by_criteria_from_date,
     fetch_contacts_by_account_ids,
-    fetch_contacts_by_ids,
+    fetch_contacts_by_ids_and_non_null_accounts,
 )
 from server.constants import WHO_ID
 from server.cache import (
@@ -70,12 +70,12 @@ def update_activation_states():
             ),
         ).data
 
-        contact_ids = []
+        contact_ids = set()
         for criteria_name in tasks_by_filter_name:
-            contact_ids.extend(pluck(tasks_by_filter_name[criteria_name], WHO_ID))
+            contact_ids.update(pluck(tasks_by_filter_name[criteria_name], WHO_ID))
 
         contacts = (
-            fetch_contacts_by_ids(contact_ids).data
+            fetch_contacts_by_ids_and_non_null_accounts(list(contact_ids)).data
             if len(contact_ids) > 0
             else ApiResponse(data=[], message="", success=True)
         )

@@ -59,13 +59,37 @@ def add_days(date, days):
     return date + timedelta(days=days)
 
 
-def is_model_created_within_period(sobject_model, start_date, period_days):
+def is_model_date_field_within_window(
+    sobject_model, start_date, period_days, date_field="created_date"
+):
+    """
+    Check if the date field of a model is within a window of days from a start date.
+
+    :param sobject_model: The model to check
+    :param start_date: The start date of the window
+    :param period_days: The number of days in the window
+    :param date_field: The date field to check
+    """
     end_date = start_date + timedelta(days=period_days)
-    return start_date <= sobject_model.created_date <= end_date
+    model_date_value = getattr(sobject_model, date_field)
+    return start_date <= model_date_value <= end_date
 
 
 def dt_to_iso_format(dt: datetime):
     return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
+
+def parse_date_with_timezone(date_str) -> datetime:
+    """
+    Takes a datetime string from an SObject and converts it to a datetime object with timezone.
+    """
+    base_time = date_str[:-9]
+    timezone = date_str[-5:]
+    fixed_timezone = timezone[:3] + ":" + timezone[3:]
+
+    iso_formatted_str = base_time + fixed_timezone
+
+    return datetime.fromisoformat(iso_formatted_str)
 
 
 # error utils

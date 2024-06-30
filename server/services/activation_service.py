@@ -11,7 +11,7 @@ from server.models import Activation, Account, ApiResponse
 from server.utils import (
     generate_unique_id,
     add_days,
-    is_model_created_within_period,
+    is_model_date_field_within_window,
     group_by,
     pluck,
     format_error_message,
@@ -88,7 +88,7 @@ def find_unresponsive_activations(activations, settings: Settings):
 
             found_prospecting_activity = False
             for task in all_tasks:
-                is_task_within_inactivity_threshold = is_model_created_within_period(
+                is_task_within_inactivity_threshold = is_model_date_field_within_window(
                     task,
                     activation.last_prospecting_activity,
                     settings["account_inactivity_threshold"],
@@ -191,7 +191,7 @@ def increment_existing_activations(activations, settings):
             # opportunity for merge sort implementation
             all_tasks = sorted(all_tasks, key=lambda x: x.created_date)
             for task in all_tasks:
-                is_task_within_inactivity_threshold = is_model_created_within_period(
+                is_task_within_inactivity_threshold = is_model_date_field_within_window(
                     task,
                     activation.last_prospecting_activity,
                     settings["account_inactivity_threshold"],
@@ -214,7 +214,7 @@ def increment_existing_activations(activations, settings):
             if events:
                 for event in events:
                     if (
-                        is_model_created_within_period(
+                        is_model_date_field_within_window(
                             event,
                             activation.first_prospecting_activity,
                             settings["account_inactivity_threshold"],
@@ -226,7 +226,7 @@ def increment_existing_activations(activations, settings):
 
             if opportunities:
                 for opportunity in opportunities:
-                    if is_model_created_within_period(
+                    if is_model_date_field_within_window(
                         opportunity,
                         activation.first_prospecting_activity,
                         settings["account_inactivity_threshold"],
@@ -260,153 +260,154 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     """
     response = ApiResponse(data=[], message="", success=True)
 
-    tasks_by_account_id = get_tasks_by_account_id(tasks_by_criteria, contacts)
-    first_prospecting_activity = get_first_prospecting_activity_date(tasks_by_criteria)
-    opportunity_by_account_id = group_by(
-        fetch_opportunities_by_account_ids_from_date(
-            tasks_by_account_id.keys(), first_prospecting_activity
-        ).data,
-        "account_id",
-    )
-    events_by_account_id = fetch_events_by_account_ids_from_date(
-        tasks_by_account_id.keys(), first_prospecting_activity
-    )
-
-    task_ids_by_criteria_name = get_task_ids_by_criteria_name(tasks_by_account_id)
-    contact_by_id = {contact.id: contact for contact in contacts}
-    for account_id, tasks_by_criteria_by_who_id in tasks_by_account_id.items():
-        all_tasks_under_account = get_all_tasks_under_account(
-            tasks_by_criteria_by_who_id
+    try:
+        tasks_by_account_id = get_tasks_by_account_id(tasks_by_criteria, contacts)
+        first_prospecting_activity = get_first_prospecting_activity_date(
+            tasks_by_criteria
         )
-
-        if len(all_tasks_under_account) == 0:
-            continue
-
-        activations = []
-
-        # although the Task API query is sorted already, grouping them potentially breaks a perfect sort
-        ## so we'll sort again here to be safe...opportunity for optimization via merge sort
-        all_tasks_under_account = sorted(
-            all_tasks_under_account, key=lambda x: x.created_date
+        opportunity_by_account_id = group_by(
+            fetch_opportunities_by_account_ids_from_date(
+                list(tasks_by_account_id.keys()), first_prospecting_activity
+            ).data,
+            "account_id",
         )
+        events_by_account_id = fetch_events_by_account_ids_from_date(
+            list(tasks_by_account_id.keys()), first_prospecting_activity
+        ).data
 
-        start_tracking_period = all_tasks_under_account[0].created_date
-
-        qualifying_event = get_qualifying_event(
-            events_by_account_id.get(account_id, []),
-            start_tracking_period,
-            settings.tracking_period,
-        )
-
-        qualifying_opportunity = get_qualifying_opportunity(
-            opportunity_by_account_id.get(account_id, []),
-            start_tracking_period,
-            settings.tracking_period,
-        )
-
-        valid_task_ids_by_who_id = {}
-        task_ids = []
-
-        for task in all_tasks_under_account:
-            is_task_in_tracking_period = is_model_created_within_period(
-                task, start_tracking_period, settings.tracking_period
+        task_ids_by_criteria_name = get_task_ids_by_criteria_name(tasks_by_account_id)
+        for account_id, tasks_by_criteria_by_who_id in tasks_by_account_id.items():
+            all_tasks_under_account = get_all_tasks_under_account(
+                tasks_by_criteria_by_who_id
             )
-            if is_task_in_tracking_period:
-                if task.who_id not in valid_task_ids_by_who_id:
-                    valid_task_ids_by_who_id[task.who_id] = []
-                    first_prospecting_activity = task.created_date
-                valid_task_ids_by_who_id[task.who_id].append(task.id)
-                task_ids.append(task.id)
 
-            if not is_task_in_tracking_period:
-                active_contact_ids = get_active_contact_ids(
-                    valid_task_ids_by_who_id, settings.activities_per_contact
-                )
+            if len(all_tasks_under_account) == 0:
+                continue
 
-                is_account_active_for_tracking_period = (
-                    len(active_contact_ids) >= settings.contacts_per_account
-                    or qualifying_event
-                    or qualifying_opportunity
+            activations = []
+
+            # although the Task API query is sorted already, grouping them potentially breaks a perfect sort
+            ## so we'll sort again here to be safe...opportunity for optimization via merge sort
+            all_tasks_under_account = sorted(
+                all_tasks_under_account, key=lambda x: x.created_date
+            )
+
+            start_tracking_period = all_tasks_under_account[0].created_date
+
+            qualifying_event = get_qualifying_event(
+                events_by_account_id.get(account_id, []),
+                start_tracking_period,
+                settings.tracking_period,
+            )
+
+            qualifying_opportunity = get_qualifying_opportunity(
+                opportunity_by_account_id.get(account_id, []),
+                start_tracking_period,
+                settings.tracking_period,
+            )
+
+            valid_task_ids_by_who_id = {}
+            task_ids = []
+
+            for task in all_tasks_under_account:
+                is_task_in_tracking_period = is_model_date_field_within_window(
+                    task, start_tracking_period, settings.tracking_period
                 )
-                if not is_account_active_for_tracking_period:
-                    start_tracking_period = add_days(
-                        start_tracking_period,
-                        settings.tracking_period + settings.inactivity_threshold,
-                    )
-                    valid_task_ids_by_who_id.clear()
-                    first_prospecting_activity = None
-                    task_ids.clear()
-                    if is_model_created_within_period(
-                        task, start_tracking_period, settings.tracking_period
-                    ):
-                        valid_task_ids_by_who_id[task.who_id] = [task.id]
+                if is_task_in_tracking_period:
+                    if task.who_id not in valid_task_ids_by_who_id:
+                        valid_task_ids_by_who_id[task.who_id] = []
                         first_prospecting_activity = task.created_date
-                        task_ids = [task.id]
-                    continue
+                    valid_task_ids_by_who_id[task.who_id].append(task.id)
+                    task_ids.append(task.id)
 
-                # Can add Prospecting Metadata by
-                # finding Task Ids within task_ids_by_criteria_name
-                activations.append(
-                    Activation(
-                        id=generate_unique_id(),
-                        account=Account(
-                            name=contacts[active_contact_ids[0]].account.name,
-                            id=account_id,
-                        ),
-                        activated_date=first_prospecting_activity,
-                        active_contact_ids=active_contact_ids,
-                        last_prospecting_activity=task.created_date,
-                        first_prospecting_activity=first_prospecting_activity,
-                        task_ids=task_ids,
-                        opportunity=qualifying_opportunity,
-                        event_ids=(
-                            set(qualifying_event.id) if qualifying_event else None
-                        ),
-                        status=(
-                            "Opportunity Created"
-                            if qualifying_opportunity
-                            else "Meeting Set" if qualifying_event else "Activated"
-                        ),
+                if not is_task_in_tracking_period:
+                    active_contact_ids = get_active_contact_ids(
+                        valid_task_ids_by_who_id, settings.activities_per_contact
                     )
-                )
 
-        # this account's tasks have ended, check for activation
-        active_contact_ids = get_active_contact_ids(
-            valid_task_ids_by_who_id, settings.activities_per_contact
-        )
+                    is_account_active_for_tracking_period = (
+                        len(active_contact_ids) >= settings.contacts_per_account
+                        or qualifying_event
+                        or qualifying_opportunity
+                    )
+                    if not is_account_active_for_tracking_period:
+                        start_tracking_period = add_days(
+                            start_tracking_period,
+                            settings.tracking_period + settings.inactivity_threshold,
+                        )
+                        valid_task_ids_by_who_id.clear()
+                        first_prospecting_activity = None
+                        task_ids.clear()
+                        if is_model_date_field_within_window(
+                            task, start_tracking_period, settings.tracking_period
+                        ):
+                            valid_task_ids_by_who_id[task.who_id] = [task.id]
+                            first_prospecting_activity = task.created_date
+                            task_ids = [task.id]
+                        continue
 
-        is_account_active_for_tracking_period = (
-            len(active_contact_ids) >= settings.contacts_per_account
-            or qualifying_event
-            or qualifying_opportunity
-        )
-        if not is_account_active_for_tracking_period:
-            continue
+                    # Can add Prospecting Metadata by
+                    # finding Task Ids within task_ids_by_criteria_name
+                    activations.append(
+                        Activation(
+                            id=generate_unique_id(),
+                            account=Account(
+                                name=contacts[active_contact_ids[0]].account.name,
+                                id=account_id,
+                            ),
+                            activated_date=first_prospecting_activity,
+                            active_contact_ids=active_contact_ids,
+                            last_prospecting_activity=task.created_date,
+                            first_prospecting_activity=first_prospecting_activity,
+                            task_ids=task_ids,
+                            opportunity=qualifying_opportunity,
+                            event_ids=(
+                                set(qualifying_event.id) if qualifying_event else None
+                            ),
+                            status=(
+                                "Opportunity Created"
+                                if qualifying_opportunity
+                                else "Meeting Set" if qualifying_event else "Activated"
+                            ),
+                        )
+                    )
 
-        # Can add Prospecting Metadata by
-        activations.append(
-            Activation(
-                id=generate_unique_id(),
-                account=Account(
-                    name=contact_by_id.get(active_contact_ids[0]).account.name,
-                    id=account_id,
-                ),
-                activated_date=first_prospecting_activity,
-                active_contact_ids=active_contact_ids,
-                first_prospecting_activity=first_prospecting_activity,
-                last_prospecting_activity=task.created_date,
-                opportunity=qualifying_opportunity,
-                event_ids=(set(qualifying_event.id) if qualifying_event else None),
-                task_ids=task_ids,
-                status=(
-                    "Opportunity Created"
-                    if qualifying_opportunity
-                    else "Meeting Set" if qualifying_event else "Activated"
-                ),
+            # this account's tasks have ended, check for activation
+            active_contact_ids = get_active_contact_ids(
+                valid_task_ids_by_who_id, settings.activities_per_contact
             )
-        )
 
-        response.data.extend(activations)
+            is_account_active_for_tracking_period = (
+                len(active_contact_ids) >= settings.contacts_per_account
+                or qualifying_event
+                or qualifying_opportunity
+            )
+            if not is_account_active_for_tracking_period:
+                continue
+
+            # Can add Prospecting Metadata by
+            activations.append(
+                Activation(
+                    id=generate_unique_id(),
+                    account=Account(id=account_id),
+                    activated_date=first_prospecting_activity.date(),
+                    active_contact_ids=active_contact_ids,
+                    first_prospecting_activity=first_prospecting_activity.date(),
+                    last_prospecting_activity=task.created_date.date(),
+                    opportunity=qualifying_opportunity,
+                    event_ids=(set(qualifying_event.id) if qualifying_event else None),
+                    task_ids=task_ids,
+                    status=(
+                        "Opportunity Created"
+                        if qualifying_opportunity
+                        else "Meeting Set" if qualifying_event else "Activated"
+                    ),
+                )
+            )
+
+            response.data.extend(activations)
+    except Exception as e:
+        raise Exception(format_error_message(e))
 
     return response
 
@@ -464,12 +465,15 @@ def get_tasks_by_account_id(tasks_by_criteria, contacts):
             if criteria_key not in tasks_by_account_id[account_id][task.who_id]:
                 tasks_by_account_id[account_id][task.who_id][criteria_key] = []
             tasks_by_account_id[account_id][task.who_id][criteria_key].append(task)
+    return tasks_by_account_id
 
 
 def get_qualifying_event(events, start_date, tracking_period):
     qualifying_event = None
     for event in events:
-        if is_model_created_within_period(event, start_date, tracking_period):
+        if is_model_date_field_within_window(
+            event, start_date, tracking_period, "start_datetime"
+        ):
             qualifying_event = event
             break
     return qualifying_event
@@ -478,7 +482,7 @@ def get_qualifying_event(events, start_date, tracking_period):
 def get_qualifying_opportunity(opportunities, start_date, tracking_period):
     qualifying_opportunity = None
     for opportunity in opportunities:
-        if is_model_created_within_period(opportunity, start_date, tracking_period):
+        if is_model_date_field_within_window(opportunity, start_date, tracking_period):
             qualifying_opportunity = opportunity
             break
     return qualifying_opportunity

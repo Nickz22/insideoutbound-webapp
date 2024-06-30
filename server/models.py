@@ -1,9 +1,9 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import List
 from datetime import date, datetime
 from typing import List, Optional, Any
 
-from server.utils import remove_underscores_from_numbers
+from server.utils import remove_underscores_from_numbers, parse_date_with_timezone
 
 
 @dataclass
@@ -40,22 +40,13 @@ class ProspectingMetadata:
 @dataclass
 class Account:
     id: str
-    name: str
-
-
-@dataclass
-class Opportunity:
-    id: str
-    name: str
-    amount: int
-    created_date: date
-    status: str
+    name: Optional[str] = None
 
 
 @dataclass
 class Task:
     id: str
-    created_date: date
+    created_date: datetime
     who_id: str
     subject: str
     status: str
@@ -83,11 +74,48 @@ class TaskSObject:
 
 
 @dataclass
+class EventSObject:
+    Id: str
+    CreatedDate: datetime
+    WhoId: str
+    Subject: str
+    StartDateTime: datetime
+    EndDateTime: datetime
+
+    def __post_init__(self):
+        if isinstance(self.CreatedDate, str):
+            self.CreatedDate = parse_date_with_timezone(self.CreatedDate)
+        if isinstance(self.StartDateTime, str):
+            self.StartDateTime = parse_date_with_timezone(self.StartDateTime)
+        if isinstance(self.EndDateTime, str):
+            self.EndDateTime = parse_date_with_timezone(self.EndDateTime)
+
+    def to_dict(self):
+        return convert_to_dict(asdict(self))
+
+
+@dataclass
 class Event:
     id: str
     created_date: date
     who_id: str
     subject: str
+    start_datetime: datetime
+    end_datetime: datetime
+
+    @classmethod
+    def from_sobject(cls, sobject: EventSObject):
+        return cls(
+            id=sobject.Id,
+            created_date=sobject.CreatedDate,
+            who_id=sobject.WhoId,
+            subject=sobject.Subject,
+            start_datetime=sobject.StartDateTime,
+            end_datetime=sobject.EndDateTime,
+        )
+
+    def to_dict(self):
+        return convert_to_dict(asdict(self))
 
 
 @dataclass
@@ -97,6 +125,43 @@ class Contact:
     last_name: str
     account_id: str
     account: Account
+
+
+@dataclass
+class OpportunitySObject:
+    Id: str
+    Name: str
+    Amount: int
+    AccountId: str
+    StageName: str
+    CreatedDate: str
+
+    def to_dict(self):
+        return asdict(self)
+
+
+@dataclass
+class Opportunity:
+    id: str
+    account_id: str
+    name: str
+    amount: int
+    created_date: datetime
+    status: str
+
+    @classmethod
+    def from_sobject(cls, sobject: OpportunitySObject):
+        return cls(
+            id=sobject.Id,
+            account_id=sobject.AccountId,
+            name=sobject.Name,
+            amount=sobject.Amount,
+            created_date=parse_date_with_timezone(sobject.CreatedDate),
+            status=sobject.StageName,
+        )
+
+    def to_dict(self):
+        return convert_to_dict(asdict(self))
 
 
 @dataclass
@@ -116,6 +181,9 @@ class Activation:
     last_outbound_engagement: Optional[date] = None
     opportunity: Optional[Opportunity] = None
     status: Optional[str] = "Activated"
+
+    def to_dict(self):
+        return convert_to_dict(asdict(self))
 
 
 @dataclass
@@ -285,3 +353,17 @@ class SettingsModel:
                 else None
             ),
         }
+
+
+def convert_to_dict(obj):
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    elif isinstance(obj, set):
+        return list(obj)
+    elif isinstance(obj, dict):
+        return {k: convert_to_dict(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_dict(v) for v in obj]
+    elif hasattr(obj, "to_dict"):
+        return obj.to_dict()
+    return obj

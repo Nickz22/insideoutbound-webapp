@@ -10,10 +10,16 @@ from server.tests.c import (
     mock_tasks_for_criteria_with_contains_content,
     mock_tasks_for_criteria_with_unique_values_content,
 )
-from server.tests.utils import (
-    is_valid_salesforce_query,
+from server.tests.mocks import (
+    set_mock_response_by_request_key,
+    clear_mocks,
+    response_based_on_query,
+    get_one_mock_task_per_contact_for_contains_content_criteria_query,
     get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query,
     get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query,
+    get_ten_mock_contacts_spread_across_five_accounts,
+    get_mock_opportunity_for_account,
+    get_mock_event_for_account,
 )
 
 ##
@@ -41,7 +47,7 @@ class TestActivationLogic(unittest.TestCase):
         self.do_onboarding_flow()
         settings_model = self.fetch_settings_model_from_db()
 
-        self.assertEqual(settings_model.activitiesPerContact, 7)
+        self.assertEqual(settings_model.activitiesPerContact, 3)
         self.assertEqual(settings_model.contactsPerAccount, 2)
         self.assertEqual(settings_model.trackingPeriod, 5)
         self.assertEqual(settings_model.activateByMeeting, True)
@@ -113,65 +119,112 @@ class TestActivationLogic(unittest.TestCase):
             len(subject_filters) == 1
         ), "There should be exactly one FilterModel with field='Subject' and operator='contains' and value of 'Unique Subject'"
 
+    def tearDown(self):
+        # clear any mock api responses setup by last test
+        clear_mocks()
+        # clear any activations from last test
+        with open("test_activations.json", "w") as f:
+            f.write("[]")
+
     @patch("requests.get")
     def test_should_create_new_activation_when_sufficient_prospecting_activities_are_in_salesforce(
         self, mock_sobject_fetch
     ):
+
+        # setup mock api responses
+        set_mock_response_by_request_key(
+            "contains_content_criteria_query",
+            get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query(),
+        )
+        set_mock_response_by_request_key(
+            "unique_values_content_criteria_query",
+            get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query(),
+        )
+        set_mock_response_by_request_key(
+            "fetch_contacts_by_account_ids",
+            get_ten_mock_contacts_spread_across_five_accounts(),
+        )
+        set_mock_response_by_request_key(
+            "fetch_opportunities_by_account_ids_from_date",
+            [get_mock_opportunity_for_account()],
+        )
+        set_mock_response_by_request_key("fetch_events_by_account_ids_from_date", [])
+
         save_tokens("test_access_token", "test_instance_url")
-        mock_sobject_fetch.side_effect = self.response_based_on_query
+        mock_sobject_fetch.side_effect = response_based_on_query
         load_prospecting_activities_response = self.app.get(
             "/load_prospecting_activities"
         )
 
-    # mocks
+        payload = json.loads(load_prospecting_activities_response.data)
+        self.assertEqual(
+            load_prospecting_activities_response.status_code, 200, payload["message"]
+        )
+        activations = payload["data"]
 
-    def response_based_on_query(self, url, **kwargs):
-        """
-        Mocks the response of a GET request to Salesforce's SObject API
-        """
-        # Here, 'url' and 'kwargs' are automatically provided by the caller of requests.get
-        print(f"URL: {url}")
-        print(f"Parameters: {kwargs}")
-
-        query_param = kwargs.get("params", {}).get("q", "")
-        is_valid_query = is_valid_salesforce_query(query_param)
-
-        if not is_valid_query:
-            return MagicMock(status_code=400, json=lambda: {"error": "Invalid query"})
-
-        is_contains_content_criteria_query = (
-            "Status LIKE '%Mock%'" in query_param
-            and "Status LIKE '%Status%'" in query_param
-            and "Subject LIKE '%task%'" in query_param
-            and "Subject LIKE '%subject%'" in query_param
+        self.assertEqual(5, len(activations))
+        self.assertTrue(
+            any(
+                activation["status"] == "Opportunity Created"
+                for activation in activations
+            ),
+            "No Activation with Status 'Opportunity Created' found",
         )
 
-        is_unique_values_content_criteria_query = (
-            "Status LIKE '%Unique%'" in query_param
-            and "Status LIKE '%Other%'" in query_param
-            and "Subject LIKE '%Unique Subject%'" in query_param
+    @patch("requests.get")
+    def test_should_create_new_activation_when_one_activity_per_contact_and_a_meeting_per_contact_is_in_salesforce(
+        self, mock_sobject_fetch
+    ):
+        # setup mock api responses
+        set_mock_response_by_request_key(
+            "contains_content_criteria_query",
+            get_one_mock_task_per_contact_for_contains_content_criteria_query(),
+        )
+        set_mock_response_by_request_key("unique_values_content_criteria_query", [])
+        set_mock_response_by_request_key(
+            "fetch_contacts_by_ids_and_non_null_accounts",
+            get_ten_mock_contacts_spread_across_five_accounts(),
+        )
+        set_mock_response_by_request_key(
+            "fetch_opportunities_by_account_ids_from_date",
+            [get_mock_opportunity_for_account()],
+        )
+        set_mock_response_by_request_key(
+            "fetch_events_by_account_ids_from_date",
+            [get_mock_event_for_account()],
+        )
+        set_mock_response_by_request_key(
+            "fetch_contacts_by_account_ids",
+            get_ten_mock_contacts_spread_across_five_accounts(),
         )
 
-        if is_contains_content_criteria_query:
-            return MagicMock(
-                status_code=200,
-                json=lambda: {
-                    "totalSize": 30,
-                    "done": True,
-                    "records": get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query(),
-                },
-            )
-        elif is_unique_values_content_criteria_query:
-            return MagicMock(
-                status_code=200,
-                json=lambda: {
-                    "totalSize": 30,
-                    "done": True,
-                    "records": get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query(),
-                },
-            )
-        else:
-            return MagicMock(status_code=404, json=lambda: {"error": "Not found"})
+        save_tokens("test_access_token", "test_instance_url")
+        mock_sobject_fetch.side_effect = response_based_on_query
+        load_prospecting_activities_response = self.app.get(
+            "/load_prospecting_activities"
+        )
+        payload = json.loads(load_prospecting_activities_response.data)
+        self.assertEqual(
+            load_prospecting_activities_response.status_code, 200, payload["message"]
+        )
+
+        activations = payload["data"]
+        self.assertEqual(2, len(activations))
+
+        any_meeting_set = any(
+            activation["status"] == "Meeting Set" for activation in activations
+        )
+        self.assertTrue(
+            any_meeting_set, "No Activation with Status 'Meeting Set' found"
+        )
+
+        any_opportunity_created = any(
+            activation["status"] == "Opportunity Created" for activation in activations
+        )
+        self.assertTrue(
+            any_opportunity_created,
+            "No Activation with Status 'Opportunity Created' found",
+        )
 
     # helpers
 
@@ -227,7 +280,7 @@ class TestActivationLogic(unittest.TestCase):
         post_data = SettingsModel(
             activateByMeeting=True,
             activateByOpportunity=True,
-            activitiesPerContact=7,
+            activitiesPerContact=3,
             contactsPerAccount=2,
             criteria=prospecting_activity_criteria,
             inactivityThreshold=10,
