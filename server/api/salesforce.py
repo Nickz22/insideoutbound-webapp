@@ -12,6 +12,7 @@ from server.models import (
     Event,
     EventSObject,
     CriteriaField,
+    FilterContainer,
 )
 
 from server.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
@@ -53,9 +54,87 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     return api_response
 
 
-def fetch_tasks_by_account_ids_from_date_not_in_ids(
-    account_ids, start, criteria, already_counted_task_ids
+def fetch_accounts_not_in_ids(account_ids):
+    """
+    Fetches all Accounts from Salesforce and loops through them to find those which are not in `account_ids`
+
+    Parameters:
+    - account_ids (list[str]): A list of account IDs to exclude from the fetched accounts.
+
+    Returns:
+    - ApiResponse: An ApiResponse object containing the fetched accounts as a list of Account objects.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
+    """
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    try:
+        soql_query = "SELECT Id FROM Account"
+
+        response = _fetch_sobjects(soql_query, instance_url, access_token)
+        accounts = [
+            Account(id=account.get("Id"), name=account.get("Name"))
+            for account in response.data
+            if account.get("Id") not in account_ids
+        ]
+
+        api_response.data = accounts
+        api_response.success = True
+        api_response.message = "Accounts fetched successfully."
+    except Exception as e:
+        raise Exception(format_error_message(e))
+
+    return api_response
+
+
+def fetch_criteria_tasks_by_account_ids_from_date(
+    account_ids: list[str], start: str, criteria: list[FilterContainer]
 ):
+    """
+    Takes response from fetch_tasks_by_account_ids_from_date_not_in_ids and organizes the tasks by criteria name.
+
+    Parameters:
+    - account_ids (list[str]): A list of account IDs to fetch tasks for.
+    - start (str): The start date to fetch tasks from.
+    - criteria (list[FilterContainer]): A list of FilterContainer objects.
+
+    Returns:
+    - ApiResponse: An ApiResponse object containing the fetched tasks organized by criteria name.
+    """
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    try:
+        tasks_by_criteria_by_account_id = (
+            fetch_tasks_by_account_ids_from_date_not_in_ids(
+                account_ids, start, criteria, []
+            ).data
+        )
+        tasks_by_criteria = {}
+
+        for (
+            account_id,
+            tasks_by_criteria_name,
+        ) in tasks_by_criteria_by_account_id.items():
+            for criteria_name, tasks in tasks_by_criteria_name.items():
+                if criteria_name not in tasks_by_criteria:
+                    tasks_by_criteria[criteria_name] = []
+                tasks_by_criteria[criteria_name].extend(tasks)
+
+        api_response.data = tasks_by_criteria
+        api_response.success = True
+    except Exception as e:
+        raise Exception(format_error_message(e))
+
+    return api_response
+
+
+def fetch_tasks_by_account_ids_from_date_not_in_ids(
+    account_ids: list[str],
+    start: str,
+    criteria: list[FilterContainer],
+    already_counted_task_ids: list[str],
+) -> ApiResponse:
     """
     Fetches tasks from Salesforce based on a list of account IDs, starting from a specific date,
     organized by criteria names for tasks related to contacts belonging to the specified accounts.
@@ -79,7 +158,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     try:
         contacts = fetch_contacts_by_account_ids(account_ids)
         contact_by_id = {contact.id: contact for contact in contacts.data}
-        contact_ids = pluck(contacts.data, "id")
+        contact_ids = list(pluck(contacts.data, "id"))
 
         batch_size = 150
         tasks_by_criteria_name = {}  # To accumulate tasks across batches
@@ -454,5 +533,7 @@ def _construct_condition(filter_obj):
 def get_http_error_message(response):
     if response.status_code == 401:
         return f"{SESSION_EXPIRED}"
+    elif isinstance(response.json(), dict):
+        return response.json().get("error", "An error occurred")
     else:
         return response.json()[0].get("message", "An error occurred")

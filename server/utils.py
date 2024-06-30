@@ -1,7 +1,7 @@
 import uuid, traceback
 from dataclasses import is_dataclass
 from typing import Any, Set
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 from functools import reduce
 import re
 
@@ -81,15 +81,30 @@ def dt_to_iso_format(dt: datetime):
 
 def parse_date_with_timezone(date_str) -> datetime:
     """
-    Takes a datetime string from an SObject and converts it to a datetime object with timezone.
+    Takes a datetime string formatted as 'YYYY-MM-DDTHH:MM:SS.mmm+ZZZZ' and converts it to a timezone-naive datetime object.
     """
-    base_time = date_str[:-9]
-    timezone = date_str[-5:]
-    fixed_timezone = timezone[:3] + ":" + timezone[3:]
+    try:
+        # Split the datetime string by the last '+' or '-' to separate the datetime and timezone parts
+        if "+" in date_str:
+            base_time, tz_info = date_str.rsplit("+", 1)
+            tz_sign = 1
+        else:
+            base_time, tz_info = date_str.rsplit("-", 1)
+            tz_sign = -1
 
-    iso_formatted_str = base_time + fixed_timezone
+        # Convert timezone info from 'HHMM' to a timedelta object assuming 'HHMM' format
+        tz_hours = int(tz_info[:2])
+        tz_minutes = int(tz_info[2:4])
+        timezone_delta = timedelta(hours=tz_hours, minutes=tz_minutes) * tz_sign
 
-    return datetime.fromisoformat(iso_formatted_str)
+        # Parse the base datetime part
+        dt = datetime.strptime(base_time, "%Y-%m-%dT%H:%M:%S.%f")
+
+        # Apply the timezone offset to get the datetime in UTC and remove timezone information
+        dt = dt - timezone_delta
+        return dt
+    except ValueError as e:
+        raise ValueError(f"Error parsing date string: {date_str}. Error: {str(e)}")
 
 
 # error utils

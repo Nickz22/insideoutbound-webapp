@@ -11,7 +11,9 @@ from server.tests.c import (
     mock_tasks_for_criteria_with_unique_values_content,
 )
 from server.tests.mocks import (
-    set_mock_response_by_request_key,
+    MOCK_CONTACT_IDS,
+    MOCK_ACCOUNT_IDS,
+    add_mock_response,
     clear_mocks,
     response_based_on_query,
     get_one_mock_task_per_contact_for_contains_content_criteria_query,
@@ -19,7 +21,8 @@ from server.tests.mocks import (
     get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query,
     get_ten_mock_contacts_spread_across_five_accounts,
     get_mock_opportunity_for_account,
-    get_mock_event_for_account,
+    get_mock_event_for_contact,
+    get_five_mock_accounts,
 )
 
 ##
@@ -38,6 +41,9 @@ class TestActivationLogic(unittest.TestCase):
         # create empty test_activations.json file in the root directory
         with open("test_activations.json", "w") as f:
             f.write("[]")
+
+        # save dummy access tokens because the OAuth flow is pretty hard to write a test for right now
+        save_tokens("test_access_token", "test_instance_url")
 
         # Creates a test client
         self.app = app.test_client()
@@ -132,25 +138,36 @@ class TestActivationLogic(unittest.TestCase):
     ):
 
         # setup mock api responses
-        set_mock_response_by_request_key(
+        add_mock_response(
             "contains_content_criteria_query",
             get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query(),
         )
-        set_mock_response_by_request_key(
+        add_mock_response(
             "unique_values_content_criteria_query",
             get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query(),
         )
-        set_mock_response_by_request_key(
+        add_mock_response(
+            "fetch_accounts_not_in_ids",
+            get_five_mock_accounts(),
+        )
+        add_mock_response(
+            "fetch_contacts_by_ids_and_non_null_accounts",
+            get_ten_mock_contacts_spread_across_five_accounts(),
+        )
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [get_mock_opportunity_for_account(MOCK_ACCOUNT_IDS[0])],
+        )
+        add_mock_response("fetch_events_by_account_ids_from_date", [])
+        add_mock_response(
             "fetch_contacts_by_account_ids",
             get_ten_mock_contacts_spread_across_five_accounts(),
         )
-        set_mock_response_by_request_key(
-            "fetch_opportunities_by_account_ids_from_date",
-            [get_mock_opportunity_for_account()],
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_ten_mock_contacts_spread_across_five_accounts(),
         )
-        set_mock_response_by_request_key("fetch_events_by_account_ids_from_date", [])
 
-        save_tokens("test_access_token", "test_instance_url")
         mock_sobject_fetch.side_effect = response_based_on_query
         load_prospecting_activities_response = self.app.get(
             "/load_prospecting_activities"
@@ -172,33 +189,12 @@ class TestActivationLogic(unittest.TestCase):
         )
 
     @patch("requests.get")
-    def test_should_create_new_activation_when_one_activity_per_contact_and_a_meeting_per_contact_is_in_salesforce(
+    def test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce(
         self, mock_sobject_fetch
     ):
         # setup mock api responses
-        set_mock_response_by_request_key(
-            "contains_content_criteria_query",
-            get_one_mock_task_per_contact_for_contains_content_criteria_query(),
-        )
-        set_mock_response_by_request_key("unique_values_content_criteria_query", [])
-        set_mock_response_by_request_key(
-            "fetch_contacts_by_ids_and_non_null_accounts",
-            get_ten_mock_contacts_spread_across_five_accounts(),
-        )
-        set_mock_response_by_request_key(
-            "fetch_opportunities_by_account_ids_from_date",
-            [get_mock_opportunity_for_account()],
-        )
-        set_mock_response_by_request_key(
-            "fetch_events_by_account_ids_from_date",
-            [get_mock_event_for_account()],
-        )
-        set_mock_response_by_request_key(
-            "fetch_contacts_by_account_ids",
-            get_ten_mock_contacts_spread_across_five_accounts(),
-        )
+        self.setup_one_activity_per_contact_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
 
-        save_tokens("test_access_token", "test_instance_url")
         mock_sobject_fetch.side_effect = response_based_on_query
         load_prospecting_activities_response = self.app.get(
             "/load_prospecting_activities"
@@ -226,7 +222,82 @@ class TestActivationLogic(unittest.TestCase):
             "No Activation with Status 'Opportunity Created' found",
         )
 
+    @patch("requests.get")
+    def test_should_increment_existing_activation_to_opportunity_created_status_when_opportunity_is_created_under_previously_activated_account(
+        self, mock_sobject_fetch
+    ):
+        # setup mock api responses for one account activated via meeting set and another via opportunity created
+        self.setup_one_activity_per_contact_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
+        mock_sobject_fetch.side_effect = response_based_on_query
+
+        # create 2 activations via meeting set and opportunity created
+        activations = json.loads(self.app.get("/load_prospecting_activities").data)[
+            "data"
+        ]
+
+        meeting_set_activation = next(
+            a for a in activations if a["status"] == "Meeting Set"
+        )
+
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [get_mock_opportunity_for_account(meeting_set_activation["account"]["id"])],
+        )
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response(
+            "fetch_events_by_account_ids_from_date",
+            [],
+        )
+        add_mock_response("fetch_accounts_not_in_ids", [])
+
+        increment_activations_response = self.app.get("/load_prospecting_activities")
+        payload = json.loads(increment_activations_response.data)
+        self.assertEqual(
+            increment_activations_response.status_code, 200, payload["message"]
+        )
+
+        # ensure one activation has both the 'status' column as "Opportunity Created" and a non-empty `event_ids` column
+        self.assertTrue(
+            any(
+                activation["status"] == "Opportunity Created"
+                and activation["event_ids"]
+                for activation in payload["data"]
+            ),
+            "No Activation with Status 'Opportunity Created' and non-empty 'event_ids' found",
+        )
+
     # helpers
+
+    def setup_one_activity_per_contact_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account(
+        self,
+    ):
+        add_mock_response(
+            "contains_content_criteria_query",
+            get_one_mock_task_per_contact_for_contains_content_criteria_query(),
+        )
+        add_mock_response("unique_values_content_criteria_query", [])
+        add_mock_response(
+            "fetch_contacts_by_ids_and_non_null_accounts",
+            get_ten_mock_contacts_spread_across_five_accounts(),
+        )
+        add_mock_response("fetch_accounts_not_in_ids", get_five_mock_accounts())
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [get_mock_opportunity_for_account(MOCK_ACCOUNT_IDS[0])],
+        )
+        add_mock_response(
+            "fetch_events_by_account_ids_from_date",
+            [get_mock_event_for_contact(MOCK_CONTACT_IDS[3])],
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_ten_mock_contacts_spread_across_five_accounts(),
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_ten_mock_contacts_spread_across_five_accounts(),
+        )
 
     def do_onboarding_flow(self):
         """

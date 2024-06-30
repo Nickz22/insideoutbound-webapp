@@ -1,5 +1,5 @@
 import os, sys
-from server.models import Settings
+from server.models import Settings, Event
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from server.api.salesforce import (
@@ -56,6 +56,11 @@ def find_unresponsive_activations(activations, settings: Settings):
             < today
         ]
 
+        if len(unresponsive_activation_candidates) == 0:
+            response.data = []
+            response.success = True
+            return response
+
         account_ids = pluck(unresponsive_activation_candidates, "account.id")
         already_counted_task_ids = [
             task_id
@@ -64,7 +69,7 @@ def find_unresponsive_activations(activations, settings: Settings):
         ]
         criteria_group_tasks_by_account_id = (
             fetch_tasks_by_account_ids_from_date_not_in_ids(
-                account_ids,
+                list(account_ids),
                 dt_to_iso_format(first_prospecting_activity),
                 settings.criteria,
                 already_counted_task_ids,
@@ -91,7 +96,7 @@ def find_unresponsive_activations(activations, settings: Settings):
                 is_task_within_inactivity_threshold = is_model_date_field_within_window(
                     task,
                     activation.last_prospecting_activity,
-                    settings["account_inactivity_threshold"],
+                    settings["inactivity_threshold"],
                 )
                 if is_task_within_inactivity_threshold:
                     found_prospecting_activity = True
@@ -111,27 +116,27 @@ def find_unresponsive_activations(activations, settings: Settings):
 
 # Positive Testing steps:
 #     1. Mock activations with a last_prospecting_activity of yesterday
-#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the account_inactivity_threshold
+#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the inactivity_threshold
 #     3. Assert activations are returned with incremented Prospecting Metadata
 
 # Positive Testing steps (Opportunity Created):
 #     1. Mock activations with a last_prospecting_activity of yesterday
-#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the account_inactivity_threshold
+#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the inactivity_threshold
 #     3. Mock api return results to return 1 opportunity per Account
 #     4. Assert activations are returned with Opportunity Created status
 
 # Positive Testing steps (Meeting Set):
 #     1. Mock activations with a last_prospecting_activity of yesterday
-#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the account_inactivity_threshold
+#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the inactivity_threshold
 #     3. Mock api return results to return 1 event per Account
 #     4. Assert activations are returned with Meeting Set status
 
 
 # Negative Testing steps:
 #     1. Mock activations with a last_prospecting_activity of 2 days ago
-#     2. Mock api return results to return 3 tasks per Account, 2 of which are outside of the account_inactivity_threshold
+#     2. Mock api return results to return 3 tasks per Account, 2 of which are outside of the inactivity_threshold
 #     3. Assert activations are returned with no additional Prospecting Metadata
-def increment_existing_activations(activations, settings):
+def increment_existing_activations(activations, settings: Settings):
     """
     Processes a list of activation objects and updates their counters based on criteria specified in the settings.
 
@@ -153,7 +158,7 @@ def increment_existing_activations(activations, settings):
     try:
         first_prospecting_activity = activations[0].first_prospecting_activity
         activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
-        account_ids = pluck(activations, "account.id")
+        account_ids = list(pluck(activations, "account.id"))
         already_counted_task_ids = [
             task_id for activation in activations for task_id in activation.task_ids
         ]
@@ -161,7 +166,7 @@ def increment_existing_activations(activations, settings):
             fetch_tasks_by_account_ids_from_date_not_in_ids(
                 account_ids,
                 first_prospecting_activity,
-                settings["criteria"],
+                settings.criteria,
                 already_counted_task_ids,
             ).data
         )
@@ -194,7 +199,7 @@ def increment_existing_activations(activations, settings):
                 is_task_within_inactivity_threshold = is_model_date_field_within_window(
                     task,
                     activation.last_prospecting_activity,
-                    settings["account_inactivity_threshold"],
+                    settings["inactivity_threshold"],
                 )
                 if not is_task_within_inactivity_threshold:
                     break
@@ -217,7 +222,7 @@ def increment_existing_activations(activations, settings):
                         is_model_date_field_within_window(
                             event,
                             activation.first_prospecting_activity,
-                            settings["account_inactivity_threshold"],
+                            settings["inactivity_threshold"],
                         )
                         and activation.status == "Activated"
                     ):
@@ -229,7 +234,7 @@ def increment_existing_activations(activations, settings):
                     if is_model_date_field_within_window(
                         opportunity,
                         activation.first_prospecting_activity,
-                        settings["account_inactivity_threshold"],
+                        settings.inactivity_threshold,
                     ) and activation.status in ["Activated", "Meeting Set"]:
                         activation.opportunity = opportunities[0]
                         activation.status = "Opportunity Created"
@@ -362,7 +367,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                             task_ids=task_ids,
                             opportunity=qualifying_opportunity,
                             event_ids=(
-                                set(qualifying_event.id) if qualifying_event else None
+                                [qualifying_event.id] if qualifying_event else None
                             ),
                             status=(
                                 "Opportunity Created"
@@ -395,7 +400,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     first_prospecting_activity=first_prospecting_activity.date(),
                     last_prospecting_activity=task.created_date.date(),
                     opportunity=qualifying_opportunity,
-                    event_ids=(set(qualifying_event.id) if qualifying_event else None),
+                    event_ids=[qualifying_event.id] if qualifying_event else None,
                     task_ids=task_ids,
                     status=(
                         "Opportunity Created"
@@ -468,7 +473,7 @@ def get_tasks_by_account_id(tasks_by_criteria, contacts):
     return tasks_by_account_id
 
 
-def get_qualifying_event(events, start_date, tracking_period):
+def get_qualifying_event(events, start_date, tracking_period) -> Event:
     qualifying_event = None
     for event in events:
         if is_model_date_field_within_window(

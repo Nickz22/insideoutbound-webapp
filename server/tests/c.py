@@ -1,9 +1,12 @@
 from server.models import TaskSObject
+from datetime import datetime
+
+today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000+0000")
 
 mock_tasks_for_criteria_with_contains_content = [
     TaskSObject(
         Id="mock_task_id_for_criteria",
-        CreatedDate="2021-01-01T00:00:00.000+0000",
+        CreatedDate=today,
         WhoId="mock_contact_id",
         Subject="mock task subject",
         Status="Mock Task Status",
@@ -11,7 +14,7 @@ mock_tasks_for_criteria_with_contains_content = [
     ).to_dict(),
     TaskSObject(
         Id="mock_task_id_for_criteria",
-        CreatedDate="2021-01-01T00:00:00.000+0000",
+        CreatedDate=today,
         WhoId="mock_contact_id",
         Subject="task subject",
         Status="Another Mock Status",
@@ -19,7 +22,7 @@ mock_tasks_for_criteria_with_contains_content = [
     ).to_dict(),
     TaskSObject(
         Id="mock_task_id_for_criteria",
-        CreatedDate="2021-01-01T00:00:00.000+0000",
+        CreatedDate=today,
         WhoId="mock_contact_id",
         Subject="some other task subject",
         Status="Mock Task Status",
@@ -30,7 +33,7 @@ mock_tasks_for_criteria_with_contains_content = [
 mock_tasks_for_criteria_with_unique_values_content = [
     TaskSObject(
         Id="mock_task_id_for_criteria",
-        CreatedDate="2021-01-01T00:00:00.000+0000",
+        CreatedDate=today,
         WhoId="mock_contact_id",
         Subject="first subject",
         Status="first status",
@@ -38,7 +41,7 @@ mock_tasks_for_criteria_with_unique_values_content = [
     ).to_dict(),
     TaskSObject(
         Id="mock_task_id_for_criteria",
-        CreatedDate="2021-01-01T00:00:00.000+0000",
+        CreatedDate=today,
         WhoId="mock_contact_id",
         Subject="and another",
         Status="and another",
@@ -46,7 +49,7 @@ mock_tasks_for_criteria_with_unique_values_content = [
     ).to_dict(),
     TaskSObject(
         Id="mock_task_id_for_criteria",
-        CreatedDate="2021-01-01T00:00:00.000+0000",
+        CreatedDate=today,
         WhoId="mock_contact_id",
         Subject="yet one more",
         Status="yet one more",

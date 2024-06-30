@@ -6,8 +6,8 @@ from server.services.activation_service import (
     find_unresponsive_activations,
 )
 from server.api.salesforce import (
-    fetch_contact_tasks_by_criteria_from_date,
-    fetch_contacts_by_account_ids,
+    fetch_criteria_tasks_by_account_ids_from_date,
+    fetch_accounts_not_in_ids,
     fetch_contacts_by_ids_and_non_null_accounts,
 )
 from server.constants import WHO_ID
@@ -50,24 +50,15 @@ def update_activation_states():
             ).data
             upsert_activations(activations)
 
-        account_ids = pluck(active_activations, "account.id")
-
-        account_contacts = (
-            fetch_contacts_by_account_ids(account_ids).data
-            if len(account_ids) > 0
-            else ApiResponse(data=[], message="", success=True)
+        active_account_ids = list(pluck(active_activations, "account.id"))
+        activatable_account_ids = list(
+            pluck(fetch_accounts_not_in_ids(active_account_ids).data, "id")
         )
 
-        activated_account_contact_ids = pluck(account_contacts.data, "id")
-
-        tasks_by_filter_name = fetch_contact_tasks_by_criteria_from_date(
-            settings.criteria,
+        tasks_by_filter_name = fetch_criteria_tasks_by_account_ids_from_date(
+            activatable_account_ids,
             f"{get_threshold_date_for_activatable_tasks(settings)}T00:00:00Z",
-            (
-                f"WHERE WhoId NOT IN ('{','.join(activated_account_contact_ids)}')"
-                if len(activated_account_contact_ids) > 0
-                else None
-            ),
+            settings.criteria,
         ).data
 
         contact_ids = set()
@@ -77,7 +68,7 @@ def update_activation_states():
         contacts = (
             fetch_contacts_by_ids_and_non_null_accounts(list(contact_ids)).data
             if len(contact_ids) > 0
-            else ApiResponse(data=[], message="", success=True)
+            else []
         )
 
         new_activations = compute_activated_accounts(
