@@ -97,25 +97,7 @@ def upsert_activations(new_activations: list[Activation]):
 
     # Update existing or add new activations
     for activation in new_activations:
-        activation_data = Activation(
-            id=activation.id,
-            account=activation.account,
-            activated_date=activation.activated_date,
-            active_contact_ids=activation.active_contact_ids,
-            prospecting_metadata=activation.prospecting_metadata,
-            days_activated=activation.days_activated,
-            days_engaged=activation.days_engaged,
-            engaged_date=activation.engaged_date,
-            last_outbound_engagement=activation.last_outbound_engagement,
-            first_prospecting_activity=activation.first_prospecting_activity,
-            last_prospecting_activity=activation.last_prospecting_activity,
-            task_ids=activation.task_ids,
-            event_ids=activation.event_ids,
-            opportunity=activation.opportunity,
-            status=activation.status,
-        ).to_dict()
-        # Upsert the activation data
-        activation_dict[activation.id] = activation_data
+        activation_dict[activation.id] = activation.to_dict()
 
     # Write updated/ new data back to the file
     with open(ACTIVATIONS_FILE, "w") as file:
@@ -134,6 +116,65 @@ def deserialize_opportunity(data):
     if data:
         return Opportunity(id=data["id"], name=data["name"])
     return None
+
+
+def load_inactive_activations() -> ApiResponse:
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        file_path = ACTIVATIONS_FILE
+        with open(file_path, "r") as file:
+            data = json.load(file)
+            activations = []
+            for entry in data:
+                if entry.get("status") == "Unresponsive":
+                    account = deserialize_account(entry["account"])
+                    prospecting_metadata = None
+                    if entry.get("prospecting_metadata"):
+                        prospecting_metadata = deserialize_prospecting_metadata(
+                            entry.get("prospecting_metadata", [])
+                        )
+
+                    activation = Activation(
+                        id=entry["id"],
+                        account=account,
+                        activated_date=datetime.fromisoformat(entry["activated_date"]),
+                        active_contact_ids=entry["active_contact_ids"],
+                        prospecting_metadata=prospecting_metadata,
+                        days_activated=entry.get("days_activated"),
+                        days_engaged=entry.get("days_engaged"),
+                        engaged_date=(
+                            datetime.fromisoformat(entry["engaged_date"])
+                            if entry.get("engaged_date")
+                            else None
+                        ),
+                        last_outbound_engagement=(
+                            datetime.fromisoformat(entry["last_outbound_engagement"])
+                            if entry.get("last_outbound_engagement")
+                            else None
+                        ),
+                        first_prospecting_activity=(
+                            datetime.fromisoformat(entry["first_prospecting_activity"])
+                            if "first_prospecting_activity" in entry
+                            else None
+                        ),
+                        last_prospecting_activity=datetime.fromisoformat(
+                            entry["last_prospecting_activity"]
+                        ),
+                        task_ids=(entry["task_ids"] if "task_ids" in entry else None),
+                        event_ids=(
+                            entry.get("event_ids") if "event_ids" in entry else None
+                        ),
+                        opportunity=(
+                            entry.get("opportunity") if "opportunity" in entry else None
+                        ),
+                        status=entry.get("status", "Activated"),
+                    )
+                    activations.append(activation)
+            response.data = activations
+            response.success = True
+    except Exception as e:
+        raise Exception(format_error_message(e))
+    return response
 
 
 def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResponse:

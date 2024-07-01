@@ -1,11 +1,18 @@
 import unittest, json, sys, os
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+from datetime import datetime
 
 os.environ["APP_ENV"] = "test"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from server.models import SettingsModel, FilterContainerModel, FilterModel
+from server.models import SettingsModel, FilterContainerModel, FilterModel, Activation
 from server.app import app
-from server.cache import save_tokens
+from server.cache import (
+    save_tokens,
+    upsert_activations,
+    load_active_activations_order_by_first_prospecting_activity_asc,
+    load_inactive_activations,
+)
+from server.utils import add_days
 from server.tests.c import (
     mock_tasks_for_criteria_with_contains_content,
     mock_tasks_for_criteria_with_unique_values_content,
@@ -137,7 +144,135 @@ class TestActivationLogic(unittest.TestCase):
         self, mock_sobject_fetch
     ):
 
+        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
+
+        mock_sobject_fetch.side_effect = response_based_on_query
+        activations = self.assert_and_return_payload(
+            self.app.get("/load_prospecting_activities")
+        )
+
+        self.assertEqual(5, len(activations))
+        self.assertTrue(
+            any(
+                activation["status"] == "Opportunity Created"
+                for activation in activations
+            ),
+            "No Activation with Status 'Opportunity Created' found",
+        )
+
+    @patch("requests.get")
+    def test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce(
+        self, mock_sobject_fetch
+    ):
         # setup mock api responses
+        self.setup_one_activity_per_contact_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
+
+        mock_sobject_fetch.side_effect = response_based_on_query
+        activations = self.assert_and_return_payload(
+            self.app.get("/load_prospecting_activities")
+        )
+        self.assertEqual(2, len(activations))
+
+        any_meeting_set = any(
+            activation["status"] == "Meeting Set" for activation in activations
+        )
+        self.assertTrue(
+            any_meeting_set, "No Activation with Status 'Meeting Set' found"
+        )
+
+        any_opportunity_created = any(
+            activation["status"] == "Opportunity Created" for activation in activations
+        )
+        self.assertTrue(
+            any_opportunity_created,
+            "No Activation with Status 'Opportunity Created' found",
+        )
+
+    @patch("requests.get")
+    def test_should_increment_existing_activation_to_opportunity_created_status_when_opportunity_is_created_under_previously_activated_account(
+        self, mock_sobject_fetch
+    ):
+        # setup mock api responses for one account activated via meeting set and another via opportunity created
+        self.setup_one_activity_per_contact_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
+        mock_sobject_fetch.side_effect = response_based_on_query
+
+        activations = self.assert_and_return_payload(
+            self.app.get("/load_prospecting_activities")
+        )
+
+        meeting_set_activation = next(
+            a for a in activations if a["status"] == "Meeting Set"
+        )
+
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [get_mock_opportunity_for_account(meeting_set_activation["account"]["id"])],
+        )
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response(
+            "fetch_events_by_account_ids_from_date",
+            [],
+        )
+        add_mock_response("fetch_accounts_not_in_ids", [])
+
+        increment_activations_response = self.app.get("/load_prospecting_activities")
+        payload = json.loads(increment_activations_response.data)
+        self.assertEqual(
+            increment_activations_response.status_code, 200, payload["message"]
+        )
+
+        self.assertTrue(
+            any(
+                activation["status"] == "Opportunity Created"
+                and activation["event_ids"]
+                for activation in payload["data"]
+            ),
+            "No Activation with Status 'Opportunity Created' and non-empty 'event_ids' found",
+        )
+
+    @patch("requests.get")
+    def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
+        self, mock_sobject_fetch
+    ):
+        # setup mock api responses
+        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
+
+        mock_sobject_fetch.side_effect = response_based_on_query
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+
+        activations = (
+            load_active_activations_order_by_first_prospecting_activity_asc().data
+        )
+        self.assertEqual(5, len(activations))
+
+        activation = activations[0]
+        activation.last_prospecting_activity = add_days(
+            activation.last_prospecting_activity, -11
+        )
+        upsert_activations([activation])
+
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
+        add_mock_response("fetch_events_by_account_ids_from_date", [])
+        add_mock_response("fetch_accounts_not_in_ids", [])
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response("fetch_contacts_by_account_ids", [])
+
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+
+        inactive_activations = load_inactive_activations().data
+
+        self.assertEqual(1, len(inactive_activations))
+
+    # helpers
+
+    def assert_and_return_payload(self, test_api_response):
+        payload = json.loads(test_api_response.data)
+        self.assertEqual(test_api_response.status_code, 200, payload["message"])
+        return payload["data"]
+
+    def setup_thirty_tasks_across_ten_contacts_and_five_accounts(self):
         add_mock_response(
             "contains_content_criteria_query",
             get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query(),
@@ -167,107 +302,6 @@ class TestActivationLogic(unittest.TestCase):
             "fetch_contacts_by_account_ids",
             get_ten_mock_contacts_spread_across_five_accounts(),
         )
-
-        mock_sobject_fetch.side_effect = response_based_on_query
-        load_prospecting_activities_response = self.app.get(
-            "/load_prospecting_activities"
-        )
-
-        payload = json.loads(load_prospecting_activities_response.data)
-        self.assertEqual(
-            load_prospecting_activities_response.status_code, 200, payload["message"]
-        )
-        activations = payload["data"]
-
-        self.assertEqual(5, len(activations))
-        self.assertTrue(
-            any(
-                activation["status"] == "Opportunity Created"
-                for activation in activations
-            ),
-            "No Activation with Status 'Opportunity Created' found",
-        )
-
-    @patch("requests.get")
-    def test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce(
-        self, mock_sobject_fetch
-    ):
-        # setup mock api responses
-        self.setup_one_activity_per_contact_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
-
-        mock_sobject_fetch.side_effect = response_based_on_query
-        load_prospecting_activities_response = self.app.get(
-            "/load_prospecting_activities"
-        )
-        payload = json.loads(load_prospecting_activities_response.data)
-        self.assertEqual(
-            load_prospecting_activities_response.status_code, 200, payload["message"]
-        )
-
-        activations = payload["data"]
-        self.assertEqual(2, len(activations))
-
-        any_meeting_set = any(
-            activation["status"] == "Meeting Set" for activation in activations
-        )
-        self.assertTrue(
-            any_meeting_set, "No Activation with Status 'Meeting Set' found"
-        )
-
-        any_opportunity_created = any(
-            activation["status"] == "Opportunity Created" for activation in activations
-        )
-        self.assertTrue(
-            any_opportunity_created,
-            "No Activation with Status 'Opportunity Created' found",
-        )
-
-    @patch("requests.get")
-    def test_should_increment_existing_activation_to_opportunity_created_status_when_opportunity_is_created_under_previously_activated_account(
-        self, mock_sobject_fetch
-    ):
-        # setup mock api responses for one account activated via meeting set and another via opportunity created
-        self.setup_one_activity_per_contact_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
-        mock_sobject_fetch.side_effect = response_based_on_query
-
-        # create 2 activations via meeting set and opportunity created
-        activations = json.loads(self.app.get("/load_prospecting_activities").data)[
-            "data"
-        ]
-
-        meeting_set_activation = next(
-            a for a in activations if a["status"] == "Meeting Set"
-        )
-
-        add_mock_response("fetch_contacts_by_account_ids", [])
-        add_mock_response(
-            "fetch_opportunities_by_account_ids_from_date",
-            [get_mock_opportunity_for_account(meeting_set_activation["account"]["id"])],
-        )
-        add_mock_response("fetch_contacts_by_account_ids", [])
-        add_mock_response(
-            "fetch_events_by_account_ids_from_date",
-            [],
-        )
-        add_mock_response("fetch_accounts_not_in_ids", [])
-
-        increment_activations_response = self.app.get("/load_prospecting_activities")
-        payload = json.loads(increment_activations_response.data)
-        self.assertEqual(
-            increment_activations_response.status_code, 200, payload["message"]
-        )
-
-        # ensure one activation has both the 'status' column as "Opportunity Created" and a non-empty `event_ids` column
-        self.assertTrue(
-            any(
-                activation["status"] == "Opportunity Created"
-                and activation["event_ids"]
-                for activation in payload["data"]
-            ),
-            "No Activation with Status 'Opportunity Created' and non-empty 'event_ids' found",
-        )
-
-    # helpers
 
     def setup_one_activity_per_contact_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account(
         self,
