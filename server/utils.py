@@ -75,8 +75,8 @@ def is_model_date_field_within_window(
     return start_date <= model_date_value <= end_date
 
 
-def dt_to_iso_format(dt: datetime):
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+def dt_to_soql_format(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 
 
 def parse_date_with_timezone(date_str) -> datetime:

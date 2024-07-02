@@ -87,12 +87,23 @@ def validate_where_part(where_part: str) -> bool:
     order_by_parts = where_part.split(" ORDER BY ")
     where_part = order_by_parts[0]
 
+    # Check for CreatedDate conditions
+    created_date_pattern = r"CreatedDate\s*(>=|>|<|<=)\s*'?([^'\s]+)'?"
+    created_date_matches = re.finditer(created_date_pattern, where_part, re.IGNORECASE)
+
+    for match in created_date_matches:
+        date_value = match.group(2)
+        if date_value.lower() != "none":
+            # If it's not 'None', it should be a valid datetime
+            if not re.match(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$", date_value):
+                return False
+
     # Check for valid operators - order is important
     valid_operators = [
         "!=",
-        "=",
         "<=",
         ">=",
+        "=",
         "<",
         ">",
         "NOT IN",
@@ -131,7 +142,9 @@ def validate_where_part(where_part: str) -> bool:
         where_part = where_part.replace(literal, " ")
 
     # Remove any ISO8601 date strings
-    where_part = re.sub(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", " ", where_part)
+    where_part = re.sub(
+        r"\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z?)?", " ", where_part
+    )
 
     # Remove string literals
     where_part = re.sub(r"'[^']*'", " ", where_part)
@@ -139,14 +152,14 @@ def validate_where_part(where_part: str) -> bool:
     # Remove numeric literals
     where_part = re.sub(r"\b\d+\b", " ", where_part)
 
-    # Remove null
-    where_part = where_part.replace("null", " ")
+    # Remove null and None
+    where_part = re.sub(r"\b(null|none)\b", " ", where_part, flags=re.IGNORECASE)
 
     # Remove extra spaces
     where_part = " ".join(where_part.split())
 
     # If we've removed all valid parts, what remains should only be field names, parentheses and commas
-    if re.search(r"[^a-zA-Z0-9_\s\(\),]", where_part):
+    if re.search(r"[^a-zA-Z0-9_\s(),]", where_part):
         return False
 
     return True

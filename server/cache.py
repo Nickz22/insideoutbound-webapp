@@ -1,5 +1,6 @@
 import os, json
 from server.constants import SESSION_EXPIRED
+from datetime import datetime, date
 
 APP_ENV = "production"
 if "APP_ENV" in os.environ:
@@ -67,7 +68,7 @@ def custom_decoder(obj):
     return obj
 
 
-def load_settings():
+def load_settings() -> Settings:
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, "r") as file:
             settings = json.load(file, object_hook=custom_decoder)
@@ -77,8 +78,13 @@ def load_settings():
 
 
 def save_settings(settings):
+    def default_converter(o):
+        if isinstance(o, date):
+            return o.isoformat()
+        return o.__dict__
+
     with open(SETTINGS_FILE, "w") as file:
-        json.dump(settings, file, indent=4, default=lambda x: x.__dict__)
+        json.dump(settings, file, indent=4, default=default_converter)
 
 
 def upsert_activations(new_activations: list[Activation]):

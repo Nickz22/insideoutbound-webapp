@@ -17,7 +17,7 @@ from server.cache import (
     load_active_activations_order_by_first_prospecting_activity_asc,
     upsert_activations,
 )
-from server.models import ApiResponse, Settings
+from server.models import ApiResponse, Settings, Activation
 from server.utils import add_days, pluck, format_error_message
 
 
@@ -25,9 +25,9 @@ def update_activation_states():
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        settings = load_settings()
+        settings: Settings = load_settings()
 
-        active_activations = (
+        active_activations: list[Activation] = (
             load_active_activations_order_by_first_prospecting_activity_asc().data
         )
 
@@ -40,15 +40,14 @@ def update_activation_states():
         if unresponsive_activations and len(unresponsive_activations) > 0:
             upsert_activations(unresponsive_activations)
 
-        active_activations = [
+        active_activations: list[Activation] = [
             a for a in active_activations if a.id not in unresponsive_activations
         ]
 
         if len(active_activations) > 0:
-            activations = increment_existing_activations(
-                active_activations, settings
-            ).data
-            upsert_activations(activations)
+            upsert_activations(
+                increment_existing_activations(active_activations, settings).data
+            )
 
         active_account_ids = list(pluck(active_activations, "account.id"))
         activatable_account_ids = list(
@@ -78,7 +77,9 @@ def update_activation_states():
         upsert_activations(new_activations)
 
         today = datetime.now().date()
-        settings.latest_date_queried = today.strftime("%Y-%m-%d")
+        settings.latest_date_queried = datetime.strptime(
+            today.strftime("%Y-%m-%d"), "%Y-%m-%d"
+        ).date()
         save_settings(settings)
 
         api_response.data = (

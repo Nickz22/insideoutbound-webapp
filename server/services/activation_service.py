@@ -15,12 +15,14 @@ from server.utils import (
     group_by,
     pluck,
     format_error_message,
-    dt_to_iso_format,
+    dt_to_soql_format,
 )
 from datetime import datetime
 
 
-def find_unresponsive_activations(activations, settings: Settings):
+def find_unresponsive_activations(
+    activations: list[Activation], settings: Settings
+) -> ApiResponse:
     """
     This function processes a list of activation objects and a settings dictionary to determine which activations are unresponsive.
     An activation is considered unresponsive if it has not had any prospecting activity within a specified threshold period.
@@ -70,7 +72,7 @@ def find_unresponsive_activations(activations, settings: Settings):
         criteria_group_tasks_by_account_id = (
             fetch_tasks_by_account_ids_from_date_not_in_ids(
                 list(account_ids),
-                dt_to_iso_format(first_prospecting_activity),
+                dt_to_soql_format(first_prospecting_activity),
                 settings.criteria,
                 already_counted_task_ids,
             ).data
@@ -136,19 +138,12 @@ def find_unresponsive_activations(activations, settings: Settings):
 #     1. Mock activations with a last_prospecting_activity of 2 days ago
 #     2. Mock api return results to return 3 tasks per Account, 2 of which are outside of the inactivity_threshold
 #     3. Assert activations are returned with no additional Prospecting Metadata
-def increment_existing_activations(activations, settings: Settings):
+def increment_existing_activations(activations: list[Activation], settings: Settings):
     """
     Processes a list of activation objects and updates their counters based on criteria specified in the settings.
 
-    Detailed Description:
-    The function performs several key operations as part of its processing:
-    1. Sorts the given activations in descending order based on their last prospecting activity.
-    2. Processes each activation to update its task IDs, last prospecting activity, and active contact IDs based on the newly fetched tasks that meet the specified criteria.
-    3. Updates the status of each activation based on the presence of events and opportunities within a specified inactivity threshold.
-    4. Returns the updated collection of activation objects.
-
     Parameters:
-    - `activations` (list): A list of activation objects to be processed.
+    - `activations` (list): A list of activation objects to be processed, ASSUMED TO BE ORDERED BY first_prospecting_activity ASC.
     - `settings` (dict): A dictionary containing various criteria used to determine how the activation objects should be updated.
 
     Returns:
@@ -156,7 +151,9 @@ def increment_existing_activations(activations, settings: Settings):
     """
     response = ApiResponse(data=[], message="", success=False)
     try:
-        first_prospecting_activity = activations[0].first_prospecting_activity
+        first_prospecting_activity = dt_to_soql_format(
+            activations[0].first_prospecting_activity
+        )
         activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
         account_ids = list(pluck(activations, "account.id"))
         already_counted_task_ids = [
@@ -199,7 +196,7 @@ def increment_existing_activations(activations, settings: Settings):
                 is_task_within_inactivity_threshold = is_model_date_field_within_window(
                     task,
                     activation.last_prospecting_activity,
-                    settings["inactivity_threshold"],
+                    settings.inactivity_threshold,
                 )
                 if not is_task_within_inactivity_threshold:
                     break
@@ -449,7 +446,7 @@ def get_first_prospecting_activity_date(tasks_by_criteria):
                 if not first_prospecting_activity
                 else min(first_prospecting_activity, task.created_date)
             )
-    first_prospecting_activity = dt_to_iso_format(
+    return dt_to_soql_format(
         first_prospecting_activity if first_prospecting_activity else datetime.now()
     )
 

@@ -2,8 +2,8 @@ import random
 from server.tests.utils import is_valid_salesforce_query
 from unittest.mock import MagicMock
 from server.tests.c import (
-    mock_tasks_for_criteria_with_contains_content,
-    mock_tasks_for_criteria_with_unique_values_content,
+    mock_tasks_for_criteria_with_contains_content,  # 3
+    mock_tasks_for_criteria_with_unique_values_content,  # 3
 )
 from server.models import TaskSObject, OpportunitySObject
 from typing import List, Dict
@@ -58,7 +58,9 @@ def response_based_on_query(url, **kwargs):
         is_valid_query = is_valid_salesforce_query(query_param)
 
         if not is_valid_query:
-            return MagicMock(status_code=400, json=lambda: {"error": "Invalid query"})
+            return MagicMock(
+                status_code=400, json=lambda: {"error": f"Invalid query {query_param}"}
+            )
 
         # Mapping query characteristics to the corresponding key in the mock response dictionary
         query_to_key_map = {
@@ -113,34 +115,68 @@ def response_based_on_query(url, **kwargs):
 
 
 # mock data
-def get_one_mock_task_per_contact_for_contains_content_criteria_query():
+def get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(n, x):
+    if x > len(MOCK_CONTACT_IDS):
+        raise ValueError("Number of contacts exceeds the number of mock contact")
+    if n > 3:
+        raise ValueError("Number of tasks exceeds the number of mock tasks")
     cloned_tasks = []
-    for contact_id in MOCK_CONTACT_IDS:
-        task_copy = TaskSObject(**mock_tasks_for_criteria_with_contains_content[0])
-        task_copy.WhoId = contact_id
-        cloned_tasks.append(task_copy.to_dict())
+    for i in range(x):
+        for j in range(n):
+            task_copy = TaskSObject(**mock_tasks_for_criteria_with_contains_content[j])
+            task_copy.WhoId = MOCK_CONTACT_IDS[i]
+            cloned_tasks.append(task_copy.to_dict())
     return cloned_tasks
+
+
+def get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(n, x):
+    if x > len(MOCK_CONTACT_IDS):
+        raise ValueError("Number of contacts exceeds the number of mock contact")
+    if n > 3:
+        raise ValueError("Number of tasks exceeds the number of mock tasks")
+    cloned_tasks = []
+    for i in range(x):
+        for j in range(n):
+            task_copy = TaskSObject(
+                **mock_tasks_for_criteria_with_unique_values_content[j]
+            )
+            task_copy.WhoId = MOCK_CONTACT_IDS[i]
+            cloned_tasks.append(task_copy.to_dict())
+    return cloned_tasks
+
+
+def get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query():
+    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(3, 2)
+
+
+def get_one_mock_task_per_contact_for_contains_content_criteria_query():
+    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
+        1, len(MOCK_CONTACT_IDS)
+    )
 
 
 def get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query():
-    cloned_tasks = []
-    for contact_id in MOCK_CONTACT_IDS:
-        for task in mock_tasks_for_criteria_with_contains_content:
-            task_copy = TaskSObject(**task)
-            task_copy.WhoId = contact_id
-            cloned_tasks.append(task_copy.to_dict())
-    return cloned_tasks
+    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(3, 10)
 
 
 def get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query():
-    cloned_tasks = []
-    for i, contact_id in enumerate(MOCK_CONTACT_IDS):
-        for task in mock_tasks_for_criteria_with_unique_values_content:
-            task_copy = TaskSObject(**task)
-            task_copy.WhoId = contact_id
-            task_copy.Status = f"{task_copy.Status}_Unique_{i}"
-            cloned_tasks.append(task_copy.to_dict())
-    return cloned_tasks
+    return get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(
+        3, 10
+    )
+
+
+def get_n_mock_contacts_for_account(n, account_id):
+    contacts = []
+    for range_index in range(n):
+        contact = {
+            "Id": f"mock_contact_id{range_index}",
+            "FirstName": f"MockFirstName{range_index}",
+            "LastName": f"MockLastName{range_index}",
+            "AccountId": account_id,
+            "Account": {"Name": f"MockAccountName_{range_index + 1}"},
+        }
+        contacts.append(contact)
+    return contacts
 
 
 def get_ten_mock_contacts_spread_across_five_accounts():

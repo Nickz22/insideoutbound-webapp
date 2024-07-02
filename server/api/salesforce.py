@@ -206,9 +206,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
         api_response.success = True
         api_response.message = "Tasks fetched and organized successfully."
     except Exception as e:
-        api_response.success = False
-        api_response.message = format_error_message(e)
-        raise Exception(api_response.message)
+        raise Exception(format_error_message(e))
 
     return api_response
 

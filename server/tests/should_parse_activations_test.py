@@ -23,6 +23,8 @@ from server.tests.mocks import (
     add_mock_response,
     clear_mocks,
     response_based_on_query,
+    get_n_mock_contacts_for_account,
+    get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query,
     get_one_mock_task_per_contact_for_contains_content_criteria_query,
     get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query,
     get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query,
@@ -252,12 +254,7 @@ class TestActivationLogic(unittest.TestCase):
         )
         upsert_activations([activation])
 
-        add_mock_response("fetch_contacts_by_account_ids", [])
-        add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
-        add_mock_response("fetch_events_by_account_ids_from_date", [])
-        add_mock_response("fetch_accounts_not_in_ids", [])
-        add_mock_response("fetch_contacts_by_account_ids", [])
-        add_mock_response("fetch_contacts_by_account_ids", [])
+        self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
 
         self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
 
@@ -265,12 +262,120 @@ class TestActivationLogic(unittest.TestCase):
 
         self.assertEqual(1, len(inactive_activations))
 
+    @patch("requests.get")
+    def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
+        self, mock_sobject_fetch
+    ):
+        # setup mock api responses
+        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
+        mock_sobject_fetch.side_effect = response_based_on_query
+        # initial account activation
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+
+        activations = (
+            load_active_activations_order_by_first_prospecting_activity_asc().data
+        )
+
+        self.assertEqual(5, len(activations))
+
+        # set last_prospecting_activity of first activation to 1 day over threshold
+        activation = activations[0]
+        activation.last_prospecting_activity = add_days(
+            activation.last_prospecting_activity, -11
+        )
+        upsert_activations([activation])
+
+        # setup no prospecting activity to come back from Salesforce to force inactivation of Activation
+        self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
+
+        # inactivate the Accounts
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+
+        inactive_activations = load_inactive_activations().data
+
+        self.assertEqual(1, len(inactive_activations))
+        self.assertEqual(inactive_activations[0].id, activation.id)
+
+        # setup prospecting activities to come back from Salesforce on the new attempt
+        self.setup_six_tasks_across_two_contacts_and_one_account(
+            inactive_activations[0].account.id
+        )
+
+        # assert that new activations are created for the previously activated accounts
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+
+        active_activations = (
+            load_active_activations_order_by_first_prospecting_activity_asc().data
+        )
+
+        is_inactive_account_reactivated = any(
+            activation.account.id == inactive_activations[0].account.id
+            for activation in active_activations
+        )
+
+        self.assertTrue(is_inactive_account_reactivated)
+
     # helpers
 
     def assert_and_return_payload(self, test_api_response):
         payload = json.loads(test_api_response.data)
         self.assertEqual(test_api_response.status_code, 200, payload["message"])
         return payload["data"]
+
+    def setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events(
+        self,
+    ):
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
+        add_mock_response("fetch_events_by_account_ids_from_date", [])
+        add_mock_response("fetch_accounts_not_in_ids", [])
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response("fetch_contacts_by_account_ids", [])
+
+    def setup_six_tasks_across_two_contacts_and_one_account(self, account_id):
+        add_mock_response(
+            "contains_content_criteria_query",
+            get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query(),
+        )
+        add_mock_response("unique_values_content_criteria_query", [])
+        add_mock_response(
+            "fetch_accounts_not_in_ids",
+            get_five_mock_accounts(),
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
+        add_mock_response(
+            "contains_content_criteria_query",
+            get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query(),
+        )
+        add_mock_response("unique_values_content_criteria_query", [])
+        add_mock_response(
+            "fetch_contacts_by_ids_and_non_null_accounts",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [],
+        )
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [],
+        )
+        add_mock_response("fetch_events_by_account_ids_from_date", [])
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
 
     def setup_thirty_tasks_across_ten_contacts_and_five_accounts(self):
         add_mock_response(
