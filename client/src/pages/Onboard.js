@@ -175,15 +175,15 @@ const Onboard = () => {
         <InfoGatheringStep
           key={step}
           stepData={ONBOARD_WIZARD_STEPS[step - 1]}
-          onInputChange={handleInfoGatheringInputChange}
+          // onInputChange={handleInfoGatheringInputChange}
           onComplete={handleInfoGatheringComplete}
-          stepIndex={step - 1}
-          filterFields={
-            meetingObject.toLowerCase() === "task"
-              ? taskFilterFields || []
-              : eventFilterFields || []
-          }
-          filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+          // stepIndex={step - 1}
+          // filterFields={
+          //   meetingObject.toLowerCase() === "task"
+          //     ? taskFilterFields || []
+          //     : eventFilterFields || []
+          // }
+          // filterOperatorMapping={FILTER_OPERATOR_MAPPING}
         />
       );
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {

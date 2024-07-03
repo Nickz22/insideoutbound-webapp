@@ -76,78 +76,71 @@ export const MOCK_TASK_DATA = [
  * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
  */
 
-/** @type {Array<OnboardWizardStep | OnboardWizardStep[]>} */
+/** @type {Array<OnboardWizardStep>} */
 export const ONBOARD_WIZARD_STEPS = [
   {
-    title: "Tracking Period",
-    setting: "trackingPeriod",
-    description: "How long should an Account be actively pursued?",
-    inputType: "number",
-    inputLabel: "Number of days",
+    title: "Welcome to InsideOutbound!",
+    description:
+      "Our goal is to help you better measure and manage your account-based prospecting efforts.",
+    setting: "defineProspecting",
+    inputType: "text",
+    inputLabel:
+      'An "approach" is defined as when a rep attempts to engage with __ people at a target/prospect company within a __ day period.',
   },
   {
-    title: "Inactivity Threshold",
+    title: "Great — we have a definition for prospecting at the company level!",
+    description:
+      "Next, we need to do the same thing for the people who work at target companies.",
+    setting: "defineProspectingIndividual",
+    inputType: "text",
+    inputLabel:
+      'Once a rep logs __ attempts to contact an individual (emails, calls, InMails, Etc), we consider that "prospecting".',
+  },
+  {
+    title:
+      "You're on a roll — we've got a measurable definition for what counts as account-based prospecting!",
+    description:
+      'Next up, we\'re going to decide when a prospecting "approach" has ended due to inactivity.',
     setting: "inactivityThreshold",
-    description:
-      "How many days can an Account have no prospecting activity before it should be considered inactive?",
     inputType: "number",
-    inputLabel: "Number of days",
+    inputLabel:
+      "An account should be removed from my prospecting funnel after __ days of inactivity.",
   },
   {
-    title: "Cooloff Period",
+    title:
+      'You\'ve decided what constitutes an "approach" as well as when we should stop tracking an approach due to inactivity.',
+    description:
+      "Most companies that do account-based prospecting approach companies more than once if they don't buy the first time you prospect them.",
     setting: "cooloffPeriod",
-    description: "How much time should pass before re-engaging?",
     inputType: "number",
-    inputLabel: "Number of days",
+    inputLabel:
+      "Once an approach ends, how long should your cooling off period be? When in doubt, we suggest 30 days.",
   },
   {
-    title: "Contacts per Account",
-    setting: "contactsPerAccount",
-    description:
-      "How many Contacts under a single Account need to be prospected before the Account is considered to be engaged?",
-    inputType: "number",
-    inputLabel: "Number of Contacts",
+    title:
+      "Now let's talk about the fun stuff — when your approaches are successful!",
+    description: "First, how are meetings recorded in your CRM?",
+    setting: "meetingObject",
+    inputType: "picklist",
+    inputLabel: "Meeting recording method",
+    options: [
+      "We have an opportunity stage for that.",
+      "We use the task object for that",
+      "We use the event object for that",
+      "A custom object record is created",
+      "I'm not sure...I need help with this one",
+    ],
   },
   {
-    title: "Acivities per Contact",
-    setting: "activitiesPerContact",
-    description:
-      "How many prospecting activities are needed under a single Contact before it can be considered prospected?",
-    inputType: "number",
-    inputLabel: "Number of Activities",
-  },
-  [
-    {
-      title: "Meetings",
-      setting: "meetingObject",
-      description: "Are meetings logged as Tasks or Events?",
-      inputType: "picklist",
-      inputLabel: "Meeting Object",
-      options: ["Task", "Event"],
-    },
-    {
-      title: "",
-      inputLabel: "",
-      inputType: "filterContainer",
-      setting: "meetingsCriteria",
-      description: "Configure filters for meeting engagement",
-      defaultFilterName: "Meeting Criteria",
-    },
-    {
-      title: "",
-      description:
-        "Should an Account be immediately considered as engaged when a meeting is booked with one of its Contacts?",
-      setting: "activateByMeeting",
-      inputType: "boolean",
-      inputLabel: "Automatically Engage via Meetings",
-    },
-  ],
-  {
-    title: "Automatically Engage via Opportunities",
-    setting: "activateByOpportunity",
-    description:
-      "Should an Account be immediately considered as engaged when an Opportunity is created?",
-    inputType: "boolean",
-    inputLabel: "Automatically Engage via Opportunities",
+    title: "Moving on to opportunities...",
+    description: "Which of the following is most true for your team?",
+    setting: "opportunityCreation",
+    inputType: "picklist",
+    inputLabel: "Opportunity creation process",
+    options: [
+      "Opportunities are created by one team, then passed to another.",
+      "The rep who creates the opportunity keeps it and works it through close.",
+      "It depends on the team.",
+    ],
   },
 ];

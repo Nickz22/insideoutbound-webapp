@@ -1,5 +1,16 @@
 import { useState, useCallback } from "react";
 
+/**
+ * @typedef {import('types').FilterContainer} FilterContainer
+ * @typedef {import('types').CriteriaField} CriteriaField
+ */
+
+/**
+ *
+ * @param {FilterContainer} initialFilterContainer
+ * @param {CriteriaField[]} filterFields
+ * @returns
+ */
 export const useFilterLogic = (initialFilterContainer, filterFields) => {
   const [filterContainer, setFilterContainer] = useState(
     initialFilterContainer || {
@@ -8,9 +19,15 @@ export const useFilterLogic = (initialFilterContainer, filterFields) => {
       name: "",
     }
   );
+  /** @type {[{[key: number]: any}, Function]} */
   const [logicErrors, setLogicErrors] = useState({});
 
   const handleFieldChange = useCallback(
+    /**
+     *
+     * @param {number} filterIndex
+     * @param {any} value
+     */
     (filterIndex, value) => {
       setFilterContainer((prevContainer) => {
         const newFilters = [...prevContainer.filters];

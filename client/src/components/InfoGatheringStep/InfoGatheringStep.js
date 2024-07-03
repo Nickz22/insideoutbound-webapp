@@ -1,212 +1,70 @@
-import React, { useState, useEffect } from "react";
-import {
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Switch,
-  FormControlLabel,
-  Select,
-  MenuItem,
-} from "@mui/material";
-import FilterContainer from "../FilterContainer/FilterContainer";
+import React, { useState } from "react";
 
-/**
- * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
- * @typedef {import('types').CriteriaField} CriteriaField
- */
+const InfoGatheringStep = ({ stepData, onComplete }) => {
+  const [inputValue, setInputValue] = useState("");
 
-const nextValidityWhitelist = ["activateByMeeting", "activateByOpportunity"];
-
-/**
- *
- * @param {{stepData: OnboardWizardStep | OnboardWizardStep[], onComplete: function, onInputChange: function, stepIndex: number, filterFields: CriteriaField[], filterOperatorMapping: { [key: string]: {[key:string]: string} }}} props
- * @returns
- */
-const InfoGatheringStep = ({
-  stepData,
-  onComplete,
-  onInputChange,
-  stepIndex,
-  filterFields,
-  filterOperatorMapping,
-}) => {
-  const isArrayStep = Array.isArray(stepData);
-  /**
-   * @type {[{label:string, value: any}[] | null, function]}
-   **/
-  const [responses, setResponses] = useState(
-    isArrayStep ? new Array(stepData.length).fill(null) : [null]
-  );
-
-  useEffect(() => {
-    setResponses(
-      isArrayStep
-        ? stepData.map((step) => ({ label: step.setting, value: "" }))
-        : [{ label: stepData.setting, value: "" }]
-    );
-  }, [stepIndex, isArrayStep]);
-
-  /**
-   *
-   * @param {number} index
-   * @param {string | boolean | number} value
-   * @param {string} title
-   */
-  const handleInputChange = (index, value, title) => {
-    if (isArrayStep) {
-      setResponses(
-        /** @param {{ label: string, value: any }[]} prev */
-        (prev) => {
-          const newResponses = [...prev];
-          newResponses[index] = { label: title, value: value };
-          return newResponses;
-        }
-      );
-    } else {
-      setResponses([{ label: title, value: value }]);
-    }
-    onInputChange({ label: title, value: value });
+  const handleInputChange = (event) => {
+    setInputValue(event.target.value);
   };
 
-  const handleComplete = () => {
-    onComplete(responses);
+  const handleSubmit = () => {
+    onComplete([{ label: stepData.setting, value: inputValue }]);
   };
 
-  /**
-   *
-   * @param {OnboardWizardStep} inputData
-   * @param {number} index
-   * @returns
-   */
-  const renderInput = (inputData, index) => {
-    switch (inputData.inputType) {
+  const renderInput = () => {
+    switch (stepData.inputType) {
       case "text":
-      case "number":
         return (
-          <TextField
-            fullWidth
-            variant="outlined"
-            label={inputData.inputLabel}
-            type={inputData.inputType}
-            value={(responses && responses[index]?.value) || ""}
-            onChange={(e) =>
-              handleInputChange(index, e.target.value, inputData.setting)
-            }
-            margin="normal"
+          <input
+            type="text"
+            value={inputValue}
+            onChange={handleInputChange}
+            placeholder={stepData.inputLabel}
+            className="w-full p-2 border rounded"
           />
         );
-      case "boolean":
+      case "number":
         return (
-          <FormControlLabel
-            control={
-              <Switch
-                checked={(responses && responses[index]?.value) || false}
-                onChange={(e) =>
-                  handleInputChange(index, e.target.checked, inputData.setting)
-                }
-                color="primary"
-              />
-            }
-            label={inputData.inputLabel}
+          <input
+            type="number"
+            value={inputValue}
+            onChange={handleInputChange}
+            placeholder={stepData.inputLabel}
+            className="w-full p-2 border rounded"
           />
         );
       case "picklist":
         return (
-          <Select
-            fullWidth
-            value={(responses && responses[index]?.value) || ""}
-            onChange={(e) =>
-              handleInputChange(index, e.target.value, inputData.setting)
-            }
-            label={inputData.inputLabel}
+          <select
+            value={inputValue}
+            onChange={handleInputChange}
+            className="w-full p-2 border rounded"
           >
-            {inputData.options?.map((option) => (
-              <MenuItem key={option} value={option}>
+            <option value="">Select an option</option>
+            {stepData.options.map((option, index) => (
+              <option key={index} value={option}>
                 {option}
-              </MenuItem>
+              </option>
             ))}
-          </Select>
-        );
-      case "filterContainer":
-        return (
-          <FilterContainer
-            filterContainer={
-              (responses && responses[index]?.value?.filterContainer) || {
-                filters: [],
-                filterLogic: "",
-                name: "",
-              }
-            }
-            filterFields={filterFields}
-            filterOperatorMapping={filterOperatorMapping}
-            onLogicChange={(newData) =>
-              handleInputChange(index, newData, inputData.setting)
-            }
-            hasNameField={false}
-          />
+          </select>
         );
       default:
         return null;
     }
   };
 
-  const renderArrayStep = () => {
-    const step = Array.isArray(stepData) ? stepData : [stepData];
-    return step.map((subStep, index) => (
-      <Box
-        key={index}
-        mt={2}
-        style={{
-          display:
-            index === 0 || responses[index - 1]?.value !== null
-              ? "block"
-              : "none",
-        }}
-      >
-        <Typography variant="subtitle1" gutterBottom>
-          {subStep.title}
-        </Typography>
-        <Typography variant="body2" paragraph>
-          {subStep.description}
-        </Typography>
-        {renderInput(subStep, index)}
-      </Box>
-    ));
-  };
-
-  const renderSingleStep = () => {
-    const step = Array.isArray(stepData) ? stepData[0] : stepData;
-    return (
-      <>
-        <Typography variant="h6" gutterBottom>
-          {step.title}
-        </Typography>
-        <Typography variant="body1" paragraph>
-          {step.description}
-        </Typography>
-        {renderInput(step, 0)}
-      </>
-    );
-  };
-
   return (
-    responses && (
-      <Box display="flex" flexDirection="column" alignItems="stretch" p={3}>
-        {isArrayStep ? renderArrayStep() : renderSingleStep()}
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleComplete}
-          sx={{ mt: 2, alignSelf: "center" }}
-          disabled={responses?.some(
-            (r) => !r?.value && !nextValidityWhitelist.includes(r?.label)
-          )}
-        >
-          Next
-        </Button>
-      </Box>
-    )
+    <div className="max-w-2xl mx-auto p-6 bg-white rounded-lg shadow-lg">
+      <h2 className="text-2xl font-bold mb-4">{stepData.title}</h2>
+      <p className="mb-4">{stepData.description}</p>
+      <div className="mb-4">{renderInput()}</div>
+      <button
+        onClick={handleSubmit}
+        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+      >
+        Next
+      </button>
+    </div>
   );
 };
 
