@@ -8,13 +8,14 @@ import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep
 
 /**
  * @typedef {import('types').Settings} Settings
+ * @typedef {import('types').FilterContainer} FilterContainer
  * @typedef {import('types').CriteriaField} CriteriaField
  * @typedef {import('types').ApiResponse} ApiResponse
  * @typedef {import('types').Task} Task
  */
 
 import {
-  FILTER_OPERATOR_MAPPING,
+  // FILTER_OPERATOR_MAPPING,
   PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS,
   MOCK_TASK_DATA,
   ONBOARD_WIZARD_STEPS,
@@ -25,7 +26,7 @@ import {
 } from "../components/Api/Api";
 
 /**
- * @param {{ tasks: Task[], onAddCategory: function, onDone: function, placeholder: string }} props
+ * @param {{ tasks: Task[], onAddCategory: function, onDone: React.MouseEventHandler, placeholder: string }} props
  */
 const CategoryFormWithHeader = ({
   tasks,
@@ -52,12 +53,13 @@ const Onboard = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // Start from step 1
   const [categories, setCategories] = useState(new Map());
+  /** @type {[FilterContainer[], Function]} */
   const [filters, setFilters] = useState([]);
   /** @type {[CriteriaField[] | undefined, function]} */
   const [taskFilterFields, setTaskFilterFields] = useState();
-  /** @type {[CriteriaField[] | undefined, function]} */
-  const [eventFilterFields, setEventFilterFields] = useState();
-  const [meetingObject, setMeetingObject] = useState("Task");
+  // /** @type {[CriteriaField[] | undefined, function]} */
+  // const [eventFilterFields, setEventFilterFields] = useState();
+  // const [meetingObject, setMeetingObject] = useState("Task");
   /** @type {[{ [key: string]: any }, function]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
   const [categoryFormKey, setCategoryFormKey] = useState(0);
@@ -122,7 +124,7 @@ const Onboard = () => {
         }
 
         setTaskFilterFields(taskFilterFields.data);
-        setEventFilterFields(eventFilterFields.data);
+        // setEventFilterFields(eventFilterFields.data);
       } catch (error) {
         console.error("Error fetching filter fields:", error);
       }
@@ -139,12 +141,12 @@ const Onboard = () => {
    * @description sets meeting object to "Task" or "Event" based on the input value
    * @param {{label: string, value: string}} info
    */
-  const handleInfoGatheringInputChange = (info) => {
-    const isMeetingObjectInfo = info.label?.toLowerCase() === "meetingobject";
-    if (isMeetingObjectInfo) {
-      setMeetingObject(info.value);
-    }
-  };
+  // const handleInfoGatheringInputChange = (info) => {
+  //   const isMeetingObjectInfo = info.label?.toLowerCase() === "meetingobject";
+  //   if (isMeetingObjectInfo) {
+  //     setMeetingObject(info.value);
+  //   }
+  // };
 
   /**
    * Corresponds to the onboarding wizard step question, if the question is composed of an array of questions,
@@ -213,10 +215,12 @@ const Onboard = () => {
     return step > ONBOARD_WIZARD_STEPS.length;
   };
 
-  const handleClose = () => {
-    // Function to handle closing the wizard, if needed
-  };
-
+  /**
+   *
+   * @param {string} category
+   * @param {Set<string>} selectedTaskIds
+   * @returns
+   */
   const addCategory = (category, selectedTaskIds) => {
     if (categories.has(category)) {
       alert("Category already exists!");
@@ -225,13 +229,13 @@ const Onboard = () => {
 
     // Add the new category with selected tasks
     const newCategories = new Map(categories);
-    const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.Id));
+    const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.id));
     newCategories.set(category, selectedTasks);
     setCategories(newCategories);
 
     // Remove selected tasks from the available tasks list
     const remainingTasks = tasks.filter(
-      (task) => !selectedTaskIds.has(task.Id)
+      (task) => !selectedTaskIds.has(task.id)
     );
     setTasks(remainingTasks);
 
@@ -296,7 +300,9 @@ const Onboard = () => {
   return (
     <Dialog
       open
-      onClose={() => {}} // You might want to handle closing differently now
+      onClose={() => {
+        console.log("closing");
+      }} // You might want to handle closing differently now
       PaperProps={{
         style: {
           boxShadow: "0 4px 20px rgba(0,0,0,0.1)",

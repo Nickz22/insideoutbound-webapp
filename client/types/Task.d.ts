@@ -1,8 +1,11 @@
+import { Contact } from './Contact';
 export interface Task {
   id: string;
   createdDate: Date;
-  whoId: string;
+  who: Contact;
   subject: string;
   status: string;
-  taskSubtype?: string;
+  priority: string;
+  type: string;
+  taskSubtype: string;
 }

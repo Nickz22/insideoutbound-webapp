@@ -10,12 +10,18 @@ import {
   Select,
   MenuItem,
 } from "@mui/material";
+
 import MetricCard from "../components/MetricCard/MetricCard";
 import DiagramCard from "../components/DiagramCard/DiagramCard";
 import ConversionRatesChart from "../components/ConversionRatesChart/ConversionRatesChart";
 import FunnelChart from "../components/FunnelChart/FunnelChart";
 
+/**
+ * @typedef {import('@mui/material/Select').SelectChangeEvent<string>} SelectChangeEvent
+ */
+
 const Prospecting = () => {
+  /** @type {[string, Function]} */
   const [period, setPeriod] = useState("");
   const [view, setView] = useState("");
   const [loading, setLoading] = useState(true);
@@ -30,7 +36,7 @@ const Prospecting = () => {
       const response = await axios.get(
         "http://localhost:8000/load_prospecting_activities",
         {
-          validateStatus: function (status) {
+          validateStatus: function () {
             return true;
           },
         }
@@ -61,10 +67,17 @@ const Prospecting = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Handles changes to the period select component.
+   * @param {SelectChangeEvent} event
+   */
   const handlePeriodChange = (event) => {
     setPeriod(event.target.value);
   };
 
+  /**
+   * @param {SelectChangeEvent} event
+   **/
   const handleViewChange = (event) => {
     setView(event.target.value);
   };

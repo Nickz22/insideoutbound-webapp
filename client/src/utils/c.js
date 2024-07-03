@@ -1,3 +1,8 @@
+/**
+ * @typedef {import('types').Task} Task
+ * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
+ **/
+
 /** @type {{ [key: string]: {[key:string]: string} }}} */
 export const FILTER_OPERATOR_MAPPING = {
   string: {
@@ -33,48 +38,51 @@ export const PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS = [
   "Conferences",
 ];
 
+/**
+ * @type {Task[]}
+ */
 export const MOCK_TASK_DATA = [
   {
-    Id: 1,
-    Subject: "Call John Doe",
-    Who: "John Doe",
-    Priority: "High",
-    Status: "Not Started",
-    Type: "Call",
-    TaskSubtype: "Email",
+    id: "1",
+    createdDate: new Date(Date.now()),
+    subject: "Call John Doe",
+    who: { id: "mock_contact_1", firstName: "John", lastName: "Doe" },
+    priority: "High",
+    status: "Not Started",
+    type: "Call",
+    taskSubtype: "Email",
   },
   {
-    Id: 2,
-    Subject: "Email Jane Doe",
-    Who: "Jane Doe",
-    Priority: "High",
-    Status: "Not Started",
-    Type: "Email",
-    TaskSubtype: "Email",
+    id: "2",
+    createdDate: new Date(Date.now()),
+    subject: "Email Jane Doe",
+    who: { id: "mock_contact_1", firstName: "Jane", lastName: "Doe" },
+    priority: "High",
+    status: "Not Started",
+    type: "Email",
+    taskSubtype: "Email",
   },
   {
-    Id: 3,
-    Subject: "Call John Smith",
-    Who: "John Smith",
-    Priority: "Low",
-    Status: "Not Started",
-    Type: "Call",
-    TaskSubtype: "Call",
+    id: "3",
+    createdDate: new Date(Date.now()),
+    subject: "Call John Smith",
+    who: { id: "mock_contact_1", firstName: "John", lastName: "Smith" },
+    priority: "Low",
+    status: "Not Started",
+    type: "Call",
+    taskSubtype: "Call",
   },
   {
-    Id: 4,
-    Subject: "Email Jane Smith",
-    Who: "Jane Smith",
-    Priority: "High",
-    Status: "Not Started",
-    Type: "Email",
-    TaskSubtype: "Call",
+    id: "4",
+    createdDate: new Date(Date.now()),
+    subject: "Email Jane Smith",
+    who: { id: "mock_contact_1", firstName: "Jane", lastName: "Smith" },
+    priority: "High",
+    status: "Not Started",
+    type: "Email",
+    taskSubtype: "Call",
   },
 ];
-
-/**
- * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
- */
 
 /** @type {Array<OnboardWizardStep>} */
 export const ONBOARD_WIZARD_STEPS = [

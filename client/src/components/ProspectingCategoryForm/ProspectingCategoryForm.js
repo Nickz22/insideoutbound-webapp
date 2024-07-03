@@ -2,6 +2,13 @@ import React, { useState } from "react";
 import { TextField, Button, Typography, Box } from "@mui/material";
 import CustomTable from "../CustomTable/CustomTable"; // Adjust the path as necessary
 
+/**
+ * @typedef {import('types').Task} Task
+ */
+
+/**
+ * @param {{ tasks: Task[], onAddCategory: Function, onDone: React.MouseEventHandler, placeholder: string }} props
+ */
 const ProspectingCategoryForm = ({
   tasks,
   onAddCategory,
@@ -11,12 +18,15 @@ const ProspectingCategoryForm = ({
   const [categoryName, setCategoryName] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
 
+  /**
+   * @param {Task} task
+   */
   const handleTaskToggle = (task) => {
     const newSelectedTaskIds = new Set(selectedTaskIds);
-    if (newSelectedTaskIds.has(task.Id)) {
-      newSelectedTaskIds.delete(task.Id);
+    if (newSelectedTaskIds.has(task.id)) {
+      newSelectedTaskIds.delete(task.id);
     } else {
-      newSelectedTaskIds.add(task.Id);
+      newSelectedTaskIds.add(task.id);
     }
     setSelectedTaskIds(newSelectedTaskIds);
   };
@@ -38,8 +48,8 @@ const ProspectingCategoryForm = ({
   return (
     <Box sx={{ p: 1 }}>
       <Typography gutterBottom>
-        Create a prospecting category and select example tasks. We'll use these
-        to set up automatic detection for similar activities.
+        Create a prospecting category and select example tasks. We will use
+        these to set up automatic detection for similar activities.
       </Typography>
       <TextField
         label="Category Name"
@@ -51,12 +61,12 @@ const ProspectingCategoryForm = ({
       />
       <CustomTable
         columns={[
-          { id: "Subject", label: "Subject" },
-          { id: "Who", label: "Who" },
-          { id: "Priority", label: "Priority" },
-          { id: "Status", label: "Status" },
-          { id: "Type", label: "Type" },
-          { id: "TaskSubtype", label: "Task Subtype" },
+          { id: "subject", label: "Subject" },
+          { id: "who", label: "Who" },
+          { id: "priority", label: "Priority" },
+          { id: "status", label: "Status" },
+          { id: "type", label: "Type" },
+          { id: "taskSubtype", label: "Task Subtype" },
           { id: "select", label: "Select", selectedIds: selectedTaskIds },
         ]}
         data={tasks}

@@ -95,11 +95,10 @@ const FilterContainer = ({
                       onChange={(e) => handleFieldChange(index, e.target.value)}
                     >
                       {filterFields.map((field) => (
-                          <MenuItem key={field.name} value={field.name}>
-                            {field.name}
-                          </MenuItem>
-                        )
-                      )}
+                        <MenuItem key={field.name} value={field.name}>
+                          {field.name}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </FormControl>
                 </Grid>
@@ -113,9 +112,9 @@ const FilterContainer = ({
                         handleOperatorChange(index, e.target.value)
                       }
                     >
-                      {Object.entries(
+                      {Object.keys(
                         filterOperatorMapping[filter.dataType] || {}
-                      ).map(([key, value]) => (
+                      ).map((key) => (
                         <MenuItem key={key} value={key}>
                           {key}
                         </MenuItem>

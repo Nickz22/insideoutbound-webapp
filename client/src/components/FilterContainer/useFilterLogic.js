@@ -3,6 +3,7 @@ import { useState, useCallback } from "react";
 /**
  * @typedef {import('types').FilterContainer} FilterContainer
  * @typedef {import('types').CriteriaField} CriteriaField
+ * @typedef {import('types').Filter} Filter
  */
 
 /**
@@ -46,30 +47,53 @@ export const useFilterLogic = (initialFilterContainer, filterFields) => {
     [filterFields]
   );
 
-  const handleOperatorChange = useCallback((filterIndex, value) => {
-    setFilterContainer((prevContainer) => {
-      const newFilters = [...prevContainer.filters];
-      newFilters[filterIndex] = { ...newFilters[filterIndex], operator: value };
-      return { ...prevContainer, filters: newFilters };
-    });
-  }, []);
+  const handleOperatorChange = useCallback(
+    /**
+     * @param {number} filterIndex
+     * @param {any} value
+     */
+    (filterIndex, value) => {
+      setFilterContainer((prevContainer) => {
+        const newFilters = [...prevContainer.filters];
+        newFilters[filterIndex] = {
+          ...newFilters[filterIndex],
+          operator: value,
+        };
+        return { ...prevContainer, filters: newFilters };
+      });
+    },
+    []
+  );
 
-  const handleValueChange = useCallback((filterIndex, value, onValueChange) => {
-    setFilterContainer((prevContainer) => {
-      const newFilters = [...prevContainer.filters];
-      newFilters[filterIndex] = { ...newFilters[filterIndex], value: value };
-      if (onValueChange) {
-        onValueChange({ ...prevContainer, filters: newFilters });
-      }
-      return { ...prevContainer, filters: newFilters };
-    });
-  }, []);
+  const handleValueChange = useCallback(
+    /**
+     *
+     * @param {number} filterIndex
+     * @param {any} value
+     * @param {Function} onValueChange
+     */
+    (filterIndex, value, onValueChange) => {
+      setFilterContainer((prevContainer) => {
+        const newFilters = [...prevContainer.filters];
+        newFilters[filterIndex] = { ...newFilters[filterIndex], value: value };
+        if (onValueChange) {
+          onValueChange({ ...prevContainer, filters: newFilters });
+        }
+        return { ...prevContainer, filters: newFilters };
+      });
+    },
+    []
+  );
 
   const handleLogicChange = useCallback(
+    /**
+     * @param {any} value
+     * @param {Function} onLogicChange
+     */
     (value, onLogicChange) => {
       const error = validateFilterLogic(filterContainer.filters, value);
       const newFilterContainer = { ...filterContainer, filterLogic: value };
-      setFilterContainer((prevContainer) => newFilterContainer);
+      setFilterContainer(() => newFilterContainer);
       setLogicErrors({ 0: error });
       if (!error && onLogicChange) {
         onLogicChange(newFilterContainer);
@@ -90,26 +114,49 @@ export const useFilterLogic = (initialFilterContainer, filterFields) => {
     }));
   }, []);
 
-  const handleDeleteFilter = useCallback((filterIndex) => {
-    setFilterContainer((prevContainer) => ({
-      ...prevContainer,
-      filters: prevContainer.filters.filter(
-        (_, index) => index !== filterIndex
-      ),
-    }));
-    setLogicErrors((currentErrors) => ({
-      ...currentErrors,
-      0: "Filter deleted. Please review and update the logic.",
-    }));
-  }, []);
+  const handleDeleteFilter = useCallback(
+    /**
+     * @param {number} filterIndex
+     */
+    (filterIndex) => {
+      setFilterContainer((prevContainer) => ({
+        ...prevContainer,
+        filters: prevContainer.filters.filter(
+          (_, index) => index !== filterIndex
+        ),
+      }));
+      setLogicErrors(
+        /**
+         * @param {{[key: number]: any}} currentErrors
+         */
+        (currentErrors) => ({
+          ...currentErrors,
+          0: "Filter deleted. Please review and update the logic.",
+        })
+      );
+    },
+    []
+  );
 
-  const handleNameChange = useCallback((value) => {
-    setFilterContainer((prevContainer) => ({
-      ...prevContainer,
-      name: value,
-    }));
-  }, []);
+  const handleNameChange = useCallback(
+    /**
+     * @param {any} value
+     */
+    (value) => {
+      setFilterContainer((prevContainer) => ({
+        ...prevContainer,
+        name: value,
+      }));
+    },
+    []
+  );
 
+  /**
+   *
+   * @param {Filter[]} filters
+   * @param {string} logicInput
+   * @returns
+   */
   const validateFilterLogic = (filters, logicInput) => {
     const numberOfFilters = filters.length;
     const logicInputNumbers = logicInput.match(/\d+/g) || [];
