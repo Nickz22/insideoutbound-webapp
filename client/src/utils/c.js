@@ -142,6 +142,11 @@ export const ONBOARD_WIZARD_STEPS = [
           dataType: "string",
         },
         {
+          id: "role",
+          label: "Role",
+          dataType: "string",
+        },
+        {
           id: "username",
           label: "Username",
           dataType: "string",

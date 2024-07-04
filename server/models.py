@@ -363,6 +363,7 @@ class UserSObject:
     FirstName: str
     LastName: str
     FullPhotoUrl: str
+    Role: str
 
 
 @dataclass
@@ -373,6 +374,7 @@ class UserModel:
     firstName: str
     lastName: str
     photoUrl: str
+    role: str
 
     @classmethod
     def from_sobject(cls, sobject: UserSObject):
@@ -383,6 +385,7 @@ class UserModel:
             firstName=sobject.FirstName,
             lastName=sobject.LastName,
             photoUrl=sobject.FullPhotoUrl,
+            role=sobject.Role,
         )
 
     def to_dict(self):

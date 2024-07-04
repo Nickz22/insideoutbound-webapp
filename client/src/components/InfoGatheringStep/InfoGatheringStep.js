@@ -147,10 +147,10 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
   const handleToggle = (item) => {
     setTableData((prev) => {
       const newSelectedIds = new Set(prev.selectedIds);
-      if (newSelectedIds.has(item.Id)) {
-        newSelectedIds.delete(item.Id);
+      if (newSelectedIds.has(item.id)) {
+        newSelectedIds.delete(item.id);
       } else {
-        newSelectedIds.add(item.Id);
+        newSelectedIds.add(item.id);
       }
       return { ...prev, selectedIds: newSelectedIds };
     });
@@ -197,9 +197,10 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
       case "table":
         return (
           <CustomTable
-            columns={tableData.columns}
-            data={tableData.data}
+            key={tableData.selectedIds.size} // Add this line
+            tableData={tableData}
             onToggle={handleToggle}
+            paginate={true}
           />
         );
       default:
@@ -229,7 +230,7 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
             size="large"
             fullWidth
           >
-            Complete
+            Next
           </Button>
         </Box>
       )}

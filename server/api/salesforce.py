@@ -143,11 +143,17 @@ def fetch_salesforce_users():
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        soql_query = (
-            "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl FROM User"
-        )
+        soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User"
 
         response = _fetch_sobjects(soql_query, instance_url, access_token)
+        for entry in response.data:
+
+            entry["Role"] = (
+                entry["UserRole"]["Name"] if entry.get("UserRole") is not None else None
+            )
+            del entry["UserRole"]
+            del entry["attributes"]
+
         users = [
             UserModel.from_sobject(
                 UserSObject(**{k: v for k, v in entry.items() if k != "attributes"})
