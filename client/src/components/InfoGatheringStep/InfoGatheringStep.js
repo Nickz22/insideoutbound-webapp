@@ -23,71 +23,55 @@ import { useNavigate } from "react-router-dom";
  */
 
 /**
- * @param {{ stepData: OnboardWizardStep | OnboardWizardStep[], onComplete: Function, onTableDisplay: Function}} props
+ * @param {{ stepData: OnboardWizardStep, onComplete: Function, onTableDisplay: Function}} props
  */
 const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
   const navigate = useNavigate();
-  const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  /** @type {[{ [key: string]: string }, Function]} */
   const [inputValues, setInputValues] = useState({});
-  /** @type {[{ columns: TableColumn[], data: any[], selectedIds: Set<string> }, Function]} */
-  const [tableData, setTableData] = useState({
-    columns: [],
-    data: [],
-    selectedIds: new Set(),
-  });
+  const [tableData, setTableData] = useState(null);
 
   useEffect(() => {
-    if (steps[currentStepIndex].type === "table") {
-      fetchTableData();
-      onTableDisplay(true);
-    } else {
-      onTableDisplay(false);
-    }
-  }, [currentStepIndex, onTableDisplay]);
-
-  const steps = Array.isArray(stepData) ? stepData : [stepData];
-
-  useEffect(() => {
-    // Evaluate next step when input values change
-    if (Array.isArray(stepData) && currentStepIndex < steps.length - 1) {
-      const nextStep = steps[currentStepIndex + 1];
-      if (shouldRenderStep(nextStep, currentStepIndex + 1)) {
-        setCurrentStepIndex(currentStepIndex + 1);
-      }
-    }
-  }, [inputValues]);
-
-  const fetchTableData = async () => {
-    const currentStep = steps[currentStepIndex];
-    if (currentStep.type === "table" && currentStep.dataFetcher) {
-      const data = await currentStep.dataFetcher();
+    const fetchTableData = async () => {
+      const tableInput = stepData.inputs.find(
+        (input) => input.inputType === "table"
+      );
       if (
-        !data.success &&
-        data.message.toLowerCase().includes("session expired")
+        tableInput &&
+        shouldRenderInput(tableInput, stepData.inputs.indexOf(tableInput))
       ) {
-        navigate("/");
-        return;
+        if (tableInput.dataFetcher) {
+          const data = await tableInput.dataFetcher();
+          if (data.success) {
+            setTableData({
+              columns: tableInput.columns,
+              data: data.data,
+              selectedIds: new Set(),
+            });
+            onTableDisplay(true);
+          } else if (data.message.toLowerCase().includes("session expired")) {
+            navigate("/");
+          }
+        }
+      } else {
+        setTableData(null);
+        onTableDisplay(false);
       }
+    };
 
-      setTableData({
-        columns: currentStep.columns,
-        data: data.data,
-        selectedIds: new Set(),
-      });
-    }
-  };
+    fetchTableData();
+  }, [stepData, inputValues]);
 
-  /**
-   * Handles changes to the input components.
-   * @param {SelectChangeEvent | React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>} event
-   * @param {string} setting
-   */
   const handleInputChange = (event, setting) => {
     setInputValues((prev) => ({
       ...prev,
       [setting]: event.target.value,
     }));
+  };
+
+  const handleTableSelectionChange = (newSelectedIds) => {
+    setTableData((prev) =>
+      prev ? { ...prev, selectedIds: newSelectedIds } : null
+    );
   };
 
   const handleSubmit = () => {
@@ -97,19 +81,20 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
         value,
       })
     );
-    if (tableData.selectedIds.size > 0) {
+
+    const tableInput = stepData.inputs.find(
+      (input) => input.inputType === "table"
+    );
+    if (tableInput && tableData && tableData.selectedIds.size > 0) {
       completedInputs.push({
-        label: "selectedTeammates",
+        label: tableInput.setting,
         value: Array.from(tableData.selectedIds),
       });
     }
+
     onComplete(completedInputs);
   };
 
-  /**
-   * @param {OnboardWizardStepInput} input
-   * @returns {JSX.Element | null}
-   */
   const renderInput = (input) => {
     switch (input.inputType) {
       case "text":
@@ -145,93 +130,48 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
             </Select>
           </FormControl>
         );
-      default:
-        return null;
-    }
-  };
-
-  /**
-   * Toggles the selected state of a table row.
-   * @param {any} item table row data
-   */
-  const handleToggle = (item) => {
-    setTableData((prev) => {
-      const newSelectedIds = new Set(prev.selectedIds);
-      if (newSelectedIds.has(item.id)) {
-        newSelectedIds.delete(item.id);
-      } else {
-        newSelectedIds.add(item.id);
-      }
-      return { ...prev, selectedIds: newSelectedIds };
-    });
-  };
-
-  /**
-   * Determines if the current step should be rendered based on the previous step's input.
-   * @param {OnboardWizardStep} step
-   * @param {number} index
-   * @returns {boolean}
-   **/
-  const shouldRenderStep = (step, index) => {
-    if (!step.renderEval) return true;
-    const prevStep = steps[index - 1];
-    return (
-      prevStep?.inputs?.some(
-        (input) =>
-          step?.renderEval &&
-          step.renderEval(input.inputLabel, inputValues[input.setting])
-      ) || false
-    );
-  };
-
-  /**
-   * Renders a single step based on its type.
-   * @param {OnboardWizardStep} step
-   * @param {number} index
-   * @returns {JSX.Element | null}
-   */
-  const renderStep = (step, index) => {
-    if (!shouldRenderStep(step, index)) return null;
-
-    switch (step.type) {
-      case "input":
-        return (
-          <Grid container spacing={2}>
-            {step?.inputs?.map((input, inputIndex) => (
-              <Grid item xs={12} sm={6} key={inputIndex}>
-                {renderInput(input)}
-              </Grid>
-            ))}
-          </Grid>
-        );
       case "table":
-        return (
+        return tableData ? (
           <CustomTable
-            key={tableData.selectedIds.size} // Add this line
             tableData={tableData}
-            onToggle={handleToggle}
+            onSelectionChange={handleTableSelectionChange}
             paginate={true}
           />
-        );
+        ) : null;
       default:
         return null;
     }
+  };
+
+  const shouldRenderInput = (input, index) => {
+    if (!input.renderEval) return true;
+    if (index === 0) return true; // Always render the first input
+
+    const previousInput = stepData.inputs[index - 1];
+    const previousValue = inputValues[previousInput.setting];
+
+    return input.renderEval(previousInput.inputLabel, previousValue);
   };
 
   return (
-    <Paper elevation={3} sx={{ mx: "auto", p: 4 }}>
-      {steps.slice(0, currentStepIndex + 1).map((step, index) => (
-        <Box key={index} mb={4}>
-          <Typography variant="h4" component="h2" gutterBottom>
-            {step.title}
-          </Typography>
-          <Typography variant="body1" paragraph>
-            {parse(step.description)}
-          </Typography>
-          {renderStep(step, index)}
-        </Box>
-      ))}
-      {currentStepIndex === steps.length - 1 && (
+    stepData && (
+      <Paper elevation={3} sx={{ mx: "auto", p: 4 }}>
+        <Typography variant="h4" component="h2" gutterBottom>
+          {stepData.title}
+        </Typography>
+        <Typography variant="body1" paragraph>
+          {parse(stepData.description)}
+        </Typography>
+        <Grid container spacing={2}>
+          {stepData.inputs.map(
+            (input, index) =>
+              shouldRenderInput(input, index) && (
+                <Grid item xs={12} key={index}>
+                  {renderInput(input)}
+                </Grid>
+              )
+          )}
+        </Grid>
         <Box mt={2}>
           <Button
             variant="contained"
@@ -243,8 +183,8 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
             Next
           </Button>
         </Box>
-      )}
-    </Paper>
+      </Paper>
+    )
   );
 };
 

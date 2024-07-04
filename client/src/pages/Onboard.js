@@ -55,8 +55,8 @@ const Onboard = () => {
   const [categories, setCategories] = useState(new Map());
   /** @type {[FilterContainer[], Function]} */
   const [filters, setFilters] = useState([]);
-  /** @type {[CriteriaField[] | undefined, function]} */
-  const [taskFilterFields, setTaskFilterFields] = useState();
+  // /** @type {[CriteriaField[] | undefined, function]} */
+  // const [taskFilterFields, setTaskFilterFields] = useState();
   // /** @type {[CriteriaField[] | undefined, function]} */
   // const [eventFilterFields, setEventFilterFields] = useState();
   // const [meetingObject, setMeetingObject] = useState("Task");
@@ -65,8 +65,16 @@ const Onboard = () => {
   const [categoryFormKey, setCategoryFormKey] = useState(0);
   const placeholderIndexRef = useRef(0);
   const [isLargeDialog, setIsLargeDialog] = useState(false);
-
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  
   const [tasks, setTasks] = useState(MOCK_TASK_DATA);
+
+  useEffect(() => {
+    if (isTransitioning) {
+      const timer = setTimeout(() => setIsTransitioning(false), 300); // Match this with transition duration
+      return () => clearTimeout(timer);
+    }
+  }, [isTransitioning]);
 
   /**
    * Formats the settings data from the form responses.
@@ -104,27 +112,27 @@ const Onboard = () => {
         /** @type {ApiResponse} */
         // const eventFilterFields = await fetchEventFilterFields();
 
-        if (
-          taskFilterFields?.statusCode !== 200 ||
-          eventFilterFields?.statusCode !== 200
-        ) {
-          switch (taskFilterFields.statusCode) {
-            case 400:
-              navigate("/");
-              break;
-            case 500:
-              console.error(
-                "Internal server error while fetching task filter fields"
-              );
-              break;
-            default:
-              console.error("Error fetching task filter fields");
-          }
+        // if (
+        //   taskFilterFields?.statusCode !== 200 ||
+        //   eventFilterFields?.statusCode !== 200
+        // ) {
+        //   switch (taskFilterFields.statusCode) {
+        //     case 400:
+        //       navigate("/");
+        //       break;
+        //     case 500:
+        //       console.error(
+        //         "Internal server error while fetching task filter fields"
+        //       );
+        //       break;
+        //     default:
+        //       console.error("Error fetching task filter fields");
+        //   }
 
-          return;
-        }
+        //   return;
+        // }
 
-        setTaskFilterFields(taskFilterFields.data);
+        // setTaskFilterFields(taskFilterFields.data);
         // setEventFilterFields(eventFilterFields.data);
       } catch (error) {
         console.error("Error fetching filter fields:", error);
@@ -300,10 +308,30 @@ const Onboard = () => {
     return isLargeDialog || step > ONBOARD_WIZARD_STEPS.length;
   };
 
+  const dialogStyle = {
+    transition: 'all 0.3s ease-in-out',
+    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+    border: "1px solid #e0e0e0",
+    ...(isLargeDialogStep()
+      ? {
+          maxWidth: "90vw",
+          width: "90vw",
+          maxHeight: "90vh",
+          height: "90vh",
+        }
+      : {
+          maxWidth: "600px", // Adjust as needed for small dialog
+          width: "100%",
+          maxHeight: "80vh",
+          height: "auto",
+        }),
+  };
+
   /**
    * @param {boolean} isDisplayed
    */
   const handleTableDisplay = (isDisplayed) => {
+    setIsTransitioning(true);
     setIsLargeDialog(isDisplayed);
   };
 
@@ -312,20 +340,9 @@ const Onboard = () => {
       open
       onClose={() => {
         console.log("closing");
-      }} // You might want to handle closing differently now
+      }}
       PaperProps={{
-        style: {
-          boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-          border: "1px solid #e0e0e0",
-          ...(isLargeDialogStep()
-            ? {
-                maxWidth: "90vw",
-                width: "90vw",
-                maxHeight: "90vh",
-                height: "90vh",
-              }
-            : {}),
-        },
+        style: dialogStyle,
       }}
       fullWidth
       maxWidth={isLargeDialogStep() ? "lg" : "sm"}
@@ -333,6 +350,7 @@ const Onboard = () => {
       <DialogContent
         style={{
           padding: isLargeDialogStep() ? "24px" : "16px",
+          transition: 'padding 0.3s ease-in-out',
         }}
       >
         {renderStep()}

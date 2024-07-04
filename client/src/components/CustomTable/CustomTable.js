@@ -20,14 +20,22 @@ import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 
 /**
- * * @typedef {import('types').TableData} TableData
  * @typedef {import('types').TableColumn} TableColumn
+ * @typedef {import('types').TableData} TableData
  */
 
 /**
- * @param {{ tableData: TableData, onToggle: Function, paginate?: boolean }} props
+ * @param {{
+ *   tableData: {
+ *     columns: TableColumn[],
+ *     data: TableData[],
+ *     selectedIds: Set<string>
+ *   },
+ *   onSelectionChange: (selectedIds: Set<string>) => void,
+ *   paginate?: boolean
+ * }} props
  */
-const CustomTable = ({ tableData, onToggle, paginate = false }) => {
+const CustomTable = ({ tableData, onSelectionChange, paginate = false }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -82,19 +90,23 @@ const CustomTable = ({ tableData, onToggle, paginate = false }) => {
     setOrderBy(columnId);
   };
 
-  /**
-   * Renders a cell based on the column data type
-   * @param {TableColumn} column
-   * @param {TableData} item
-   * @returns {React.ReactNode}
-   */
+  const handleToggle = (item) => {
+    const newSelectedIds = new Set(tableData.selectedIds);
+    if (newSelectedIds.has(item.id)) {
+      newSelectedIds.delete(item.id);
+    } else {
+      newSelectedIds.add(item.id);
+    }
+    onSelectionChange(newSelectedIds);
+  };
+
   const renderCell = (column, item) => {
     switch (column.dataType) {
       case "select":
         return (
           <Checkbox
-            checked={tableData.selectedIds?.has(item.id) || false}
-            onChange={() => onToggle(item)}
+            checked={tableData.selectedIds.has(item.id) || false}
+            onChange={() => handleToggle(item)}
           />
         );
       case "image":

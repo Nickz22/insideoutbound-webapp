@@ -86,74 +86,70 @@ export const MOCK_TASK_DATA = [
   },
 ];
 
-/** @type {Array<OnboardWizardStep | OnboardWizardStep[]>} */
+/** @type {OnboardWizardStep[]} */
 export const ONBOARD_WIZARD_STEPS = [
-  [
-    {
-      title: "Tell us about yourself",
-      description: "",
-      type: "input",
-      inputs: [
-        {
-          setting: "userRole",
-          inputType: "picklist",
-          inputLabel: "User Role",
-          options: ["I manage a team", "I am an individual contributor"],
-        },
-      ],
-    },
-    {
-      title: "",
-      type: "table",
-      description: "Select your teammates",
-      renderEval: (inputLabel, previousStepInputValue) => {
-        if (inputLabel?.toLowerCase() === "user role") {
-          return previousStepInputValue?.toLowerCase() === "i manage a team";
-        }
+  {
+    description: "",
+    title: "Tell us about yourself",
+    inputs: [
+      {
+        setting: "userRole",
+        inputType: "picklist",
+        inputLabel: "User Role",
+        options: ["I manage a team", "I am an individual contributor"],
       },
-      dataFetcher: async () => {
-        return await fetchSalesforceUsers();
+      {
+        setting: "teamMembers",
+        inputType: "table",
+        renderEval: (inputLabel, previousStepInputValue) => {
+          return (
+            inputLabel?.toLowerCase() === "user role" &&
+            previousStepInputValue?.toLowerCase() === "i manage a team"
+          );
+        },
+        dataFetcher: async () => {
+          return await fetchSalesforceUsers();
+        },
+        columns: [
+          {
+            id: "select",
+            label: "Select",
+            dataType: "select",
+          },
+          {
+            id: "photoUrl",
+            label: "",
+            dataType: "image",
+          },
+          {
+            id: "firstName",
+            label: "First Name",
+            dataType: "string",
+          },
+          {
+            id: "lastName",
+            label: "Last Name",
+            dataType: "string",
+          },
+          {
+            id: "email",
+            label: "Email",
+            dataType: "string",
+          },
+          {
+            id: "role",
+            label: "Role",
+            dataType: "string",
+          },
+          {
+            id: "username",
+            label: "Username",
+            dataType: "string",
+          },
+        ],
       },
-      columns: [
-        {
-          id: "select",
-          label: "Select",
-          dataType: "select",
-        },
-        {
-          id: "photoUrl",
-          label: "",
-          dataType: "image",
-        },
-        {
-          id: "firstName",
-          label: "First Name",
-          dataType: "string",
-        },
-        {
-          id: "lastName",
-          label: "Last Name",
-          dataType: "string",
-        },
-        {
-          id: "email",
-          label: "Email",
-          dataType: "string",
-        },
-        {
-          id: "role",
-          label: "Role",
-          dataType: "string",
-        },
-        {
-          id: "username",
-          label: "Username",
-          dataType: "string",
-        },
-      ],
-      // content here to drive showing an instance of `CustomTable`
-    },
-  ],
+    ],
+  },
   {
     title: "",
     description: `Our goal is to help you better measure and manage your account-based prospecting efforts. 
@@ -165,7 +161,6 @@ export const ONBOARD_WIZARD_STEPS = [
       <br><br>
       An "approach" is defined as when a rep attempts to engage with _ people at a target/prospect company within a _ day period.
       `,
-    type: "input",
     inputs: [
       {
         setting: "contactsPerAccount",
@@ -183,7 +178,6 @@ export const ONBOARD_WIZARD_STEPS = [
     title: "Great — we have a definition for prospecting at the company level!",
     description:
       "Next, we need to do the same thing for the people who work at target companies.",
-    type: "input",
     inputs: [
       {
         setting: "defineProspectingIndividual",
@@ -198,7 +192,6 @@ export const ONBOARD_WIZARD_STEPS = [
       "You're on a roll — we've got a measurable definition for what counts as account-based prospecting!",
     description:
       'Next up, we\'re going to decide when a prospecting "approach" has ended due to inactivity.',
-    type: "input",
     inputs: [
       {
         setting: "inactivityThreshold",
@@ -213,7 +206,6 @@ export const ONBOARD_WIZARD_STEPS = [
       'You\'ve decided what constitutes an "approach" as well as when we should stop tracking an approach due to inactivity.',
     description:
       "Most companies that do account-based prospecting approach companies more than once if they don't buy the first time you prospect them.",
-    type: "input",
     inputs: [
       {
         setting: "cooloffPeriod",
@@ -227,7 +219,6 @@ export const ONBOARD_WIZARD_STEPS = [
     title:
       "Now let's talk about the fun stuff — when your approaches are successful!",
     description: "First, how are meetings recorded in your CRM?",
-    type: "input",
     inputs: [
       {
         setting: "meetingObject",
@@ -246,7 +237,6 @@ export const ONBOARD_WIZARD_STEPS = [
   {
     title: "Moving on to opportunities...",
     description: "Which of the following is most true for your team?",
-    type: "input",
     inputs: [
       {
         setting: "opportunityCreation",
