@@ -19,8 +19,6 @@ from server.models import (
 from server.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 from server.cache import load_tokens
 
-access_token, instance_url = load_tokens()
-
 
 def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     """
@@ -34,7 +32,7 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     fields_endpoint = f"{instance_url}/services/data/v55.0/sobjects/{sobject_type}/describe"  # Replace 'XX' with your actual API version
 
     try:
-        fields_data = _fetch_sobjects(fields_endpoint, instance_url, access_token).data
+        fields_data = _fetch_sobjects(fields_endpoint, load_tokens()).data
         criteria_fields = [
             CriteriaField(
                 name=field["name"],
@@ -73,7 +71,7 @@ def fetch_accounts_not_in_ids(account_ids):
     try:
         soql_query = "SELECT Id FROM Account"
 
-        response = _fetch_sobjects(soql_query, instance_url, access_token)
+        response = _fetch_sobjects(soql_query, load_tokens())
         accounts = [
             Account(id=account.get("Id"), name=account.get("Name"))
             for account in response.data
@@ -145,7 +143,7 @@ def fetch_salesforce_users():
     try:
         soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User"
 
-        response = _fetch_sobjects(soql_query, instance_url, access_token)
+        response = _fetch_sobjects(soql_query, load_tokens())
         for entry in response.data:
 
             entry["Role"] = (
@@ -283,8 +281,7 @@ def fetch_contact_tasks_by_criteria_from_date(
             contact_task_models = []
             for task in _fetch_sobjects(
                 f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC",
-                instance_url,
-                access_token,
+                load_tokens(),
             ).data:
                 if not task.get("WhoId", "") or task.get(
                     "WhoId", ""
@@ -342,8 +339,7 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
             joined_contact_ids = "','".join(batch_contact_ids)
             soql_query = f"SELECT Id, WhoId, WhatId, Subject, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= '{start}' ORDER BY StartDateTime ASC"
 
-            # Assuming _fetch_sobjects is set up to handle the query
-            response = _fetch_sobjects(soql_query, instance_url, access_token)
+            response = _fetch_sobjects(soql_query, load_tokens())
             for event in response.data:
                 account_id = contact_by_id.get(event.get("WhoId")).account_id
                 if account_id not in events_by_account_id:
@@ -384,8 +380,7 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
             soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= '{start}' AND AccountId IN ({joined_ids})"
 
-            # Assuming _fetch_sobjects is set up to handle the query
-            response = _fetch_sobjects(soql_query, instance_url, access_token)
+            response = _fetch_sobjects(soql_query, load_tokens())
             for opportunity in response.data:
                 api_response.data.append(
                     Opportunity.from_sobject(OpportunitySObject(**opportunity))
@@ -425,8 +420,7 @@ def fetch_contacts_by_account_ids(account_ids):
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
             soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE AccountId IN ({joined_ids})"
 
-            # Assuming _fetch_sobjects is set up to handle the query
-            response = _fetch_sobjects(soql_query, instance_url, access_token)
+            response = _fetch_sobjects(soql_query, load_tokens())
             for contact in response.data:
                 contact_models.append(
                     Contact(
@@ -473,8 +467,7 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
             soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
 
-            # Assuming _fetch_sobjects is set up to handle the query
-            for contact in _fetch_sobjects(soql_query, instance_url, access_token).data:
+            for contact in _fetch_sobjects(soql_query, load_tokens()).data:
                 contact_models.append(
                     Contact(
                         id=contact.get("Id"),
@@ -522,8 +515,9 @@ def _construct_where_clause_from_filter(filter_container):
     return combined_conditions
 
 
-def _fetch_sobjects(soql_query, instance_url, access_token):
+def _fetch_sobjects(soql_query, credentials):
     try:
+        access_token, instance_url = credentials
         if not access_token or not instance_url:
             raise Exception(SESSION_EXPIRED)
         headers = {"Authorization": f"Bearer {access_token}"}

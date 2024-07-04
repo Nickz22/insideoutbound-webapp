@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import parse from "html-react-parser";
 import CustomTable from "./../CustomTable/CustomTable";
+import { useNavigate } from "react-router-dom";
 
 /**
  * @typedef {import('@mui/material/Select').SelectChangeEvent<string>} SelectChangeEvent
@@ -25,6 +26,7 @@ import CustomTable from "./../CustomTable/CustomTable";
  * @param {{ stepData: OnboardWizardStep | OnboardWizardStep[], onComplete: Function, onTableDisplay: Function}} props
  */
 const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
+  const navigate = useNavigate();
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   /** @type {[{ [key: string]: string }, Function]} */
   const [inputValues, setInputValues] = useState({});
@@ -60,6 +62,14 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
     const currentStep = steps[currentStepIndex];
     if (currentStep.type === "table" && currentStep.dataFetcher) {
       const data = await currentStep.dataFetcher();
+      if (
+        !data.success &&
+        data.message.toLowerCase().includes("session expired")
+      ) {
+        navigate("/");
+        return;
+      }
+
       setTableData({
         columns: currentStep.columns,
         data: data.data,

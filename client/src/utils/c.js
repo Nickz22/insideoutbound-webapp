@@ -119,7 +119,6 @@ export const ONBOARD_WIZARD_STEPS = [
           id: "select",
           label: "Select",
           dataType: "select",
-          selectedIds: new Set(),
         },
         {
           id: "photoUrl",
