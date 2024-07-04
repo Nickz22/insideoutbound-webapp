@@ -1,5 +1,4 @@
 import requests
-from datetime import datetime
 from typing import List, Dict
 from server.utils import pluck, format_error_message, parse_date_with_timezone
 from server.models import (
@@ -13,6 +12,8 @@ from server.models import (
     EventSObject,
     CriteriaField,
     FilterContainer,
+    UserModel,
+    UserSObject,
 )
 
 from server.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
@@ -122,6 +123,38 @@ def fetch_criteria_tasks_by_account_ids_from_date(
                 tasks_by_criteria[criteria_name].extend(tasks)
 
         api_response.data = tasks_by_criteria
+        api_response.success = True
+    except Exception as e:
+        raise Exception(format_error_message(e))
+
+    return api_response
+
+
+def fetch_salesforce_users():
+    """
+    Fetches Salesforce users from Salesforce.
+
+    Returns:
+    - ApiResponse: An ApiResponse object containing the fetched Salesforce users as a list of dictionaries.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
+    """
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    try:
+        soql_query = (
+            "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl FROM User"
+        )
+
+        response = _fetch_sobjects(soql_query, instance_url, access_token)
+        users = [
+            UserModel.from_sobject(
+                UserSObject(**{k: v for k, v in entry.items() if k != "attributes"})
+            )
+            for entry in response.data
+        ]
+        api_response.data = users
         api_response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))

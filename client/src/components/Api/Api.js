@@ -31,3 +31,17 @@ export const fetchEventFilterFields = async () => {
   );
   return { ...response.data, statusCode: response.status };
 };
+
+/**
+ * Fetches Salesforce users from the Salesforce API
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchSalesforceUsers = async () => {
+  const response = await axios.get(
+    "http://localhost:8000/get_salesforce_users",
+    {
+      validateStatus: () => true,
+    }
+  );
+  return { ...response.data, statusCode: response.status };
+};

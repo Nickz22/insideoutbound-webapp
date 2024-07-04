@@ -355,6 +355,40 @@ class SettingsModel:
         }
 
 
+@dataclass
+class UserSObject:
+    Id: str
+    Email: str
+    Username: str
+    FirstName: str
+    LastName: str
+    FullPhotoUrl: str
+
+
+@dataclass
+class UserModel:
+    id: str
+    email: str
+    username: str
+    firstName: str
+    lastName: str
+    photoUrl: str
+
+    @classmethod
+    def from_sobject(cls, sobject: UserSObject):
+        return cls(
+            id=sobject.Id,
+            email=sobject.Email,
+            username=sobject.Username,
+            firstName=sobject.FirstName,
+            lastName=sobject.LastName,
+            photoUrl=sobject.FullPhotoUrl,
+        )
+
+    def to_dict(self):
+        return convert_to_dict(asdict(self))
+
+
 def convert_to_dict(obj):
     if isinstance(obj, (date, datetime)):
         return obj.isoformat()

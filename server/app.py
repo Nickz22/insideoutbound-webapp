@@ -4,7 +4,7 @@ import requests, os
 
 from server.engine.activation_engine import update_activation_states
 from server.services.setting_service import define_criteria_from_tasks
-from server.api.salesforce import get_criteria_fields
+from server.api.salesforce import get_criteria_fields, fetch_salesforce_users
 from server.cache import (
     save_code_verifier,
     load_code_verifier,
@@ -146,12 +146,13 @@ def oauth_callback():
         token_data = response.json()
         save_tokens(token_data["access_token"], token_data["instance_url"])
 
-        redirect_url = (
-            "http://localhost:3000/onboard"
-            if len(load_settings().criteria) == 0
-            else "http://localhost:3000/app/prospecting"
-        )
-        return redirect(redirect_url)
+        # redirect_url = (
+        #     "http://localhost:3000/onboard"
+        #     if len(load_settings().criteria) == 0
+        #     else "http://localhost:3000/app/prospecting"
+        # )
+        # return redirect(redirect_url)
+        return redirect("http://localhost:3000/onboard")
     else:
         error_details = {
             "error": "Failed to retrieve access token",
@@ -199,6 +200,20 @@ def get_settings():
         return jsonify(settings_model.to_dict()), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@app.route("/get_salesforce_users", methods=["GET"])
+def get_salesforce_users():
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        response.data = fetch_salesforce_users().data
+        response.success = True
+    except Exception as e:
+        response.message = (
+            f"Failed to retrieve Salesforce users: {format_error_message(e)}"
+        )
+
+    return jsonify(response.__dict__), get_status_code(response)
 
 
 if __name__ == "__main__":

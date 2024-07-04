@@ -21,8 +21,8 @@ import {
   ONBOARD_WIZARD_STEPS,
 } from "../utils/c";
 import {
-  fetchEventFilterFields,
-  fetchTaskFilterFields,
+  // fetchEventFilterFields,
+  // fetchTaskFilterFields,
 } from "../components/Api/Api";
 
 /**
@@ -64,6 +64,7 @@ const Onboard = () => {
   const [gatheringResponses, setGatheringResponses] = useState({});
   const [categoryFormKey, setCategoryFormKey] = useState(0);
   const placeholderIndexRef = useRef(0);
+  const [isLargeDialog, setIsLargeDialog] = useState(false);
 
   const [tasks, setTasks] = useState(MOCK_TASK_DATA);
 
@@ -99,9 +100,9 @@ const Onboard = () => {
     const fetchAndSetFilterFields = async () => {
       try {
         /** @type {ApiResponse} */
-        const taskFilterFields = await fetchTaskFilterFields();
+        // const taskFilterFields = await fetchTaskFilterFields();
         /** @type {ApiResponse} */
-        const eventFilterFields = await fetchEventFilterFields();
+        // const eventFilterFields = await fetchEventFilterFields();
 
         if (
           taskFilterFields?.statusCode !== 200 ||
@@ -177,6 +178,8 @@ const Onboard = () => {
         <InfoGatheringStep
           key={step}
           stepData={ONBOARD_WIZARD_STEPS[step - 1]}
+          onTableDisplay={handleTableDisplay}
+
           // onInputChange={handleInfoGatheringInputChange}
           onComplete={handleInfoGatheringComplete}
           // stepIndex={step - 1}
@@ -209,10 +212,6 @@ const Onboard = () => {
     } else {
       return <div>Invalid step</div>;
     }
-  };
-
-  const isLargeDialogStep = () => {
-    return step > ONBOARD_WIZARD_STEPS.length;
   };
 
   /**
@@ -295,6 +294,17 @@ const Onboard = () => {
     } catch (error) {
       console.error("Error saving settings:", error);
     }
+  };
+
+  const isLargeDialogStep = () => {
+    return isLargeDialog || step > ONBOARD_WIZARD_STEPS.length;
+  };
+
+  /**
+   * @param {boolean} isDisplayed
+   */
+  const handleTableDisplay = (isDisplayed) => {
+    setIsLargeDialog(isDisplayed);
   };
 
   return (
