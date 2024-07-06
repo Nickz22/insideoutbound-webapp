@@ -8,7 +8,7 @@ import { TableColumn } from "./TableColumn";
  * @prop inputLabel - The label of the input field
  * @prop options - An array of options for a picklist input
  * @prop renderEval - Function which evaluates to `true` will render this step, used to eval the preceding step based on its label and value
- * @prop dataFetcher - Function that fetches data from the server to populate the table with
+ * @prop dataFetcher - Function that fetches data from the server to populate the table
  * @prop columns - An array of TableColumn objects that define the columns of the table
  */
 export interface OnboardWizardStepInput {
@@ -25,4 +25,4 @@ type RenderEvaluatorFunction = (
   inputLabel: string,
   inputValue: string
 ) => boolean;
-type DataFetcherFunction = () => Promise<ApiResponse>;
+type DataFetcherFunction = (any) => Promise<ApiResponse>;

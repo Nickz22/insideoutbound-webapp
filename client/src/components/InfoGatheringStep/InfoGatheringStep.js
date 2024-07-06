@@ -20,15 +20,34 @@ import { useNavigate } from "react-router-dom";
  * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
  * @typedef {import('types').OnboardWizardStepInput} OnboardWizardStepInput
  * @typedef {import('types').TableColumn} TableColumn
+ * @typedef {import('types').Settings} Settings
  */
 
 /**
- * @param {{ stepData: OnboardWizardStep, onComplete: Function, onTableDisplay: Function}} props
+ * @param {{ stepData: OnboardWizardStep, onComplete: Function, onTableDisplay: Function, settings: Settings}} props
  */
-const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
+const InfoGatheringStep = ({
+  stepData,
+  onComplete,
+  onTableDisplay,
+  settings,
+}) => {
   const navigate = useNavigate();
   const [inputValues, setInputValues] = useState({});
   const [tableData, setTableData] = useState(null);
+  const [renderedDescription, setRenderedDescription] = useState(
+    stepData.description
+  );
+
+  useEffect(() => {
+    if (stepData.descriptionRenderer) {
+      const newDescription = stepData.descriptionRenderer(
+        stepData.description,
+        inputValues
+      );
+      setRenderedDescription(newDescription);
+    }
+  }, [stepData, inputValues]);
 
   useEffect(() => {
     const fetchTableData = async () => {
@@ -40,8 +59,11 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
         shouldRenderInput(tableInput, stepData.inputs.indexOf(tableInput))
       ) {
         if (tableInput.dataFetcher) {
-          const data = await tableInput.dataFetcher();
-          if (data.success) {
+          const data = await tableInput.dataFetcher({
+            ...settings,
+            ...inputValues,
+          });
+          if (data.success && data.data.length > 0) {
             setTableData({
               columns: tableInput.columns,
               data: data.data,
@@ -150,7 +172,11 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
     const previousInput = stepData.inputs[index - 1];
     const previousValue = inputValues[previousInput.setting];
 
-    return input.renderEval(previousInput.inputLabel, previousValue);
+    const renderInput = input.renderEval(
+      previousInput.inputLabel,
+      previousValue
+    );
+    return renderInput;
   };
 
   return (
@@ -160,14 +186,14 @@ const InfoGatheringStep = ({ stepData, onComplete, onTableDisplay }) => {
           {stepData.title}
         </Typography>
         <Typography variant="body1" paragraph>
-          {parse(stepData.description)}
+          {parse(renderedDescription)}
         </Typography>
         <Grid container spacing={2}>
           {stepData.inputs.map(
             (input, index) =>
               shouldRenderInput(input, index) && (
                 <Grid item xs={12} key={index}>
-                  {renderInput(input)}
+                  {renderInput(input, index)}
                 </Grid>
               )
           )}

@@ -13,4 +13,6 @@ export interface Settings {
   trackingPeriod: number;
   activateByMeeting: boolean;
   activateByOpportunity: boolean;
+  teamMemberIds: string[];
+  salesforceUserId: string;
 }

@@ -74,6 +74,27 @@ class TaskSObject:
 
 
 @dataclass
+class TaskModel:
+    id: str
+    createdDate: datetime
+    whoId: str
+    subject: str
+    status: str
+    taskSubtype: Optional[str] = None
+
+    @classmethod
+    def from_sobject(cls, sobject: TaskSObject):
+        return cls(
+            id=sobject.Id,
+            createdDate=sobject.CreatedDate,
+            whoId=sobject.WhoId,
+            subject=sobject.Subject,
+            status=sobject.Status,
+            taskSubtype=sobject.TaskSubtype,
+        )
+
+
+@dataclass
 class EventSObject:
     Id: str
     CreatedDate: datetime
@@ -93,6 +114,25 @@ class EventSObject:
     def to_dict(self):
         return convert_to_dict(asdict(self))
 
+@dataclass
+class EventModel:
+    id: str
+    createdDate: datetime
+    whoId: str
+    subject: str
+    startDateTime: datetime
+    endDateTime: datetime
+    
+    @classmethod
+    def from_sobject(cls, sobject: EventSObject):
+        return cls(
+            id=sobject.Id,
+            createdDate=sobject.CreatedDate,
+            whoId=sobject.WhoId,
+            subject=sobject.Subject,
+            startDateTime=sobject.StartDateTime,
+            endDateTime=sobject.EndDateTime,
+        )
 
 @dataclass
 class Event:
@@ -102,17 +142,6 @@ class Event:
     subject: str
     start_datetime: datetime
     end_datetime: datetime
-
-    @classmethod
-    def from_sobject(cls, sobject: EventSObject):
-        return cls(
-            id=sobject.Id,
-            created_date=sobject.CreatedDate,
-            who_id=sobject.WhoId,
-            subject=sobject.Subject,
-            start_datetime=sobject.StartDateTime,
-            end_datetime=sobject.EndDateTime,
-        )
 
     def to_dict(self):
         return convert_to_dict(asdict(self))

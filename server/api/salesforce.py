@@ -6,9 +6,12 @@ from server.models import (
     Contact,
     Account,
     Task,
+    TaskModel,
+    TaskSObject,
     Opportunity,
     OpportunitySObject,
     Event,
+    EventModel,
     EventSObject,
     CriteriaField,
     FilterContainer,
@@ -248,6 +251,42 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     return api_response
 
 
+def fetch_tasks_by_user_ids(user_ids, fields):
+    """
+    Fetches tasks from Salesforce based on a list of user IDs.
+
+    Parameters:
+    - user_ids (list[str]): A list of user IDs to fetch tasks for.
+    - fields (list[str]): A list of field names to fetch for each task.
+
+    Returns:
+    - ApiResponse: An ApiResponse object containing the fetched tasks as a list of Task objects.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
+    """
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    try:
+        joined_user_ids = "','".join(user_ids)
+        soql_query = f"SELECT {','.join(fields)} FROM Task WHERE OwnerId IN ('{joined_user_ids}')"
+
+        response = _fetch_sobjects(soql_query, load_tokens())
+        tasks = [
+            TaskModel.from_sobject(
+                TaskSObject(**{k: v for k, v in task.items() if k != "attributes"})
+            )
+            for task in response.data
+        ]
+
+        api_response.data = tasks
+        api_response.success = True
+    except Exception as e:
+        raise Exception(format_error_message(e))
+
+    return api_response
+
+
 def fetch_contact_tasks_by_criteria_from_date(
     criteria, from_datetime, additional_filter=None
 ) -> Dict[str, List[Task]]:
@@ -302,6 +341,39 @@ def fetch_contact_tasks_by_criteria_from_date(
             tasks_by_filter_name[filter_container.name] = contact_task_models
 
         api_response.data = tasks_by_filter_name
+        api_response.success = True
+    except Exception as e:
+        raise Exception(format_error_message(e))
+
+    return api_response
+
+
+def fetch_events_by_user_ids(user_ids, fields):
+    """
+    Fetches events from Salesforce based on a list of user IDs.
+
+    Parameters:
+    - user_ids (list[str]): A list of user IDs to fetch events for.
+    - fields (list[str]): A list of field names to fetch for each event.
+
+    Returns:
+    - ApiResponse: An ApiResponse object containing the fetched events as a list of Event objects.
+
+    Throws:
+    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
+    """
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    try:
+        joined_user_ids = "','".join(user_ids)
+        soql_query = f"SELECT {','.join(fields)} FROM Event WHERE OwnerId IN ('{joined_user_ids}')"
+
+        response = _fetch_sobjects(soql_query, load_tokens())
+        events = [
+            EventModel.from_sobject(EventSObject(**event)) for event in response.data
+        ]
+
+        api_response.data = events
         api_response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))
@@ -486,6 +558,29 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
         api_response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))
+
+    return api_response
+
+
+def fetch_logged_in_salesforce_user_id():
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    access_token, instance_url = load_tokens()
+    url = f"{instance_url}/services/oauth2/userinfo"
+
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    response = requests.get(url, headers=headers)
+    if response.status_code == 200:
+        api_response.data = response.json()["user_id"]
+        api_response.success = True
+    else:
+        raise Exception(
+            f"Failed to fetch logged in user ID ({response.status_code}): {get_http_error_message(response)}"
+        )
 
     return api_response
 

@@ -1,8 +1,14 @@
-import { fetchSalesforceUsers } from "./../components/Api/Api";
+import {
+  fetchSalesforceUsers,
+  fetchSalesforceTasksByUserIds,
+  fetchSalesforceEventsByUserIds,
+} from "./../components/Api/Api";
 /**
  * @typedef {import('types').Task} Task
  * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
  * @typedef {import('types').TableColumn} TableColumn
+ * @typedef {import('types').Settings} Settings
+ * @typedef {import('types').ApiResponse} ApiResponse
  **/
 
 /** @type {{ [key: string]: {[key:string]: string} }}} */
@@ -99,7 +105,7 @@ export const ONBOARD_WIZARD_STEPS = [
         options: ["I manage a team", "I am an individual contributor"],
       },
       {
-        setting: "teamMembers",
+        setting: "teamMemberIds",
         inputType: "table",
         renderEval: (inputLabel, previousStepInputValue) => {
           return (
@@ -151,8 +157,8 @@ export const ONBOARD_WIZARD_STEPS = [
     ],
   },
   {
-    title: "",
-    description: `Our goal is to help you better measure and manage your account-based prospecting efforts. 
+    description: `
+      Our goal is to help you better measure and manage your account-based prospecting efforts. 
       <br><br> 
       To do that, <b>we need to define prospecting</b>. The term we use is an \"approach\". 
       Clearly defining an approach helps us differentiate prospecting efforts from all other stuff sales reps do, like working deals or sending one-off emails.
@@ -161,6 +167,7 @@ export const ONBOARD_WIZARD_STEPS = [
       <br><br>
       An "approach" is defined as when a rep attempts to engage with _ people at a target/prospect company within a _ day period.
       `,
+    title: "Welcome to InsideOutbound",
     inputs: [
       {
         setting: "contactsPerAccount",
@@ -173,79 +180,168 @@ export const ONBOARD_WIZARD_STEPS = [
         inputLabel: "Tracking Period",
       },
     ],
+    descriptionRenderer: (description, inputValues) => {
+      const values = [
+        inputValues.contactsPerAccount,
+        inputValues.trackingPeriod,
+      ];
+      return description.replace(/_/g, (match, offset) => {
+        const index = description.slice(0, offset).match(/_/g)?.length || 0;
+        return values[index] || "_";
+      });
+    },
   },
   {
-    title: "Great — we have a definition for prospecting at the company level!",
-    description:
-      "Next, we need to do the same thing for the people who work at target companies.",
+    title: "Activities per Contact",
+    description: `
+      Great — we have a definition for prospecting at the company level! Next, we need to do the same thing for the people who work at target companies. 
+      Help us fill in the blank below: 
+      <br><br>
+      Once a rep logs _ attempts to contact an individual (emails, calls, InMails, etc.), we consider that "prospecting".
+      `,
     inputs: [
       {
-        setting: "defineProspectingIndividual",
+        setting: "activitiesPerContact",
         inputType: "text",
-        inputLabel:
-          'Once a rep logs __ attempts to contact an individual (emails, calls, InMails, Etc), we consider that "prospecting".',
+        inputLabel: "# activities per contact",
       },
     ],
+    descriptionRenderer: (description, inputValues) => {
+      if (!inputValues.activitiesPerContact) {
+        return description;
+      }
+      return description.replace(/_/g, inputValues.activitiesPerContact);
+    },
   },
   {
-    title:
-      "You're on a roll — we've got a measurable definition for what counts as account-based prospecting!",
-    description:
-      'Next up, we\'re going to decide when a prospecting "approach" has ended due to inactivity.',
+    title: "Account Inactivity Threshold",
+    description: `
+      You're on a roll — we've got a measurable definition for what counts as account-based prospecting!
+      <br><br>
+      Next up, we\'re going to decide when a prospecting "approach" has ended due to inactivity.
+      Help us fill in the blank below:
+      <br><br>
+      An account should be removed from my prospecting funnel after _ days of inactivity.
+      `,
     inputs: [
       {
         setting: "inactivityThreshold",
         inputType: "number",
-        inputLabel:
-          "An account should be removed from my prospecting funnel after __ days of inactivity.",
+        inputLabel: "inactivity threshold",
       },
     ],
+    descriptionRenderer: (description, inputValues) => {
+      if (!inputValues.inactivityThreshold) {
+        return description;
+      }
+      return description.replace(/_/g, inputValues.inactivityThreshold);
+    },
   },
   {
-    title:
-      'You\'ve decided what constitutes an "approach" as well as when we should stop tracking an approach due to inactivity.',
-    description:
-      "Most companies that do account-based prospecting approach companies more than once if they don't buy the first time you prospect them.",
+    title: "Define an Approach",
+    description: `
+    The next few questions will help us understand when to consider an Account "approached".
+    <br><br>
+    First, how are meetings recorded in your CRM?
+    `,
     inputs: [
       {
-        setting: "cooloffPeriod",
-        inputType: "number",
+        setting: "activateByMeeting",
+        inputType: "picklist",
         inputLabel:
-          "Once an approach ends, how long should your cooling off period be? When in doubt, we suggest 30 days.",
+          "Are meetings a strong indication of an Account being 'approached'?",
+        options: ["Yes", "No"],
       },
-    ],
-  },
-  {
-    title:
-      "Now let's talk about the fun stuff — when your approaches are successful!",
-    description: "First, how are meetings recorded in your CRM?",
-    inputs: [
       {
         setting: "meetingObject",
         inputType: "picklist",
-        inputLabel: "Meeting recording method",
+        inputLabel: "How are meetings recorded?",
         options: [
-          "We have an opportunity stage for that.",
+          "We have an opportunity stage for that",
           "We use the task object for that",
           "We use the event object for that",
           "A custom object record is created",
-          "I'm not sure...I need help with this one",
         ],
+        renderEval: (inputLabel, previousStepInputValue) => {
+          return (
+            inputLabel?.toLowerCase() ===
+              "are meetings a strong indication of an account being 'approached'?" &&
+            previousStepInputValue?.toLowerCase() === "yes"
+          );
+        },
+      },
+      {
+        columns: [
+          {
+            id: "select",
+            label: "Select",
+            dataType: "select"
+          },
+          {
+            id: "subject",
+            label: "Subject",
+            dataType: "string",
+          },
+          {
+            id: "status",
+            label: "Status",
+            dataType: "string",
+          },
+          {
+            id: "TaskSubtype",
+            label: "TaskSubtype",
+            dataType: "string",
+          },
+        ],
+        setting: "meetingsCriteria",
+        inputType: "table",
+        renderEval: (inputLabel, previousStepInputValue) => {
+          return (
+            inputLabel?.toLowerCase() === "how are meetings recorded?" &&
+            previousStepInputValue?.toLowerCase() !==
+              "we have an opportunity stage for that"
+          );
+        },
+        dataFetcher:
+          /** @param {Settings} settings */
+          async (settings) => {
+            if (!settings.meetingObject) {
+              return {
+                success: false,
+                data: [],
+                message: "Meeting object not provided",
+              };
+            }
+
+            /** @type {string[]} */
+            const salesforceUserIds = [
+              ...(settings.teamMemberIds || []),
+              settings.salesforceUserId,
+            ];
+            return settings.meetingObject.toLowerCase().includes("task")
+              ? await fetchSalesforceTasksByUserIds(salesforceUserIds)
+              : await fetchSalesforceEventsByUserIds(salesforceUserIds);
+          },
       },
     ],
+    descriptionRenderer: (description) => {
+      return description;
+    },
   },
   {
-    title: "Moving on to opportunities...",
-    description: "Which of the following is most true for your team?",
+    title: "Define an Approach",
+    description: `
+    Next, how are opportunities created in your CRM?
+    `,
     inputs: [
       {
         setting: "opportunityCreation",
         inputType: "picklist",
         inputLabel: "Opportunity creation process",
         options: [
-          "Opportunities are created by one team, then passed to another.",
-          "The rep who creates the opportunity keeps it and works it through close.",
-          "It depends on the team.",
+          "Opportunities are created by one team, then passed to another",
+          "The rep who creates the opportunity keeps it and works it through close",
+          "Neither",
         ],
       },
     ],

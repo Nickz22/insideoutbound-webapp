@@ -4,7 +4,13 @@ import requests, os
 
 from server.engine.activation_engine import update_activation_states
 from server.services.setting_service import define_criteria_from_tasks
-from server.api.salesforce import get_criteria_fields, fetch_salesforce_users
+from server.api.salesforce import (
+    get_criteria_fields,
+    fetch_salesforce_users,
+    fetch_tasks_by_user_ids,
+    fetch_events_by_user_ids,
+    fetch_logged_in_salesforce_user_id,
+)
 from server.cache import (
     save_code_verifier,
     load_code_verifier,
@@ -207,6 +213,77 @@ def get_salesforce_users():
     response = ApiResponse(data=[], message="", success=False)
     try:
         response.data = fetch_salesforce_users().data
+        response.success = True
+    except Exception as e:
+        response.message = (
+            f"Failed to retrieve Salesforce users: {format_error_message(e)}"
+        )
+
+    return jsonify(response.__dict__), get_status_code(response)
+
+
+###
+## Return models instead of SObjects,
+## figure out how we can take custom columns from the user when the table initially renders
+###
+
+
+@app.route("/get_salesforce_tasks_by_user_ids", methods=["GET"])
+def get_salesforce_tasks_by_user_ids():
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        user_ids = request.args.getlist("user_ids[]")
+        fields = request.args.getlist("fields[]") or [
+            "Id",
+            "WhoId",
+            "Subject",
+            "TaskSubtype",
+            "Status",
+            "CreatedDate",
+        ]
+
+        if not user_ids:
+            response.message = "No user IDs provided"
+        else:
+            response.data = fetch_tasks_by_user_ids(user_ids, fields).data
+            response.success = True
+    except Exception as e:
+        response.message = f"Failed to retrieve Salesforce tasks by user IDs: {format_error_message(e)}"
+        app.logger.error(f"Error occurred: {e}", exc_info=True)
+
+    return jsonify(response.__dict__), get_status_code(response)
+
+
+@app.route("/get_salesforce_events_by_user_ids", methods=["GET"])
+def get_salesforce_events_by_user_ids():
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        user_ids = request.args.getlist("user_ids[]")
+        fields = request.args.getlist("fields") or [
+            "Id",
+            "WhoId",
+            "WhatId",
+            "Subject",
+            "CreatedDate",
+        ]
+
+        if not user_ids:
+            response.message = "No user IDs provided"
+        else:
+            response.data = fetch_events_by_user_ids(user_ids, fields).data
+            response.success = True
+    except Exception as e:
+        response.message = f"Failed to retrieve Salesforce events by user IDs: {format_error_message(e)}"
+        app.logger.error(f"Error occurred: {e}", exc_info=True)
+
+    return jsonify(response.__dict__), get_status_code(response)
+
+
+@app.route("/get_salesforce_user_id", methods=["GET"])
+def get_salesforce_user_id():
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        response.data = fetch_logged_in_salesforce_user_id().data
         response.success = True
     except Exception as e:
         response.message = (

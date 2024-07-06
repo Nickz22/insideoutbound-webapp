@@ -15,15 +15,11 @@ import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep
  */
 
 import {
-  // FILTER_OPERATOR_MAPPING,
   PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS,
   MOCK_TASK_DATA,
   ONBOARD_WIZARD_STEPS,
 } from "../utils/c";
-import {
-  // fetchEventFilterFields,
-  // fetchTaskFilterFields,
-} from "../components/Api/Api";
+import { fetchLoggedInSalesforceUserId } from "../components/Api/Api";
 
 /**
  * @param {{ tasks: Task[], onAddCategory: function, onDone: React.MouseEventHandler, placeholder: string }} props
@@ -55,19 +51,36 @@ const Onboard = () => {
   const [categories, setCategories] = useState(new Map());
   /** @type {[FilterContainer[], Function]} */
   const [filters, setFilters] = useState([]);
-  // /** @type {[CriteriaField[] | undefined, function]} */
-  // const [taskFilterFields, setTaskFilterFields] = useState();
-  // /** @type {[CriteriaField[] | undefined, function]} */
-  // const [eventFilterFields, setEventFilterFields] = useState();
-  // const [meetingObject, setMeetingObject] = useState("Task");
   /** @type {[{ [key: string]: any }, function]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
   const [categoryFormKey, setCategoryFormKey] = useState(0);
   const placeholderIndexRef = useRef(0);
   const [isLargeDialog, setIsLargeDialog] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
-  
+
   const [tasks, setTasks] = useState(MOCK_TASK_DATA);
+
+  useEffect(() => {
+    const fetchLoggedInSalesforceUserIdAndSet = async () => {
+      const response = await fetchLoggedInSalesforceUserId();
+      if (!response.success) {
+        console.error(
+          `Error fetching logged in Salesforce User Id ${response.message}`
+        );
+        return;
+      }
+      setGatheringResponses(
+        /**
+         * @param {{ [key: string]: any }} prev
+         **/
+        (prev) => ({
+          ...prev,
+          salesforceUserId: { value: response.data },
+        })
+      );
+    };
+    fetchLoggedInSalesforceUserIdAndSet();
+  }, []);
 
   useEffect(() => {
     if (isTransitioning) {
@@ -83,79 +96,32 @@ const Onboard = () => {
   const formatSettingsData = () => {
     return {
       inactivityThreshold: parseInt(
-        gatheringResponses["inactivityThreshold"].value,
+        gatheringResponses["inactivityThreshold"]?.value,
         10
       ), // Tracking Period
-      cooloffPeriod: parseInt(gatheringResponses["cooloffPeriod"].value, 10), // Cooloff Period
+      cooloffPeriod: parseInt(gatheringResponses["cooloffPeriod"]?.value, 10), // Cooloff Period
       criteria: filters,
-      meetingObject: gatheringResponses["meetingObject"].value,
-      meetingsCriteria: gatheringResponses["meetingsCriteria"].value,
+      meetingObject: gatheringResponses["meetingObject"]?.value,
+      meetingsCriteria: gatheringResponses["meetingsCriteria"]?.value,
       activitiesPerContact: parseInt(
-        gatheringResponses["activitiesPerContact"].value,
+        gatheringResponses["activitiesPerContact"]?.value,
         10
       ),
       contactsPerAccount: parseInt(
-        gatheringResponses["contactsPerAccount"].value,
+        gatheringResponses["contactsPerAccount"]?.value,
         10
       ),
-      trackingPeriod: parseInt(gatheringResponses["trackingPeriod"].value, 10),
-      activateByMeeting: gatheringResponses["activateByMeeting"].value,
-      activateByOpportunity: gatheringResponses["activateByOpportunity"].value,
+      trackingPeriod: parseInt(gatheringResponses["trackingPeriod"]?.value, 10),
+      activateByMeeting: gatheringResponses["activateByMeeting"]?.value,
+      activateByOpportunity: gatheringResponses["activateByOpportunity"]?.value,
+      teamMemberIds: gatheringResponses["teamMemberIds"]?.value,
+      salesforceUserId: gatheringResponses["salesforceUserId"]?.value,
     };
   };
-
-  useEffect(() => {
-    const fetchAndSetFilterFields = async () => {
-      try {
-        /** @type {ApiResponse} */
-        // const taskFilterFields = await fetchTaskFilterFields();
-        /** @type {ApiResponse} */
-        // const eventFilterFields = await fetchEventFilterFields();
-
-        // if (
-        //   taskFilterFields?.statusCode !== 200 ||
-        //   eventFilterFields?.statusCode !== 200
-        // ) {
-        //   switch (taskFilterFields.statusCode) {
-        //     case 400:
-        //       navigate("/");
-        //       break;
-        //     case 500:
-        //       console.error(
-        //         "Internal server error while fetching task filter fields"
-        //       );
-        //       break;
-        //     default:
-        //       console.error("Error fetching task filter fields");
-        //   }
-
-        //   return;
-        // }
-
-        // setTaskFilterFields(taskFilterFields.data);
-        // setEventFilterFields(eventFilterFields.data);
-      } catch (error) {
-        console.error("Error fetching filter fields:", error);
-      }
-    };
-
-    fetchAndSetFilterFields();
-  }, []);
 
   const handleNext = () => {
     setStep(step + 1);
   };
-
-  /**
-   * @description sets meeting object to "Task" or "Event" based on the input value
-   * @param {{label: string, value: string}} info
-   */
-  // const handleInfoGatheringInputChange = (info) => {
-  //   const isMeetingObjectInfo = info.label?.toLowerCase() === "meetingobject";
-  //   if (isMeetingObjectInfo) {
-  //     setMeetingObject(info.value);
-  //   }
-  // };
 
   /**
    * Corresponds to the onboarding wizard step question, if the question is composed of an array of questions,
@@ -167,7 +133,7 @@ const Onboard = () => {
     setGatheringResponses(
       /**
        * @param {{ [key: string]: any }} prev
-       **/
+       */
       (prev) => {
         const newResponses = { ...prev };
         // Handle the case where we have multiple responses
@@ -187,16 +153,8 @@ const Onboard = () => {
           key={step}
           stepData={ONBOARD_WIZARD_STEPS[step - 1]}
           onTableDisplay={handleTableDisplay}
-
-          // onInputChange={handleInfoGatheringInputChange}
           onComplete={handleInfoGatheringComplete}
-          // stepIndex={step - 1}
-          // filterFields={
-          //   meetingObject.toLowerCase() === "task"
-          //     ? taskFilterFields || []
-          //     : eventFilterFields || []
-          // }
-          // filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+          settings={formatSettingsData()}
         />
       );
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
@@ -309,7 +267,7 @@ const Onboard = () => {
   };
 
   const dialogStyle = {
-    transition: 'all 0.3s ease-in-out',
+    transition: "all 0.3s ease-in-out",
     boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
     border: "1px solid #e0e0e0",
     ...(isLargeDialogStep()
@@ -350,7 +308,7 @@ const Onboard = () => {
       <DialogContent
         style={{
           padding: isLargeDialogStep() ? "24px" : "16px",
-          transition: 'padding 0.3s ease-in-out',
+          transition: "padding 0.3s ease-in-out",
         }}
       >
         {renderStep()}
