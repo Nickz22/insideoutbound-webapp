@@ -11,8 +11,6 @@ from server.models import (
     Opportunity,
     OpportunitySObject,
     Event,
-    EventModel,
-    EventSObject,
     CriteriaField,
     FilterContainer,
     SObjectFieldModel,
@@ -252,7 +250,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     return api_response
 
 
-def fetch_tasks_by_user_ids(user_ids, fields):
+def fetch_tasks_by_user_ids(user_ids):
     """
     Fetches tasks from Salesforce based on a list of user IDs.
 
@@ -270,17 +268,10 @@ def fetch_tasks_by_user_ids(user_ids, fields):
 
     try:
         joined_user_ids = "','".join(user_ids)
-        soql_query = f"SELECT {','.join(fields)} FROM Task WHERE OwnerId IN ('{joined_user_ids}')"
+        task_fields = pluck(fetch_task_fields().data, "name")
+        soql_query = f"SELECT {','.join(task_fields)} FROM Task WHERE OwnerId IN ('{joined_user_ids}')"
 
-        response = _fetch_sobjects(soql_query, load_tokens())
-        tasks = [
-            TaskModel.from_sobject(
-                TaskSObject(**{k: v for k, v in task.items() if k != "attributes"})
-            )
-            for task in response.data
-        ]
-
-        api_response.data = tasks
+        api_response.data = _fetch_sobjects(soql_query, load_tokens()).data
         api_response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))
@@ -349,7 +340,7 @@ def fetch_contact_tasks_by_criteria_from_date(
     return api_response
 
 
-def fetch_events_by_user_ids(user_ids, fields):
+def fetch_events_by_user_ids(user_ids):
     """
     Fetches events from Salesforce based on a list of user IDs.
 
@@ -367,17 +358,9 @@ def fetch_events_by_user_ids(user_ids, fields):
 
     try:
         joined_user_ids = "','".join(user_ids)
-        soql_query = f"SELECT {','.join(fields)} FROM Event WHERE OwnerId IN ('{joined_user_ids}')"
-
-        response = _fetch_sobjects(soql_query, load_tokens())
-        events = [
-            EventModel.from_sobject(
-                EventSObject(**{k: v for k, v in event.items() if k != "attributes"})
-            )
-            for event in response.data
-        ]
-
-        api_response.data = events
+        event_fields = pluck(fetch_event_fields().data, "name")
+        soql_query = f"SELECT {','.join(event_fields)} FROM Event WHERE OwnerId IN ('{joined_user_ids}')"
+        api_response.data = _fetch_sobjects(soql_query, load_tokens()).data
         api_response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))

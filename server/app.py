@@ -235,23 +235,14 @@ def get_salesforce_tasks_by_user_ids():
     response = ApiResponse(data=[], message="", success=False)
     try:
         user_ids = request.args.getlist("user_ids[]")
-        fields = request.args.getlist("fields[]") or [
-            "Id",
-            "WhoId",
-            "Subject",
-            "TaskSubtype",
-            "Status",
-            "CreatedDate",
-        ]
 
         if not user_ids:
             response.message = "No user IDs provided"
         else:
-            response.data = fetch_tasks_by_user_ids(user_ids, fields).data
+            response.data = fetch_tasks_by_user_ids(user_ids).data
             response.success = True
     except Exception as e:
         response.message = f"Failed to retrieve Salesforce tasks by user IDs: {format_error_message(e)}"
-        app.logger.error(f"Error occurred: {e}", exc_info=True)
 
     return jsonify(response.__dict__), get_status_code(response)
 
@@ -261,22 +252,14 @@ def get_salesforce_events_by_user_ids():
     response = ApiResponse(data=[], message="", success=False)
     try:
         user_ids = request.args.getlist("user_ids[]")
-        fields = request.args.getlist("fields") or [
-            "Id",
-            "EventSubtype",
-            "Subject",
-            "Type",
-            "CreatedDate",
-        ]
 
         if not user_ids:
             response.message = "No user IDs provided"
         else:
-            response.data = fetch_events_by_user_ids(user_ids, fields).data
+            response.data = fetch_events_by_user_ids(user_ids).data
             response.success = True
     except Exception as e:
         response.message = f"Failed to retrieve Salesforce events by user IDs: {format_error_message(e)}"
-        app.logger.error(f"Error occurred: {e}", exc_info=True)
 
     return jsonify(response.__dict__), get_status_code(response)
 

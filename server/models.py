@@ -1,8 +1,8 @@
-from dataclasses import dataclass, asdict
+import re
+from dataclasses import dataclass, asdict, field
 from typing import List
 from datetime import date, datetime
-from typing import List, Optional, Any
-
+from typing import List, Optional, Any, Dict
 from server.utils import remove_underscores_from_numbers, parse_date_with_timezone
 
 
@@ -15,7 +15,7 @@ class ApiResponse:
 
     def to_dict(self):
         return {
-            "data": self.data.to_dict() if self.data else None,
+            "data": [entry.to_dict() for entry in self.data] if self.data else None,
             "message": self.message,
             "success": self.success,
             "status_code": self.status_code,
@@ -92,43 +92,6 @@ class TaskModel:
             status=sobject.Status,
             taskSubtype=sobject.TaskSubtype,
         )
-
-
-@dataclass
-class EventSObject:
-    Id: str
-    CreatedDate: datetime
-    Subject: str
-    Type: str
-    EventSubtype: str
-
-    def __post_init__(self):
-        if isinstance(self.CreatedDate, str):
-            self.CreatedDate = parse_date_with_timezone(self.CreatedDate)
-
-    def to_dict(self):
-        return convert_to_dict(asdict(self))
-
-@dataclass
-class EventModel:
-    id: str
-    createdDate: datetime
-    subject: str
-    eventSubtype: str
-    type: str
-    
-    @classmethod
-    def from_sobject(cls, sobject: EventSObject):
-        return cls(
-            id=sobject.Id,
-            createdDate=sobject.CreatedDate,
-            subject=sobject.Subject,
-            eventSubtype=sobject.EventSubtype,
-            type=sobject.Type,
-        )
-    
-    def to_dict(self):
-        return convert_to_dict(asdict(self))
 
 @dataclass
 class Event:
@@ -379,14 +342,16 @@ class SettingsModel:
             ),
         }
 
+
 @dataclass
 class SObjectFieldModel:
     type: str
     name: str
     label: str
-    
+
     def to_dict(self):
         return asdict(self)
+
 
 @dataclass
 class UserSObject:
