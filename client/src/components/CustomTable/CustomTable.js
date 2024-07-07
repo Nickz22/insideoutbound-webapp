@@ -143,32 +143,45 @@ const CustomTable = ({
     onSelectionChange(newSelectedIds);
   };
 
+  /**
+   * @param {TableColumn} column
+   * @param {Record<string, any>} item
+   */
   const renderCell = (column, item) => {
+    let element;
     switch (column.dataType) {
       case "select":
-        return (
+        element = (
           <Checkbox
             checked={tableData.selectedIds.has(item.id) || false}
             onChange={() => handleToggle(item)}
           />
         );
+        break;
       case "image":
-        return (
+        element = (
           <Avatar
             src={item[column.id]}
             alt={`${column.label} for ${item.id}`}
             sx={{ width: 40, height: 40 }}
           />
         );
+        break;
       case "date":
-        return new Date(item[column.id]).toLocaleDateString();
+        element = new Date(item[column.id]).toLocaleDateString();
+        break;
       case "datetime":
-        return new Date(item[column.id]).toLocaleString();
+        element = new Date(item[column.id]).toLocaleString();
+        break;
       case "number":
-        return Number(item[column.id]).toLocaleString();
-      default: // "string" and any unhandled types
-        return item[column.id];
+        element = Number(item[column.id]).toLocaleString();
+        break;
+      default:
+        element = item[column.id];
+        break;
     }
+
+    return element;
   };
 
   const tableContent = useMemo(

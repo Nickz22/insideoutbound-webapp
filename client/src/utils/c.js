@@ -6,6 +6,7 @@ import {
   fetchEventFields,
 } from "./../components/Api/Api";
 /**
+ * @typedef {import('types').SObject} SObject
  * @typedef {import('types').SObjectField} SObjectField
  * @typedef {import('types').Task} Task
  * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
@@ -242,14 +243,12 @@ export const ONBOARD_WIZARD_STEPS = [
     description: `
     The next few questions will help us understand when to consider an Account "approached".
     <br><br>
-    First, how are meetings recorded in your CRM?
+    First, are meetings a strong indication of an Account being 'approached'?
     `,
     inputs: [
       {
         setting: "activateByMeeting",
         inputType: "picklist",
-        inputLabel:
-          "Are meetings a strong indication of an Account being 'approached'?",
         options: ["Yes", "No"],
       },
       {
@@ -260,7 +259,6 @@ export const ONBOARD_WIZARD_STEPS = [
           "We have an opportunity stage for that",
           "We use the task object for that",
           "We use the event object for that",
-          "A custom object record is created",
         ],
         renderEval: (priorInputValues) => {
           return priorInputValues["activateByMeeting"] === "Yes";
@@ -274,12 +272,12 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: "select",
           },
           {
-            id: "subject",
+            id: "Subject",
             label: "Subject",
             dataType: "string",
           },
           {
-            id: "status",
+            id: "Status",
             label: "Status",
             dataType: "string",
           },
@@ -298,6 +296,8 @@ export const ONBOARD_WIZARD_STEPS = [
           })
         ),
         setting: "meetingsCriteria",
+        inputLabel:
+          "Select Tasks that should set an Account as 'approached'. We'll create filters from your selections - don't worry, you'll have a chance to confirm them later.",
         inputType: "table",
         renderEval: (priorInputValues) => {
           return (
@@ -321,7 +321,14 @@ export const ONBOARD_WIZARD_STEPS = [
               ...(settings.teamMemberIds || []),
               settings.salesforceUserId,
             ];
-            return await fetchSalesforceTasksByUserIds(salesforceUserIds);
+            const response = await fetchSalesforceTasksByUserIds(
+              salesforceUserIds
+            );
+            response.data = response.data.map(
+              /** @param {SObject} task */
+              (task) => ({ ...task, id: task.Id })
+            );
+            return response;
           },
       },
       {
@@ -332,12 +339,12 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: "select",
           },
           {
-            id: "subject",
+            id: "Subject",
             label: "Subject",
             dataType: "string",
           },
           {
-            id: "eventSubtype",
+            id: "EventSubtype",
             label: "Event Subtype",
             dataType: "string",
           },
@@ -357,6 +364,8 @@ export const ONBOARD_WIZARD_STEPS = [
         ),
         setting: "meetingsCriteria",
         inputType: "table",
+        inputLabel:
+          "Select Events that should set an Account as 'approached'. We'll create filters from your selections - don't worry, you'll have a chance to confirm them later.",
         renderEval: (priorInputValues) => {
           return (
             priorInputValues["meetingObject"] ===
@@ -379,7 +388,15 @@ export const ONBOARD_WIZARD_STEPS = [
               ...(settings.teamMemberIds || []),
               settings.salesforceUserId,
             ];
-            return await fetchSalesforceEventsByUserIds(salesforceUserIds);
+
+            const response = await fetchSalesforceEventsByUserIds(
+              salesforceUserIds
+            );
+            response.data = response.data.map(
+              /** @param {SObject} event */
+              (event) => ({ ...event, id: event.Id })
+            );
+            return response;
           },
       },
     ],
@@ -387,22 +404,22 @@ export const ONBOARD_WIZARD_STEPS = [
       return description;
     },
   },
-  {
-    title: "Define an Approach",
-    description: `
-    Next, how are opportunities created in your CRM?
-    `,
-    inputs: [
-      {
-        setting: "opportunityCreation",
-        inputType: "picklist",
-        inputLabel: "Opportunity creation process",
-        options: [
-          "Opportunities are created by one team, then passed to another",
-          "The rep who creates the opportunity keeps it and works it through close",
-          "Neither",
-        ],
-      },
-    ],
-  },
+  // {
+  //   title: "Define an Approach",
+  //   description: `
+  //   Next, how are opportunities created in your CRM?
+  //   `,
+  //   inputs: [
+  //     {
+  //       setting: "opportunityCreation",
+  //       inputType: "picklist",
+  //       inputLabel: "Opportunity creation process",
+  //       options: [
+  //         "Opportunities are created by one team, then passed to another",
+  //         "The rep who creates the opportunity keeps it and works it through close",
+  //         "Neither",
+  //       ],
+  //     },
+  //   ],
+  // },
 ];

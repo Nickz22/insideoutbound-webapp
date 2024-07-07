@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
+  CircularProgress,
   Typography,
   TextField,
   Select,
@@ -39,6 +40,7 @@ const InfoGatheringStep = ({
   const [tableData, setTableData] = useState(
     /** @type {TableData | null} */ (null)
   );
+  const [isLoading, setIsLoading] = useState(false);
 
   const settingsRef = useRef(settings);
 
@@ -55,20 +57,25 @@ const InfoGatheringStep = ({
       );
 
       if (tableInput && tableInput.dataFetcher) {
-        const data = await tableInput.dataFetcher({
-          ...settingsRef.current,
-          ...inputValues,
-        });
-        if (data.success && data.data.length > 0) {
-          setTableData({
-            availableColumns: tableInput.availableColumns,
-            columns: tableInput.columns,
-            data: data.data,
-            selectedIds: new Set(),
+        setIsLoading(true);
+        try {
+          const data = await tableInput.dataFetcher({
+            ...settingsRef.current,
+            ...inputValues,
           });
-          onTableDisplay(true);
-        } else if (data.message.toLowerCase().includes("session expired")) {
-          navigate("/");
+          if (data.success && data.data.length > 0) {
+            setTableData({
+              availableColumns: tableInput.availableColumns,
+              columns: tableInput.columns,
+              data: data.data,
+              selectedIds: new Set(),
+            });
+            onTableDisplay(true);
+          } else if (data.message?.toLowerCase().includes("session expired")) {
+            navigate("/");
+          }
+        } finally {
+          setIsLoading(false);
         }
       } else {
         setTableData(null);
@@ -110,7 +117,9 @@ const InfoGatheringStep = ({
     if (tableInput && tableData && tableData.selectedIds.size > 0) {
       completedInputs.push({
         label: tableInput.setting,
-        value: Array.from(tableData.selectedIds),
+        value: tableData.data.filter((row) =>
+          tableData.selectedIds.has(row.id)
+        ),
       });
     }
 
@@ -153,14 +162,27 @@ const InfoGatheringStep = ({
           </FormControl>
         );
       case "table":
-        return tableData ? (
-          <CustomTable
-            tableData={tableData}
-            onSelectionChange={handleTableSelectionChange}
-            onColumnsChange={handleColumnsChange}
-            paginate={true}
-          />
-        ) : null;
+        return (
+          <Box sx={{ mt: 2, mb: 2 }}>
+            {isLoading ? (
+              <CircularProgress />
+            ) : (
+              tableData && (
+                <>
+                  <Typography variant="caption" gutterBottom>
+                    {input.inputLabel}
+                  </Typography>
+                  <CustomTable
+                    tableData={tableData}
+                    onSelectionChange={handleTableSelectionChange}
+                    onColumnsChange={handleColumnsChange}
+                    paginate={true}
+                  />
+                </>
+              )
+            )}
+          </Box>
+        );
       default:
         return null;
     }
