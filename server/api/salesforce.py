@@ -371,7 +371,10 @@ def fetch_events_by_user_ids(user_ids, fields):
 
         response = _fetch_sobjects(soql_query, load_tokens())
         events = [
-            EventModel.from_sobject(EventSObject(**event)) for event in response.data
+            EventModel.from_sobject(
+                EventSObject(**{k: v for k, v in event.items() if k != "attributes"})
+            )
+            for event in response.data
         ]
 
         api_response.data = events
@@ -605,6 +608,29 @@ def fetch_task_fields() -> ApiResponse:
     else:
         raise Exception(
             f"Failed to fetch Task fields ({response.status_code}): {get_http_error_message(response)}"
+        )
+    return api_response
+
+
+def fetch_event_fields() -> ApiResponse:
+    """
+    Retrieves fields for the Event object from Salesforce.
+    """
+
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    response = _fetch_object_fields("Event", load_tokens())
+    sobject_field_models = [
+        SObjectFieldModel(type=entry["type"], name=entry["name"], label=entry["label"])
+        for entry in response.data
+    ]
+
+    if response.success:
+        api_response.success = True
+        api_response.data = sobject_field_models
+    else:
+        raise Exception(
+            f"Failed to fetch Event fields ({response.status_code}): {get_http_error_message(response)}"
         )
     return api_response
 

@@ -97,11 +97,19 @@ export const fetchLoggedInSalesforceUserId = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchTaskFields = async () => {
-  const response = await axios.get(
-    "http://localhost:8000/get_task_fields",
-    {
-      validateStatus: () => true,
-    }
-  );
+  const response = await axios.get("http://localhost:8000/get_task_fields", {
+    validateStatus: () => true,
+  });
   return { ...response.data, statusCode: response.status };
-}
+};
+
+/**
+ * Fetches the logged in Salesforce user's team members
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchEventFields = async () => {
+  const response = await axios.get("http://localhost:8000/get_event_fields", {
+    validateStatus: () => true,
+  });
+  return { ...response.data, statusCode: response.status };
+};

@@ -3,6 +3,7 @@ import {
   fetchTaskFields,
   fetchSalesforceTasksByUserIds,
   fetchSalesforceEventsByUserIds,
+  fetchEventFields,
 } from "./../components/Api/Api";
 /**
  * @typedef {import('types').SObjectField} SObjectField
@@ -109,11 +110,8 @@ export const ONBOARD_WIZARD_STEPS = [
       {
         setting: "teamMemberIds",
         inputType: "table",
-        renderEval: (inputLabel, previousStepInputValue) => {
-          return (
-            inputLabel?.toLowerCase() === "user role" &&
-            previousStepInputValue?.toLowerCase() === "i manage a team"
-          );
+        renderEval: (priorInputValues) => {
+          return priorInputValues["userRole"] === "I manage a team";
         },
         dataFetcher: async () => {
           return await fetchSalesforceUsers();
@@ -264,12 +262,8 @@ export const ONBOARD_WIZARD_STEPS = [
           "We use the event object for that",
           "A custom object record is created",
         ],
-        renderEval: (inputLabel, previousStepInputValue) => {
-          return (
-            inputLabel?.toLowerCase() ===
-              "are meetings a strong indication of an account being 'approached'?" &&
-            previousStepInputValue?.toLowerCase() === "yes"
-          );
+        renderEval: (priorInputValues) => {
+          return priorInputValues["activateByMeeting"] === "Yes";
         },
       },
       {
@@ -305,11 +299,10 @@ export const ONBOARD_WIZARD_STEPS = [
         ),
         setting: "meetingsCriteria",
         inputType: "table",
-        renderEval: (inputLabel, previousStepInputValue) => {
+        renderEval: (priorInputValues) => {
           return (
-            inputLabel?.toLowerCase() === "how are meetings recorded?" &&
-            previousStepInputValue?.toLowerCase() !==
-              "we have an opportunity stage for that"
+            priorInputValues["meetingObject"] ===
+            "We use the task object for that"
           );
         },
         dataFetcher:
@@ -328,9 +321,65 @@ export const ONBOARD_WIZARD_STEPS = [
               ...(settings.teamMemberIds || []),
               settings.salesforceUserId,
             ];
-            return settings.meetingObject.toLowerCase().includes("task")
-              ? await fetchSalesforceTasksByUserIds(salesforceUserIds)
-              : await fetchSalesforceEventsByUserIds(salesforceUserIds);
+            return await fetchSalesforceTasksByUserIds(salesforceUserIds);
+          },
+      },
+      {
+        columns: [
+          {
+            id: "select",
+            label: "Select",
+            dataType: "select",
+          },
+          {
+            id: "subject",
+            label: "Subject",
+            dataType: "string",
+          },
+          {
+            id: "eventSubtype",
+            label: "Event Subtype",
+            dataType: "string",
+          },
+          {
+            id: "Type",
+            label: "Type",
+            dataType: "string",
+          },
+        ],
+        availableColumns: (await fetchEventFields()).data.map(
+          /** @param {SObjectField} field */
+          (field) => ({
+            id: field.name,
+            label: field.label,
+            dataType: field.type,
+          })
+        ),
+        setting: "meetingsCriteria",
+        inputType: "table",
+        renderEval: (priorInputValues) => {
+          return (
+            priorInputValues["meetingObject"] ===
+            "We use the event object for that"
+          );
+        },
+        dataFetcher:
+          /** @param {Settings} settings */
+          async (settings) => {
+            if (!settings.meetingObject) {
+              return {
+                success: false,
+                data: [],
+                message: "Meeting object not provided",
+              };
+            }
+
+            /** @type {string[]} */
+            const salesforceUserIds = [
+              ...(settings.teamMemberIds || []),
+              settings.salesforceUserId,
+            ];
+            return await fetchSalesforceEventsByUserIds(salesforceUserIds);
           },
       },
     ],

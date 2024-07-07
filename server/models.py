@@ -98,18 +98,13 @@ class TaskModel:
 class EventSObject:
     Id: str
     CreatedDate: datetime
-    WhoId: str
     Subject: str
-    StartDateTime: datetime
-    EndDateTime: datetime
+    Type: str
+    EventSubtype: str
 
     def __post_init__(self):
         if isinstance(self.CreatedDate, str):
             self.CreatedDate = parse_date_with_timezone(self.CreatedDate)
-        if isinstance(self.StartDateTime, str):
-            self.StartDateTime = parse_date_with_timezone(self.StartDateTime)
-        if isinstance(self.EndDateTime, str):
-            self.EndDateTime = parse_date_with_timezone(self.EndDateTime)
 
     def to_dict(self):
         return convert_to_dict(asdict(self))
@@ -118,21 +113,22 @@ class EventSObject:
 class EventModel:
     id: str
     createdDate: datetime
-    whoId: str
     subject: str
-    startDateTime: datetime
-    endDateTime: datetime
+    eventSubtype: str
+    type: str
     
     @classmethod
     def from_sobject(cls, sobject: EventSObject):
         return cls(
             id=sobject.Id,
             createdDate=sobject.CreatedDate,
-            whoId=sobject.WhoId,
             subject=sobject.Subject,
-            startDateTime=sobject.StartDateTime,
-            endDateTime=sobject.EndDateTime,
+            eventSubtype=sobject.EventSubtype,
+            type=sobject.Type,
         )
+    
+    def to_dict(self):
+        return convert_to_dict(asdict(self))
 
 @dataclass
 class Event:

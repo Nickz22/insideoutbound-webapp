@@ -7,6 +7,7 @@ from server.services.setting_service import define_criteria_from_tasks
 from server.api.salesforce import (
     get_criteria_fields,
     fetch_task_fields,
+    fetch_event_fields,
     fetch_salesforce_users,
     fetch_tasks_by_user_ids,
     fetch_events_by_user_ids,
@@ -262,9 +263,9 @@ def get_salesforce_events_by_user_ids():
         user_ids = request.args.getlist("user_ids[]")
         fields = request.args.getlist("fields") or [
             "Id",
-            "WhoId",
-            "WhatId",
+            "EventSubtype",
             "Subject",
+            "Type",
             "CreatedDate",
         ]
 
@@ -306,6 +307,18 @@ def get_task_fields():
         response.success = True
     except Exception as e:
         response.message = f"Failed to retrieve task fields: {format_error_message(e)}"
+
+    return jsonify(response.__dict__), get_status_code(response)
+
+
+@app.route("/get_event_fields", methods=["GET"])
+def get_event_fields():
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        response.data = fetch_event_fields().data
+        response.success = True
+    except Exception as e:
+        response.message = f"Failed to retrieve event fields: {format_error_message(e)}"
 
     return jsonify(response.__dict__), get_status_code(response)
 

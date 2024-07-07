@@ -49,28 +49,26 @@ const InfoGatheringStep = ({
   useEffect(() => {
     const fetchTableData = async () => {
       const tableInput = stepData.inputs.find(
-        (input) => input.inputType === "table"
+        (input) =>
+          input.inputType === "table" &&
+          shouldRenderInput(input, stepData.inputs.indexOf(input))
       );
-      if (
-        tableInput &&
-        shouldRenderInput(tableInput, stepData.inputs.indexOf(tableInput))
-      ) {
-        if (tableInput.dataFetcher) {
-          const data = await tableInput.dataFetcher({
-            ...settingsRef.current,
-            ...inputValues,
+
+      if (tableInput && tableInput.dataFetcher) {
+        const data = await tableInput.dataFetcher({
+          ...settingsRef.current,
+          ...inputValues,
+        });
+        if (data.success && data.data.length > 0) {
+          setTableData({
+            availableColumns: tableInput.availableColumns,
+            columns: tableInput.columns,
+            data: data.data,
+            selectedIds: new Set(),
           });
-          if (data.success && data.data.length > 0) {
-            setTableData({
-              availableColumns: tableInput.availableColumns,
-              columns: tableInput.columns,
-              data: data.data,
-              selectedIds: new Set(),
-            });
-            onTableDisplay(true);
-          } else if (data.message.toLowerCase().includes("session expired")) {
-            navigate("/");
-          }
+          onTableDisplay(true);
+        } else if (data.message.toLowerCase().includes("session expired")) {
+          navigate("/");
         }
       } else {
         setTableData(null);
@@ -172,10 +170,7 @@ const InfoGatheringStep = ({
     if (!input.renderEval) return true;
     if (index === 0) return true; // Always render the first input
 
-    const previousInput = stepData.inputs[index - 1];
-    const previousValue = inputValues[previousInput.setting];
-
-    return input.renderEval(previousInput.inputLabel, previousValue);
+    return input.renderEval(inputValues);
   };
 
   return (
