@@ -383,6 +383,14 @@ class SettingsModel:
             ),
         }
 
+@dataclass
+class SObjectFieldModel:
+    type: str
+    name: str
+    label: str
+    
+    def to_dict(self):
+        return asdict(self)
 
 @dataclass
 class UserSObject:

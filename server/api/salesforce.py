@@ -15,6 +15,7 @@ from server.models import (
     EventSObject,
     CriteriaField,
     FilterContainer,
+    SObjectFieldModel,
     UserModel,
     UserSObject,
 )
@@ -585,6 +586,29 @@ def fetch_logged_in_salesforce_user_id():
     return api_response
 
 
+def fetch_task_fields() -> ApiResponse:
+    """
+    Retrieves fields for the Task object from Salesforce.
+    """
+
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    response = _fetch_object_fields("Task", load_tokens())
+    sobject_field_models = [
+        SObjectFieldModel(type=entry["type"], name=entry["name"], label=entry["label"])
+        for entry in response.data
+    ]
+
+    if response.success:
+        api_response.success = True
+        api_response.data = sobject_field_models
+    else:
+        raise Exception(
+            f"Failed to fetch Task fields ({response.status_code}): {get_http_error_message(response)}"
+        )
+    return api_response
+
+
 # helpers
 def _construct_where_clause_from_filter(filter_container):
     """
@@ -608,6 +632,32 @@ def _construct_where_clause_from_filter(filter_container):
         combined_conditions = combined_conditions.replace(f"_{index}_", condition)
 
     return combined_conditions
+
+
+def _fetch_object_fields(object_name, credentials):
+    try:
+        access_token, instance_url = credentials
+        if not access_token or not instance_url:
+            raise Exception("Session expired")
+        headers = {"Authorization": f"Bearer {access_token}"}
+        response = requests.get(
+            f"{instance_url}/services/data/v55.0/sobjects/{object_name}/describe",
+            headers=headers,
+        )
+        if response.status_code == 200:
+            fields = response.json()["fields"]
+            return ApiResponse(
+                success=True,
+                data=fields,
+                message=None,
+                status_code=200,
+            )
+        else:
+            raise Exception(
+                f"Failed to fetch {object_name} fields ({response.status_code}): {response.json().get('message', 'An error occurred')}"
+            )
+    except Exception as e:
+        raise Exception(format_error_message(e))
 
 
 def _fetch_sobjects(soql_query, credentials):

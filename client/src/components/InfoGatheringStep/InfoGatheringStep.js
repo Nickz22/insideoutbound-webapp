@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Box,
   Typography,
@@ -20,6 +20,7 @@ import { useNavigate } from "react-router-dom";
  * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
  * @typedef {import('types').OnboardWizardStepInput} OnboardWizardStepInput
  * @typedef {import('types').TableColumn} TableColumn
+ * @typedef {import('types').TableData} TableData
  * @typedef {import('types').Settings} Settings
  */
 
@@ -34,20 +35,16 @@ const InfoGatheringStep = ({
 }) => {
   const navigate = useNavigate();
   const [inputValues, setInputValues] = useState({});
-  const [tableData, setTableData] = useState(null);
-  const [renderedDescription, setRenderedDescription] = useState(
-    stepData.description
+  /** @type {[TableData | null, Function]} */
+  const [tableData, setTableData] = useState(
+    /** @type {TableData | null} */ (null)
   );
 
+  const settingsRef = useRef(settings);
+
   useEffect(() => {
-    if (stepData.descriptionRenderer) {
-      const newDescription = stepData.descriptionRenderer(
-        stepData.description,
-        inputValues
-      );
-      setRenderedDescription(newDescription);
-    }
-  }, [stepData, inputValues]);
+    settingsRef.current = settings;
+  }, [settings]);
 
   useEffect(() => {
     const fetchTableData = async () => {
@@ -60,11 +57,12 @@ const InfoGatheringStep = ({
       ) {
         if (tableInput.dataFetcher) {
           const data = await tableInput.dataFetcher({
-            ...settings,
+            ...settingsRef.current,
             ...inputValues,
           });
           if (data.success && data.data.length > 0) {
             setTableData({
+              availableColumns: tableInput.availableColumns,
               columns: tableInput.columns,
               data: data.data,
               selectedIds: new Set(),
@@ -94,6 +92,10 @@ const InfoGatheringStep = ({
     setTableData((prev) =>
       prev ? { ...prev, selectedIds: newSelectedIds } : null
     );
+  };
+
+  const handleColumnsChange = (newColumns) => {
+    setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
   };
 
   const handleSubmit = () => {
@@ -157,6 +159,7 @@ const InfoGatheringStep = ({
           <CustomTable
             tableData={tableData}
             onSelectionChange={handleTableSelectionChange}
+            onColumnsChange={handleColumnsChange}
             paginate={true}
           />
         ) : null;
@@ -172,11 +175,7 @@ const InfoGatheringStep = ({
     const previousInput = stepData.inputs[index - 1];
     const previousValue = inputValues[previousInput.setting];
 
-    const renderInput = input.renderEval(
-      previousInput.inputLabel,
-      previousValue
-    );
-    return renderInput;
+    return input.renderEval(previousInput.inputLabel, previousValue);
   };
 
   return (
@@ -186,14 +185,14 @@ const InfoGatheringStep = ({
           {stepData.title}
         </Typography>
         <Typography variant="body1" paragraph>
-          {parse(renderedDescription)}
+          {parse(stepData.description)}
         </Typography>
         <Grid container spacing={2}>
           {stepData.inputs.map(
             (input, index) =>
               shouldRenderInput(input, index) && (
                 <Grid item xs={12} key={index}>
-                  {renderInput(input, index)}
+                  {renderInput(input)}
                 </Grid>
               )
           )}

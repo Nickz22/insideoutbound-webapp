@@ -7,6 +7,7 @@ export * from "./ApiResponse";
 export * from "./OnboardWizardStep";
 export * from "./OnboardWizardStepInput";
 export * from "./SalesforceUser";
+export * from "./SObjectField";
 export * from "./TableData";
 export * from "./TableColumn";
 export * from "./Task";

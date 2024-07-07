@@ -1,9 +1,11 @@
 import {
   fetchSalesforceUsers,
+  fetchTaskFields,
   fetchSalesforceTasksByUserIds,
   fetchSalesforceEventsByUserIds,
 } from "./../components/Api/Api";
 /**
+ * @typedef {import('types').SObjectField} SObjectField
  * @typedef {import('types').Task} Task
  * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
  * @typedef {import('types').TableColumn} TableColumn
@@ -275,7 +277,7 @@ export const ONBOARD_WIZARD_STEPS = [
           {
             id: "select",
             label: "Select",
-            dataType: "select"
+            dataType: "select",
           },
           {
             id: "subject",
@@ -293,6 +295,14 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: "string",
           },
         ],
+        availableColumns: (await fetchTaskFields()).data.map(
+          /** @param {SObjectField} field */
+          (field) => ({
+            id: field.name,
+            label: field.label,
+            dataType: field.type,
+          })
+        ),
         setting: "meetingsCriteria",
         inputType: "table",
         renderEval: (inputLabel, previousStepInputValue) => {

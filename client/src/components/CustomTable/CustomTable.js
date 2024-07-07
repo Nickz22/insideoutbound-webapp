@@ -6,6 +6,7 @@ import {
   TableHead,
   TableRow,
   Checkbox,
+  Divider,
   Paper,
   TableContainer,
   Avatar,
@@ -15,6 +16,15 @@ import {
   Box,
   TablePagination,
   TableSortLabel,
+  Menu,
+  MenuItem,
+  Modal,
+  Typography,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Tooltip,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
@@ -26,21 +36,25 @@ import ClearIcon from "@mui/icons-material/Clear";
 
 /**
  * @param {{
- *   tableData: {
- *     columns: TableColumn[],
- *     data: TableData[],
- *     selectedIds: Set<string>
- *   },
+ *   tableData: TableData,
  *   onSelectionChange: (selectedIds: Set<string>) => void,
+ *   onColumnsChange: (columns: TableColumn[]) => void,
  *   paginate?: boolean
  * }} props
  */
-const CustomTable = ({ tableData, onSelectionChange, paginate = false }) => {
+const CustomTable = ({
+  tableData,
+  onSelectionChange,
+  onColumnsChange,
+  paginate = false,
+}) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [orderBy, setOrderBy] = useState("");
   const [order, setOrder] = useState("asc");
+  const [contextMenu, setContextMenu] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   const filteredData = useMemo(() => {
     return tableData.data.filter((item) =>
@@ -74,6 +88,35 @@ const CustomTable = ({ tableData, onSelectionChange, paginate = false }) => {
     const startIndex = page * rowsPerPage;
     return sortedData.slice(startIndex, startIndex + rowsPerPage);
   }, [sortedData, page, rowsPerPage, paginate]);
+
+  const handleContextMenu = (event) => {
+    event.preventDefault();
+    setContextMenu(
+      contextMenu === null
+        ? { mouseX: event.clientX - 2, mouseY: event.clientY - 4 }
+        : null
+    );
+  };
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null);
+  };
+
+  const handleOpenModal = () => {
+    setModalOpen(true);
+    handleCloseContextMenu();
+  };
+
+  const handleCloseModal = () => {
+    setModalOpen(false);
+  };
+
+  const handleColumnToggle = (column) => {
+    const newColumns = tableData.columns.includes(column)
+      ? tableData.columns.filter((c) => c.id !== column.id)
+      : [...tableData.columns, column];
+    onColumnsChange(newColumns);
+  };
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -136,21 +179,27 @@ const CustomTable = ({ tableData, onSelectionChange, paginate = false }) => {
       >
         <Table stickyHeader>
           <TableHead>
-            <TableRow>
+            <TableRow onContextMenu={handleContextMenu}>
               {tableData.columns.map((column) => (
-                <TableCell
+                <Tooltip
                   key={column.id}
-                  style={{ backgroundColor: "#f5f5f5" }}
-                  sortDirection={orderBy === column.id ? order : false}
+                  title="Right-click for more columns"
+                  arrow
                 >
-                  <TableSortLabel
-                    active={orderBy === column.id}
-                    direction={orderBy === column.id ? order : "asc"}
-                    onClick={() => handleSort(column.id)}
+                  <TableCell
+                    key={column.id}
+                    style={{ backgroundColor: "#f5f5f5" }}
+                    sortDirection={orderBy === column.id ? order : false}
                   >
-                    {column.label}
-                  </TableSortLabel>
-                </TableCell>
+                    <TableSortLabel
+                      active={orderBy === column.id}
+                      direction={orderBy === column.id ? order : "asc"}
+                      onClick={() => handleSort(column.id)}
+                    >
+                      {column.label}
+                    </TableSortLabel>
+                  </TableCell>
+                </Tooltip>
               ))}
             </TableRow>
           </TableHead>
@@ -207,6 +256,80 @@ const CustomTable = ({ tableData, onSelectionChange, paginate = false }) => {
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
       )}
+      <Menu
+        open={contextMenu !== null}
+        onClose={handleCloseContextMenu}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          contextMenu !== null
+            ? { top: contextMenu.mouseY, left: contextMenu.mouseX }
+            : undefined
+        }
+      >
+        <MenuItem onClick={handleOpenModal}>Manage Columns</MenuItem>
+      </Menu>
+      <Modal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        aria-labelledby="modal-modal-title"
+        aria-describedby="modal-modal-description"
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 400,
+            maxHeight: "80vh", // Limit the height to 80% of the viewport height
+            bgcolor: "background.paper",
+            border: "1px solid #000",
+            boxShadow: 24,
+            p: 4,
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Typography
+            id="modal-modal-title"
+            variant="h6"
+            component="h2"
+            gutterBottom
+          >
+            Manage Columns
+          </Typography>
+          <Divider sx={{ mb: 2 }} />
+          <List
+            sx={{
+              flexGrow: 1,
+              overflow: "auto", // Make the list scrollable
+              "& .MuiListItem-root": {
+                paddingTop: 0.5,
+                paddingBottom: 0.5,
+              },
+            }}
+          >
+            {tableData.availableColumns?.map((column) => (
+              <ListItem
+                key={column.id}
+                dense
+                button
+                onClick={() => handleColumnToggle(column)}
+              >
+                <ListItemIcon>
+                  <Checkbox
+                    edge="start"
+                    checked={tableData.columns.some((c) => c.id === column.id)}
+                    tabIndex={-1}
+                    disableRipple
+                  />
+                </ListItemIcon>
+                <ListItemText primary={column.label} />
+              </ListItem>
+            ))}
+          </List>
+        </Box>
+      </Modal>
     </Box>
   );
 };

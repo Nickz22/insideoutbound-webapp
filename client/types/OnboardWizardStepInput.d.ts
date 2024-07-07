@@ -19,6 +19,7 @@ export interface OnboardWizardStepInput {
   renderEval?: RenderEvaluatorFunction;
   dataFetcher?: DataFetcherFunction;
   columns?: TableColumn[];
+  availableColumns?: TableColumn[]
 }
 
 type RenderEvaluatorFunction = (
@@ -26,3 +27,4 @@ type RenderEvaluatorFunction = (
   inputValue: string
 ) => boolean;
 type DataFetcherFunction = (any) => Promise<ApiResponse>;
+// type FetchAvailableColumnsFunction = () => Promise<TableColumn[]>;

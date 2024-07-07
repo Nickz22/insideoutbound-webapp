@@ -6,6 +6,7 @@ from server.engine.activation_engine import update_activation_states
 from server.services.setting_service import define_criteria_from_tasks
 from server.api.salesforce import (
     get_criteria_fields,
+    fetch_task_fields,
     fetch_salesforce_users,
     fetch_tasks_by_user_ids,
     fetch_events_by_user_ids,
@@ -295,6 +296,18 @@ def get_salesforce_user_id():
 
 if __name__ == "__main__":
     app.run(debug=True, host="localhost", port=8000)  # Updated to run on localhost
+
+
+@app.route("/get_task_fields", methods=["GET"])
+def get_task_fields():
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        response.data = fetch_task_fields().data
+        response.success = True
+    except Exception as e:
+        response.message = f"Failed to retrieve task fields: {format_error_message(e)}"
+
+    return jsonify(response.__dict__), get_status_code(response)
 
 
 # helpers
