@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass, asdict, field
-from typing import List
+from typing import List, Literal
 from datetime import date, datetime
 from typing import List, Optional, Any, Dict
 from server.utils import remove_underscores_from_numbers, parse_date_with_timezone
@@ -360,6 +360,11 @@ class SObjectFieldModel:
     def to_dict(self):
         return asdict(self)
 
+@dataclass
+class TableColumn:
+    id: str
+    dataType: Literal["string", "number", "date", "datetime", "select", "image"]
+    label: str
 
 @dataclass
 class UserSObject:

@@ -1,4 +1,4 @@
-from server.models import FilterContainerModel, FilterModel, TaskSObject
+from server.models import FilterContainerModel, FilterModel, TableColumn
 from server.utils import format_error_message
 from typing import List
 
@@ -6,9 +6,18 @@ from typing import List
 filter_blacklist = ["Id", "CreatedDate", "WhoId"]
 
 
-def define_criteria_from_tasks(tasks: List[TaskSObject]) -> FilterContainerModel:
+def define_criteria_from_tasks(
+    tasks, columns: List[TableColumn]
+) -> FilterContainerModel:
+    column_ids = {column.id for column in columns}  # Set of column IDs to filter by
+
+    if not tasks:
+        return FilterContainerModel(
+            name="Common Task Criteria", filters=[], filterLogic=""
+        )
+
     try:
-        common_keys = set(tasks[0].keys())
+        common_keys = column_ids.intersection(tasks[0].keys())
         for task in tasks[1:]:
             common_keys.intersection_update(task.keys())
 
@@ -16,7 +25,7 @@ def define_criteria_from_tasks(tasks: List[TaskSObject]) -> FilterContainerModel
 
         filters = []
         for key in common_keys:
-            values = [task[key] for task in tasks]
+            values = [task[key] for task in tasks if key in task]
             try:
                 unique_values = set(values)
             except Exception as e:

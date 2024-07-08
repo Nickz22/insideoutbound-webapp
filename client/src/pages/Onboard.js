@@ -316,12 +316,13 @@ const Onboard = () => {
   };
 
   const handleDone = async () => {
+    const selectedColumns = categoryFormTableData.columns;
     const filterContainersPromises = Array.from(categories.entries()).map(
       async ([category, tasks]) => {
         try {
           const response = await axios.post(
             "http://localhost:8000/generate_filters",
-            { tasks },
+            { tasks, selectedColumns },
             {
               validateStatus: () => true,
             }

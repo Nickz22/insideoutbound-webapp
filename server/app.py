@@ -21,7 +21,7 @@ from server.cache import (
     save_settings,
 )
 from server.constants import SESSION_EXPIRED, FILTER_TASK_FIELDS, FILTER_EVENT_FIELDS
-from server.models import ApiResponse, SettingsModel, TaskSObject
+from server.models import ApiResponse, SettingsModel, TableColumn
 from server.mapper.mapper import convert_settings_model_to_settings
 from server.utils import format_error_message
 
@@ -113,16 +113,18 @@ def generate_filters():
     try:
         data = request.json
         tasks = data.get("tasks")
+        columns = [TableColumn(**column) for column in data.get("selectedColumns")]
         if not tasks or len(tasks) == 0:
             response.success = False
             response.message = "No tasks provided"
         else:
-            response.data = [define_criteria_from_tasks(tasks)]
+            response.data = [define_criteria_from_tasks(tasks, columns)]
 
         final_response = jsonify(response.to_dict()), 200 if response.success else 400
     except Exception as e:
         response.success = False
         response.message = f"Failed to generate filters: {format_error_message(e)}"
+        print(response.message)
         final_response = jsonify(response.__dict__), 500
 
     return final_response
