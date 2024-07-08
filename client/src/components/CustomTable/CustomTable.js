@@ -258,7 +258,7 @@ const CustomTable = ({
         }}
       />
       {tableContent}
-      {paginate && (
+      {paginate && tableData.data && (
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"

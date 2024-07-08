@@ -15,7 +15,14 @@ class ApiResponse:
 
     def to_dict(self):
         return {
-            "data": [entry.to_dict() for entry in self.data] if self.data else None,
+            "data": (
+                [
+                    entry.to_dict() if hasattr(entry, "to_dict") else entry
+                    for entry in self.data
+                ]
+                if self.data
+                else None
+            ),
             "message": self.message,
             "success": self.success,
             "status_code": self.status_code,
@@ -92,6 +99,7 @@ class TaskModel:
             status=sobject.Status,
             taskSubtype=sobject.TaskSubtype,
         )
+
 
 @dataclass
 class Event:

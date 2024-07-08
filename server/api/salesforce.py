@@ -31,6 +31,8 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     """
     api_response = ApiResponse(data=[], message="", success=False)
 
+    access_token, instance_url = load_tokens()
+
     fields_endpoint = f"{instance_url}/services/data/v55.0/sobjects/{sobject_type}/describe"  # Replace 'XX' with your actual API version
 
     try:
@@ -271,7 +273,10 @@ def fetch_tasks_by_user_ids(user_ids):
         task_fields = pluck(fetch_task_fields().data, "name")
         soql_query = f"SELECT {','.join(task_fields)} FROM Task WHERE OwnerId IN ('{joined_user_ids}')"
 
-        api_response.data = _fetch_sobjects(soql_query, load_tokens()).data
+        api_response.data = [
+            {key: value for key, value in entry.items() if key != "attributes"}
+            for entry in _fetch_sobjects(soql_query, load_tokens()).data
+        ]
         api_response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))
@@ -360,7 +365,10 @@ def fetch_events_by_user_ids(user_ids):
         joined_user_ids = "','".join(user_ids)
         event_fields = pluck(fetch_event_fields().data, "name")
         soql_query = f"SELECT {','.join(event_fields)} FROM Event WHERE OwnerId IN ('{joined_user_ids}')"
-        api_response.data = _fetch_sobjects(soql_query, load_tokens()).data
+        api_response.data = [
+            {key: value for key, value in entry.items() if key != "attributes"}
+            for entry in _fetch_sobjects(soql_query, load_tokens()).data
+        ]
         api_response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))

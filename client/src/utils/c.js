@@ -49,53 +49,6 @@ export const PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS = [
   "Webinars",
   "Conferences",
 ];
-
-/**
- * @type {Task[]}
- */
-export const MOCK_TASK_DATA = [
-  {
-    id: "1",
-    createdDate: new Date(Date.now()),
-    subject: "Call John Doe",
-    who: { id: "mock_contact_1", firstName: "John", lastName: "Doe" },
-    priority: "High",
-    status: "Not Started",
-    type: "Call",
-    taskSubtype: "Email",
-  },
-  {
-    id: "2",
-    createdDate: new Date(Date.now()),
-    subject: "Email Jane Doe",
-    who: { id: "mock_contact_1", firstName: "Jane", lastName: "Doe" },
-    priority: "High",
-    status: "Not Started",
-    type: "Email",
-    taskSubtype: "Email",
-  },
-  {
-    id: "3",
-    createdDate: new Date(Date.now()),
-    subject: "Call John Smith",
-    who: { id: "mock_contact_1", firstName: "John", lastName: "Smith" },
-    priority: "Low",
-    status: "Not Started",
-    type: "Call",
-    taskSubtype: "Call",
-  },
-  {
-    id: "4",
-    createdDate: new Date(Date.now()),
-    subject: "Email Jane Smith",
-    who: { id: "mock_contact_1", firstName: "Jane", lastName: "Smith" },
-    priority: "High",
-    status: "Not Started",
-    type: "Email",
-    taskSubtype: "Call",
-  },
-];
-
 /** @type {OnboardWizardStep[]} */
 export const ONBOARD_WIZARD_STEPS = [
   {

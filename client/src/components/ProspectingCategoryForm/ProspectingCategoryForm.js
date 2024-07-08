@@ -5,39 +5,26 @@ import CustomTable from "../CustomTable/CustomTable"; // Adjust the path as nece
 /**
  * @typedef {import('types').Task} Task
  * @typedef {import('types').TableData} TableData
+ * @typedef {import('types').SObjectField} SObjectField
  */
 
 /**
- * @param {{ tasks: Task[], onAddCategory: Function, onDone: React.MouseEventHandler, placeholder: string }} props
+ * @param {{ initialTableData: TableData, setSelectedColumns: Function,  onAddCategory: Function, onDone: React.MouseEventHandler, placeholder: string }} props
  */
 const ProspectingCategoryForm = ({
-  tasks,
+  initialTableData,
+  setSelectedColumns,
   onAddCategory,
   onDone,
   placeholder,
 }) => {
-  /** @type {[TableData | null, Function]} */
-  const [tableData, setTableData] = useState(
-    /** @type {TableData | null} */ (null)
-  );
   const [categoryName, setCategoryName] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+  const [tableData, setTableData] = useState({ initialTableData });
 
   useEffect(() => {
-    availableColumns: [];
-    setTableData({
-      columns: [
-        { id: "select", label: "Select", dataType: "select" },
-        { id: "subject", label: "Subject", dataType: "string" },
-        { id: "priority", label: "Priority", dataType: "string" },
-        { id: "status", label: "Status", dataType: "string" },
-        { id: "type", label: "Type", dataType: "string" },
-        { id: "taskSubtype", label: "Task Subtype", dataType: "string" },
-      ],
-      data: tasks,
-      selectedIds: new Set(),
-    });
-  }, []);
+    setTableData(initialTableData);
+  }, [initialTableData]);
 
   /**
    * @param {Set<string>} newSelectedIds
@@ -45,7 +32,7 @@ const ProspectingCategoryForm = ({
   const handleTableSelectionChange = (newSelectedIds) => {
     setTableData(
       /** @param {TableData} prev */
-      (prev) => (prev ? { ...prev, selectedIds: newSelectedIds } : null)
+      (prev) => ({ ...prev, selectedIds: newSelectedIds })
     );
     setSelectedTaskIds(newSelectedIds);
   };
@@ -65,7 +52,7 @@ const ProspectingCategoryForm = ({
   };
 
   return (
-    tableData && (
+    tableData.data && (
       <Box sx={{ p: 1 }}>
         <Typography gutterBottom>
           Create a prospecting category and select example tasks. We will use
@@ -82,7 +69,7 @@ const ProspectingCategoryForm = ({
         <CustomTable
           tableData={tableData}
           onSelectionChange={handleTableSelectionChange}
-          onColumnsChange={() => console.log("")}
+          onColumnsChange={setSelectedColumns}
         />
         <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-start" }}>
           <Button

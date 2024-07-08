@@ -112,12 +112,12 @@ def generate_filters():
     final_response = None
     try:
         data = request.json
-        tasks = [TaskSObject(**task) for task in data.get("tasks")]
+        tasks = data.get("tasks")
         if not tasks or len(tasks) == 0:
             response.success = False
             response.message = "No tasks provided"
         else:
-            response.data = define_criteria_from_tasks(tasks)
+            response.data = [define_criteria_from_tasks(tasks)]
 
         final_response = jsonify(response.to_dict()), 200 if response.success else 400
     except Exception as e:

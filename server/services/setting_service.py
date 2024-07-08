@@ -8,16 +8,21 @@ filter_blacklist = ["Id", "CreatedDate", "WhoId"]
 
 def define_criteria_from_tasks(tasks: List[TaskSObject]) -> FilterContainerModel:
     try:
-        common_keys = set(tasks[0].to_dict().keys())
+        common_keys = set(tasks[0].keys())
         for task in tasks[1:]:
-            common_keys.intersection_update(task.to_dict().keys())
+            common_keys.intersection_update(task.keys())
 
         common_keys = common_keys - set(filter_blacklist)
 
         filters = []
         for key in common_keys:
-            values = [task.to_dict()[key] for task in tasks]
-            unique_values = set(values)
+            values = [task[key] for task in tasks]
+            try:
+                unique_values = set(values)
+            except Exception as e:
+                raise Exception(
+                    f"Error while processing key {key}: {format_error_message(e)}"
+                )
 
             if all(isinstance(v, str) for v in values):
                 if len(unique_values) == 1:

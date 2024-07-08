@@ -1,31 +1,38 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, Box, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
 import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
+import {
+  fetchSalesforceTasksByUserIds,
+  fetchTaskFields,
+} from "../components/Api/Api";
 
 /**
+ * @typedef {import('types').SObject} SObject
+ * @typedef {import('types').SObjectField} SObjectField
  * @typedef {import('types').Settings} Settings
  * @typedef {import('types').FilterContainer} FilterContainer
  * @typedef {import('types').CriteriaField} CriteriaField
  * @typedef {import('types').ApiResponse} ApiResponse
  * @typedef {import('types').Task} Task
+ * @typedef {import('types').TableData} TableData
  */
 
 import {
   PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS,
-  MOCK_TASK_DATA,
   ONBOARD_WIZARD_STEPS,
 } from "../utils/c";
 import { fetchLoggedInSalesforceUserId } from "../components/Api/Api";
 
 /**
- * @param {{ tasks: Task[], onAddCategory: function, onDone: React.MouseEventHandler, placeholder: string }} props
+ * @param {{ categoryFormTableData: TableData, setSelectedColumns: Function, onAddCategory: Function, onDone: React.MouseEventHandler, placeholder: string }} props
  */
 const CategoryFormWithHeader = ({
-  tasks,
+  categoryFormTableData,
+  setSelectedColumns,
   onAddCategory,
   onDone,
   placeholder,
@@ -36,7 +43,8 @@ const CategoryFormWithHeader = ({
         Prospecting Activity Criteria
       </Typography>
       <CategoryForm
-        tasks={tasks}
+        initialTableData={categoryFormTableData}
+        setSelectedColumns={setSelectedColumns}
         onAddCategory={onAddCategory}
         onDone={onDone}
         placeholder={placeholder}
@@ -57,8 +65,91 @@ const Onboard = () => {
   const placeholderIndexRef = useRef(0);
   const [isLargeDialog, setIsLargeDialog] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+  /** @type {[TableData, Function]} */
+  const [categoryFormTableData, setCategoryFormTableData] = useState({
+    availableColumns: [],
+    columns: [],
+    data: [],
+    selectedIds: new Set(),
+  });
+  const [tasks, setTasks] = useState([]);
+  const taskSObjectFields = useRef([]);
 
-  const [tasks, setTasks] = useState(MOCK_TASK_DATA);
+  useEffect(() => {
+    const setInitialCategoryFormTableData = async () => {
+      taskSObjectFields.current =
+        taskSObjectFields.current.length > 0
+          ? taskSObjectFields.current
+          : (await fetchTaskFields()).data.map(
+              /** @param {SObjectField} field */
+              (field) => ({
+                id: field.name,
+                label: field.label,
+                dataType: field.type,
+              })
+            );
+      setCategoryFormTableData({
+        availableColumns: taskSObjectFields.current,
+        columns:
+          categoryFormTableData.columns.length > 0
+            ? categoryFormTableData.columns
+            : [
+                {
+                  id: "select",
+                  label: "Select",
+                  dataType: "select",
+                },
+                {
+                  id: "Subject",
+                  label: "Subject",
+                  dataType: "string",
+                },
+                {
+                  id: "Status",
+                  label: "Status",
+                  dataType: "string",
+                },
+                {
+                  id: "TaskSubtype",
+                  label: "TaskSubtype",
+                  dataType: "string",
+                },
+              ],
+        data: tasks,
+        selectedIds: new Set(),
+      });
+    };
+    setInitialCategoryFormTableData();
+  }, [tasks]);
+
+  useEffect(() => {
+    const setSalesforceTasks = async () => {
+      try {
+        if (tasks.length > 0) return;
+
+        const settings = formatSettingsData();
+        const salesforceUserIds = [
+          ...(settings.teamMemberIds || []),
+          settings.salesforceUserId,
+        ];
+        if (salesforceUserIds.length === 0 || !salesforceUserIds[0]) return;
+        const response = await fetchSalesforceTasksByUserIds(salesforceUserIds);
+        if (!response.success) {
+          console.error(`Error fetching Salesforce tasks ${response.message}`);
+          return;
+        }
+        setTasks(
+          response.data.map(
+            /** @param {SObject} task */
+            (task) => ({ ...task, id: task.Id })
+          )
+        );
+      } catch (error) {
+        console.error("Error fetching Salesforce tasks", error);
+      }
+    };
+    setSalesforceTasks();
+  }, [gatheringResponses]);
 
   useEffect(() => {
     const fetchLoggedInSalesforceUserIdAndSet = async () => {
@@ -146,6 +237,10 @@ const Onboard = () => {
     handleNext();
   };
 
+  const setSelectedColumns = useCallback((newColumns) => {
+    setCategoryFormTableData((prev) => ({ ...prev, columns: newColumns }));
+  }, []);
+
   const renderStep = () => {
     if (step <= ONBOARD_WIZARD_STEPS.length) {
       return (
@@ -161,7 +256,8 @@ const Onboard = () => {
       return (
         <CategoryFormWithHeader
           key={categoryFormKey}
-          tasks={tasks}
+          categoryFormTableData={categoryFormTableData}
+          setSelectedColumns={setSelectedColumns}
           onAddCategory={addCategory}
           onDone={handleDone}
           placeholder={`Example: ${getPlaceholder()}`}
@@ -231,7 +327,7 @@ const Onboard = () => {
             }
           );
           return {
-            ...(response.data.data === "error" ? {} : response.data.data),
+            ...(response.data.data === "error" ? {} : response.data.data[0]),
             name: category,
           };
         } catch (error) {
