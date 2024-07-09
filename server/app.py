@@ -20,7 +20,7 @@ from server.cache import (
     load_settings,
     save_settings,
 )
-from server.constants import SESSION_EXPIRED, FILTER_TASK_FIELDS, FILTER_EVENT_FIELDS
+from server.constants import SESSION_EXPIRED
 from server.models import ApiResponse, SettingsModel, TableColumn
 from server.mapper.mapper import convert_settings_model_to_settings
 from server.utils import format_error_message
@@ -67,10 +67,9 @@ def get_task_criteria_fields():
 
     if not criteria_fields.success:
         response.message = criteria_fields.message
+        print(response.message)
     else:
-        response.data = [
-            field for field in criteria_fields.data if field.name in FILTER_TASK_FIELDS
-        ]
+        response.data = criteria_fields.data
         response.success = True
 
     return (
@@ -88,11 +87,7 @@ def get_event_criteria_fields():
         if not criteria_fields.success:
             response.message = criteria_fields.message
         else:
-            response.data = [
-                field
-                for field in criteria_fields.data
-                if field.name in FILTER_EVENT_FIELDS
-            ]
+            response.data = [field for field in criteria_fields.data]
             response.success = True
     except Exception as e:
         response.success = False
@@ -118,7 +113,9 @@ def generate_filters():
             response.success = False
             response.message = "No tasks provided"
         else:
-            response.data = [define_criteria_from_tasks(tasks, columns)]
+            response.data = [
+                define_criteria_from_tasks(tasks, columns, get_criteria_fields("Task").data)
+            ]
 
         final_response = jsonify(response.to_dict()), 200 if response.success else 400
     except Exception as e:

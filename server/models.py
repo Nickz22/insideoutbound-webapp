@@ -198,6 +198,7 @@ class Filter:
     operator: str
     value: str
     data_type: str
+    options: Optional[str] = None
 
 
 @dataclass
@@ -225,7 +226,13 @@ class Settings:
 
 class FilterModel:
     def __init__(
-        self, field=None, dataType=None, operator=None, value=None, filter_=None
+        self,
+        field=None,
+        dataType=None,
+        operator=None,
+        value=None,
+        filter_=None,
+        options: Optional[List[str]] = None,
     ):
         if filter_ is not None:
             # Initialize from Filter object
@@ -233,12 +240,14 @@ class FilterModel:
             self.dataType = filter_.data_type
             self.operator = filter_.operator
             self.value = filter_.value
+            self.options = filter_.options
         else:
             # Initialize from individual attributes
             self.field = field
             self.dataType = dataType
             self.operator = operator
             self.value = value
+            self.options = options
 
     def to_dict(self):
         return {
@@ -246,6 +255,7 @@ class FilterModel:
             "dataType": self.dataType,
             "operator": self.operator,
             "value": self.value,
+            "options": self.options,
         }
 
 
@@ -360,11 +370,13 @@ class SObjectFieldModel:
     def to_dict(self):
         return asdict(self)
 
+
 @dataclass
 class TableColumn:
     id: str
     dataType: Literal["string", "number", "date", "datetime", "select", "image"]
     label: str
+
 
 @dataclass
 class UserSObject:

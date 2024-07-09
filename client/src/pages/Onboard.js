@@ -8,6 +8,7 @@ import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep
 import {
   fetchSalesforceTasksByUserIds,
   fetchTaskFields,
+  fetchTaskFilterFields,
 } from "../components/Api/Api";
 
 /**
@@ -15,7 +16,6 @@ import {
  * @typedef {import('types').SObjectField} SObjectField
  * @typedef {import('types').Settings} Settings
  * @typedef {import('types').FilterContainer} FilterContainer
- * @typedef {import('types').CriteriaField} CriteriaField
  * @typedef {import('types').ApiResponse} ApiResponse
  * @typedef {import('types').Task} Task
  * @typedef {import('types').TableData} TableData
@@ -74,6 +74,7 @@ const Onboard = () => {
   });
   const [tasks, setTasks] = useState([]);
   const taskSObjectFields = useRef([]);
+  const taskFilterFields = useRef([]);
 
   useEffect(() => {
     const setInitialCategoryFormTableData = async () => {
@@ -121,6 +122,16 @@ const Onboard = () => {
     };
     setInitialCategoryFormTableData();
   }, [tasks]);
+
+  useEffect(() => {
+    const setTaskFilterFields = async () => {
+      taskFilterFields.current =
+        taskFilterFields.current.length > 0
+          ? taskFilterFields.current
+          : (await fetchTaskFilterFields()).data;
+    };
+    setTaskFilterFields();
+  }, []);
 
   useEffect(() => {
     const setSalesforceTasks = async () => {
@@ -268,7 +279,7 @@ const Onboard = () => {
         <CategoryOverview
           proposedFilterContainers={filters}
           onSave={saveSettings}
-          taskFilterFields={taskFilterFields}
+          taskFilterFields={taskFilterFields.current}
         />
       );
     } else {

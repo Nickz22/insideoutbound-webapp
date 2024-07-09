@@ -123,16 +123,39 @@ const FilterContainer = ({
                   </FormControl>
                 </Grid>
                 <Grid item xs={12} sm={5}>
-                  <TextField
-                    fullWidth
-                    label="Value"
-                    value={filter.value}
-                    variant="outlined"
-                    size="small"
-                    onChange={(e) =>
-                      handleValueChange(index, e.target.value, onValueChange)
-                    }
-                  />
+                  {filter.options ? (
+                    <FormControl fullWidth size="small">
+                      <InputLabel>Value</InputLabel>
+                      <Select
+                        value={filter.value}
+                        label="Value"
+                        onChange={(e) =>
+                          handleValueChange(
+                            index,
+                            e.target.value,
+                            onValueChange
+                          )
+                        }
+                      >
+                        {filter.options.map((option, optionIndex) => (
+                          <MenuItem key={optionIndex} value={option.value}>
+                            {option.label}
+                          </MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
+                  ) : (
+                    <TextField
+                      fullWidth
+                      label="Value"
+                      value={filter.value}
+                      variant="outlined"
+                      size="small"
+                      onChange={(e) =>
+                        handleValueChange(index, e.target.value, onValueChange)
+                      }
+                    />
+                  )}
                 </Grid>
                 <Grid item xs={12} sm={1}>
                   <IconButton

@@ -105,13 +105,3 @@ GPT_FILTER_GENERATION_PROMPT = [
         """,
     },
 ]
-
-FILTER_TASK_FIELDS = [
-    "Subject",
-    "Priority",
-    "Status",
-    "CallDurationInSeconds",
-    "TaskSubtype",
-]
-
-FILTER_EVENT_FIELDS = ["Subject", "EventSubtype"]

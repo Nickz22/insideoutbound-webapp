@@ -31,21 +31,19 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     """
     api_response = ApiResponse(data=[], message="", success=False)
 
-    access_token, instance_url = load_tokens()
-
-    fields_endpoint = f"{instance_url}/services/data/v55.0/sobjects/{sobject_type}/describe"  # Replace 'XX' with your actual API version
-
     try:
-        fields_data = _fetch_sobjects(fields_endpoint, load_tokens()).data
+        fields_data = _fetch_object_fields(sobject_type, load_tokens()).data
         criteria_fields = [
             CriteriaField(
                 name=field["name"],
-                type=field["type"] if field["name"] != "Subject" else "string",
+                type="string" if field["type"] != "int" else "number",
                 options=(
-                    field["picklistValues"] if field["type"] == "picklist" else []
+                    [picklist for picklist in field["picklistValues"] if picklist["active"]]
+                    if field["type"] == "picklist" else []
                 ),
             )
             for field in fields_data
+            if field["type"] in ("string", "picklist", "int")
         ]
         api_response.data = criteria_fields
         api_response.success = True

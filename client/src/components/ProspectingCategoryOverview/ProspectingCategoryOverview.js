@@ -25,7 +25,7 @@ const FILTER_OPERATOR_MAPPING = {
     "less than or equal": "<=",
     "greater than": ">",
     "greater than or equal": ">=",
-  },
+  }
 };
 
 const theme = createTheme({

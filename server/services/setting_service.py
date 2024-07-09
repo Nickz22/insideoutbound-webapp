@@ -1,16 +1,16 @@
-from server.models import FilterContainerModel, FilterModel, TableColumn
+from server.models import FilterContainerModel, FilterModel, TableColumn, CriteriaField
 from server.utils import format_error_message
 from typing import List
-
+from utils import group_by
 
 filter_blacklist = ["Id", "CreatedDate", "WhoId"]
 
 
 def define_criteria_from_tasks(
-    tasks, columns: List[TableColumn]
+    tasks, columns: List[TableColumn], task_fields: List[CriteriaField]
 ) -> FilterContainerModel:
     column_ids = {column.id for column in columns}  # Set of column IDs to filter by
-
+    task_field_by_name = group_by(task_fields, "name")
     if not tasks:
         return FilterContainerModel(
             name="Common Task Criteria", filters=[], filterLogic=""
@@ -41,6 +41,7 @@ def define_criteria_from_tasks(
                             operator="equals",
                             value=next(iter(unique_values)),
                             dataType="string",
+                            options=task_field_by_name.get(key, {})[0].options or [],
                         )
                     )
                 else:

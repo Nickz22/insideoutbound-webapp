@@ -24,22 +24,19 @@ export const useFilterLogic = (initialFilterContainer, filterFields) => {
   const [logicErrors, setLogicErrors] = useState({});
 
   const handleFieldChange = useCallback(
-    /**
-     *
-     * @param {number} filterIndex
-     * @param {any} value
-     */
     (filterIndex, value) => {
       setFilterContainer((prevContainer) => {
         const newFilters = [...prevContainer.filters];
+        const selectedField = filterFields.find(
+          (field) => field.name === value
+        );
         newFilters[filterIndex] = {
           ...newFilters[filterIndex],
           field: value,
           value: "",
           operator: "",
-          dataType:
-            filterFields.find((field) => field.name === value)?.type ||
-            "string",
+          dataType: selectedField?.type || "string",
+          options: selectedField?.options || undefined,
         };
         return { ...prevContainer, filters: newFilters };
       });
