@@ -75,6 +75,7 @@ const InfoGatheringStep = ({
         const data = await input.dataFetcher(tableData);
         if (data.success) {
           setCriteriaData(data.data[0]);
+          handleCriteriaChange(data.data[0].filterContainer);
         } else if (data.message?.toLowerCase().includes("session expired")) {
           navigate("/");
         }
@@ -94,6 +95,8 @@ const InfoGatheringStep = ({
         newFilterContainer,
     }));
   };
+
+  const prevMeetingObject = useRef();
 
   useEffect(() => {
     const fetchTableData = async () => {
@@ -136,8 +139,14 @@ const InfoGatheringStep = ({
       }
     };
 
-    fetchTableData();
-  }, [stepData, inputValues]);
+    if (
+      inputValues["meetingObject"] !== prevMeetingObject.current ||
+      prevMeetingObject.current === undefined
+    ) {
+      fetchTableData();
+      prevMeetingObject.current = inputValues["meetingObject"];
+    }
+  }, [stepData, inputValues, settingsRef]);
 
   const handleInputChange = (event, setting) => {
     setInputValues((prev) => ({
