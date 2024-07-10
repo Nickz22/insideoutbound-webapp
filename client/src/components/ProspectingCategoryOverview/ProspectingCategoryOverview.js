@@ -11,22 +11,7 @@ import {
   Toolbar,
 } from "@mui/material";
 import FilterContainer from "../FilterContainer/FilterContainer";
-
-const FILTER_OPERATOR_MAPPING = {
-  string: {
-    contains: "LIKE",
-    equals: "=",
-    "not equals": "!=",
-  },
-  int: {
-    equals: "=",
-    "not equals": "!=",
-    "less than": "<",
-    "less than or equal": "<=",
-    "greater than": ">",
-    "greater than or equal": ">=",
-  }
-};
+import { FILTER_OPERATOR_MAPPING } from "src/utils/c";
 
 const theme = createTheme({
   palette: {

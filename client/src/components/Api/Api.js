@@ -2,6 +2,7 @@ import axios from "axios";
 
 /**
  * @typedef {import('types').ApiResponse} ApiResponse
+ * @typedef {import('types').TableColumn} TableColumn
  */
 
 /**
@@ -10,8 +11,9 @@ import axios from "axios";
  */
 export const fetchTaskFilterFields = async () => {
   const response = await axios.get(
-    "http://localhost:8000/get_task_criteria_fields",
+    "http://localhost:8000/get_criteria_fields",
     {
+      params: { object: "Task" },
       validateStatus: () => true,
     }
   );
@@ -24,8 +26,9 @@ export const fetchTaskFilterFields = async () => {
  */
 export const fetchEventFilterFields = async () => {
   const response = await axios.get(
-    "http://localhost:8000/get_event_criteria_fields",
+    "http://localhost:8000/get_criteria_fields",
     {
+      params: { object: "Event" },
       validateStatus: () => true,
     }
   );
@@ -111,5 +114,25 @@ export const fetchEventFields = async () => {
   const response = await axios.get("http://localhost:8000/get_event_fields", {
     validateStatus: () => true,
   });
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * Fetches the logged in Salesforce user's team members
+ * @param {Record<string, string>[]} tasksOrEvents
+ * @param {TableColumn[]} columns
+ * @returns {Promise<ApiResponse>}
+ */
+export const generateCriteria = async (tasksOrEvents, columns) => {
+  const response = await axios.post(
+    "http://localhost:8000/generate_filters",
+    {
+      tasksOrEvents: tasksOrEvents,
+      selectedColumns: columns,
+    },
+    {
+      validateStatus: () => true,
+    }
+  );
   return { ...response.data, statusCode: response.status };
 };

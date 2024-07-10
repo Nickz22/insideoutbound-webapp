@@ -215,10 +215,12 @@ class Settings:
     meetings_criteria: FilterContainer
     meeting_object: str
     activities_per_contact: int
+    cooloff_period: int
     contacts_per_account: int
     tracking_period: int
     activate_by_meeting: bool
     activate_by_opportunity: bool
+    salesforce_user_id = None
     latest_date_queried: Optional[datetime] = None
     skip_account_criteria: Optional[FilterContainer] = None
     skip_opportunity_criteria: Optional[FilterContainer] = None
@@ -291,11 +293,13 @@ class SettingsModel:
         activateByOpportunity=None,
         activitiesPerContact=None,
         contactsPerAccount=None,
+        cooloffPeriod=None,
         criteria=None,
         inactivityThreshold=None,
         meetingObject=None,
         meetingsCriteria=None,
         trackingPeriod=None,
+        salesforceUserId=None,
         skipAccountCriteria=None,
         skipOpportunityCriteria=None,
         settings=None,

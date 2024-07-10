@@ -22,11 +22,11 @@ import { useFilterLogic } from "./useFilterLogic";
  */
 
 /**
- * @param {{filterContainer: FilterContainer, filterFields: CriteriaField[], filterOperatorMapping: { [key: string]: {[key:string]: string} }, hasNameField: boolean, onLogicChange: Function, onValueChange: Function}} props
+ * @param {{initialFilterContainer: FilterContainer, filterFields: CriteriaField[], filterOperatorMapping: { [key: string]: {[key:string]: string} }, hasNameField: boolean, onLogicChange: Function, onValueChange: Function}} props
  * @returns
  */
 const FilterContainer = ({
-  filterContainer: initialFilterContainer,
+  initialFilterContainer,
   filterFields,
   filterOperatorMapping,
   hasNameField,
@@ -123,7 +123,7 @@ const FilterContainer = ({
                   </FormControl>
                 </Grid>
                 <Grid item xs={12} sm={5}>
-                  {filter.options ? (
+                  {filter.options?.length > 0 ? (
                     <FormControl fullWidth size="small">
                       <InputLabel>Value</InputLabel>
                       <Select

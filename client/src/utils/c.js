@@ -1,4 +1,7 @@
 import {
+  generateCriteria,
+  fetchEventFilterFields,
+  fetchTaskFilterFields,
   fetchSalesforceUsers,
   fetchTaskFields,
   fetchSalesforceTasksByUserIds,
@@ -6,6 +9,9 @@ import {
   fetchEventFields,
 } from "./../components/Api/Api";
 /**
+ * @typedef {import('types').TableData} TableData
+ * @typedef {import('types').FilterContainer} FilterContainer
+ * @typedef {import('types').CriteriaField} CriteriaField
  * @typedef {import('types').SObject} SObject
  * @typedef {import('types').SObjectField} SObjectField
  * @typedef {import('types').Task} Task
@@ -29,11 +35,6 @@ export const FILTER_OPERATOR_MAPPING = {
     "less than or equal": "<=",
     "greater than": ">",
     "greater than or equal": ">=",
-  },
-  picklist: {
-    contains: "LIKE",
-    equals: "=",
-    "not equals": "!=",
   },
 };
 
@@ -248,7 +249,7 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: field.type,
           })
         ),
-        setting: "meetingsCriteria",
+        setting: "",
         inputLabel:
           "Select Tasks that should set an Account as 'approached'. We'll create filters from your selections - don't worry, you'll have a chance to confirm them later.",
         inputType: "table",
@@ -315,7 +316,7 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: field.type,
           })
         ),
-        setting: "meetingsCriteria",
+        setting: "",
         inputType: "table",
         inputLabel:
           "Select Events that should set an Account as 'approached'. We'll create filters from your selections - don't worry, you'll have a chance to confirm them later.",
@@ -352,27 +353,49 @@ export const ONBOARD_WIZARD_STEPS = [
             return response;
           },
       },
+      {
+        setting: "meetingsCriteria",
+        inputType: "criteria",
+        renderEval: (tableData) => {
+          return tableData && tableData["selectedIds"]
+            ? Array.from(tableData["selectedIds"]).length > 0
+            : false;
+        },
+        dataFetcher:
+          /**
+           * @param {TableData} tableData
+           * @return {Promise<ApiResponse>}
+           **/
+          async (tableData) => {
+            const criteriaResponse = await generateCriteria(
+              tableData.data.filter((record) =>
+                tableData.selectedIds.has(record.Id)
+              ),
+              tableData.columns
+            );
+            const filterFieldsResponse = Array.from(
+              tableData.selectedIds
+            )[0].startsWith("00T")
+              ? await fetchTaskFilterFields()
+              : await fetchEventFilterFields();
+
+            return {
+              success: criteriaResponse.success && filterFieldsResponse.success,
+              message: criteriaResponse.message || filterFieldsResponse.message,
+              data: [
+                {
+                  filterContainer: criteriaResponse.data[0],
+                  filterFields: filterFieldsResponse.data,
+                  filterOperatorMapping: FILTER_OPERATOR_MAPPING,
+                  hasNameField: true,
+                },
+              ],
+            };
+          },
+      },
     ],
     descriptionRenderer: (description) => {
       return description;
     },
   },
-  // {
-  //   title: "Define an Approach",
-  //   description: `
-  //   Next, how are opportunities created in your CRM?
-  //   `,
-  //   inputs: [
-  //     {
-  //       setting: "opportunityCreation",
-  //       inputType: "picklist",
-  //       inputLabel: "Opportunity creation process",
-  //       options: [
-  //         "Opportunities are created by one team, then passed to another",
-  //         "The rep who creates the opportunity keeps it and works it through close",
-  //         "Neither",
-  //       ],
-  //     },
-  //   ],
-  // },
 ];

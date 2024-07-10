@@ -3,9 +3,9 @@ from flask_cors import CORS
 import requests, os
 
 from server.engine.activation_engine import update_activation_states
-from server.services.setting_service import define_criteria_from_tasks
+from server.services.setting_service import define_criteria_from_events_or_tasks
 from server.api.salesforce import (
-    get_criteria_fields,
+    fetch_criteria_fields,
     fetch_task_fields,
     fetch_event_fields,
     fetch_salesforce_users,
@@ -60,34 +60,17 @@ def store_code_verifier():
         return jsonify({"error": "Code verifier not provided"}), 400
 
 
-@app.route("/get_task_criteria_fields", methods=["GET"])
-def get_task_criteria_fields():
-    response = ApiResponse(data=[], message="", success=False)
-    criteria_fields = get_criteria_fields(sobject_type="Task")
-
-    if not criteria_fields.success:
-        response.message = criteria_fields.message
-        print(response.message)
-    else:
-        response.data = criteria_fields.data
-        response.success = True
-
-    return (
-        jsonify(response.__dict__),
-        get_status_code(response),
-    )
-
-
-@app.route("/get_event_criteria_fields", methods=["GET"])
-def get_event_criteria_fields():
+@app.route("/get_criteria_fields", methods=["GET"])
+def get_criteria_fields():
     try:
         response = ApiResponse(data=[], message="", success=False)
-        criteria_fields = get_criteria_fields(sobject_type="Event")
+        object_type = request.args.get("object")
+        criteria_fields = fetch_criteria_fields(sobject_type=object_type)
 
         if not criteria_fields.success:
             response.message = criteria_fields.message
         else:
-            response.data = [field for field in criteria_fields.data]
+            response.data = criteria_fields.data
             response.success = True
     except Exception as e:
         response.success = False
@@ -107,14 +90,20 @@ def generate_filters():
     final_response = None
     try:
         data = request.json
-        tasks = data.get("tasks")
+        records = data.get("tasksOrEvents")
         columns = [TableColumn(**column) for column in data.get("selectedColumns")]
-        if not tasks or len(tasks) == 0:
+        if not records or len(records) == 0:
             response.success = False
             response.message = "No tasks provided"
         else:
             response.data = [
-                define_criteria_from_tasks(tasks, columns, get_criteria_fields("Task").data)
+                define_criteria_from_events_or_tasks(
+                    records,
+                    columns,
+                    fetch_criteria_fields(
+                        "Task" if records[0]["Id"].startswith("00T") else "Event"
+                    ).data,
+                )
             ]
 
         final_response = jsonify(response.to_dict()), 200 if response.success else 400
@@ -197,6 +186,7 @@ def commit_settings():
         save_settings(settings)
         return jsonify({"message": "Settings saved successfully"}), 200
     except Exception as e:
+        print(f"Failed to save settings: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 
@@ -221,12 +211,6 @@ def get_salesforce_users():
         )
 
     return jsonify(response.__dict__), get_status_code(response)
-
-
-###
-## Return models instead of SObjects,
-## figure out how we can take custom columns from the user when the table initially renders
-###
 
 
 @app.route("/get_salesforce_tasks_by_user_ids", methods=["GET"])
@@ -297,8 +281,7 @@ def get_task_fields():
 def get_event_fields():
     response = ApiResponse(data=[], message="", success=False)
     try:
-        response.data = fetch_event_fields().data
-        response.success = True
+        response = fetch_event_fields()
     except Exception as e:
         response.message = f"Failed to retrieve event fields: {format_error_message(e)}"
 

@@ -9,6 +9,7 @@ import {
   fetchSalesforceTasksByUserIds,
   fetchTaskFields,
   fetchTaskFilterFields,
+  generateCriteria,
 } from "../components/Api/Api";
 
 /**
@@ -56,6 +57,7 @@ const CategoryFormWithHeader = ({
 const Onboard = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // Start from step 1
+  /** {@type {[Map<string, List<SObject>, Function]}} */
   const [categories, setCategories] = useState(new Map());
   /** @type {[FilterContainer[], Function]} */
   const [filters, setFilters] = useState([]);
@@ -299,7 +301,6 @@ const Onboard = () => {
       return;
     }
 
-    // Add the new category with selected tasks
     const newCategories = new Map(categories);
     const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.id));
     newCategories.set(category, selectedTasks);
@@ -331,15 +332,9 @@ const Onboard = () => {
     const filterContainersPromises = Array.from(categories.entries()).map(
       async ([category, tasks]) => {
         try {
-          const response = await axios.post(
-            "http://localhost:8000/generate_filters",
-            { tasks, selectedColumns },
-            {
-              validateStatus: () => true,
-            }
-          );
+          const response = await generateCriteria(tasks, selectedColumns);
           return {
-            ...(response.data.data === "error" ? {} : response.data.data[0]),
+            ...response.data[0],
             name: category,
           };
         } catch (error) {

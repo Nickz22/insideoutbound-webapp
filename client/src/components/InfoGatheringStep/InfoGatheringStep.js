@@ -14,6 +14,7 @@ import {
 } from "@mui/material";
 import parse from "html-react-parser";
 import CustomTable from "./../CustomTable/CustomTable";
+import FilterContainer from "../FilterContainer/FilterContainer";
 import { useNavigate } from "react-router-dom";
 
 /**
@@ -36,17 +37,63 @@ const InfoGatheringStep = ({
 }) => {
   const navigate = useNavigate();
   const [inputValues, setInputValues] = useState({});
-  /** @type {[TableData | null, Function]} */
-  const [tableData, setTableData] = useState(
-    /** @type {TableData | null} */ (null)
-  );
-  const [isLoading, setIsLoading] = useState(false);
-
+  const [tableData, setTableData] = useState(null);
+  const [criteriaData, setCriteriaData] = useState(null);
+  const [loadingStates, setLoadingStates] = useState({});
   const settingsRef = useRef(settings);
 
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  /**
+   * @param {string} inputSetting
+   * @param {boolean} isLoading
+   */
+  const setLoadingState = (inputSetting, isLoading) => {
+    setLoadingStates((prev) => ({ ...prev, [inputSetting]: isLoading }));
+  };
+
+  useEffect(() => {
+    const criteriaInput = stepData.inputs.find(
+      (input) => input.inputType === "criteria"
+    );
+    const shouldRender =
+      !criteriaInput?.renderEval || criteriaInput.renderEval(tableData);
+    if (criteriaInput && shouldRender && tableData) {
+      fetchCriteriaData(criteriaInput);
+    }
+  }, [stepData, tableData]);
+
+  /**
+   * @param {OnboardWizardStepInput} input
+   */
+  const fetchCriteriaData = async (input) => {
+    if (input.dataFetcher && tableData) {
+      setLoadingState(input.setting, true);
+      try {
+        const data = await input.dataFetcher(tableData);
+        if (data.success) {
+          setCriteriaData(data.data[0]);
+        } else if (data.message?.toLowerCase().includes("session expired")) {
+          navigate("/");
+        }
+      } finally {
+        setLoadingState(input.setting, false);
+      }
+    }
+  };
+
+  /**
+   * @param {FilterContainer} newFilterContainer
+   */
+  const handleCriteriaChange = (newFilterContainer) => {
+    setInputValues((prev) => ({
+      ...prev,
+      [stepData.inputs.find((input) => input.inputType === "criteria").setting]:
+        newFilterContainer,
+    }));
+  };
 
   useEffect(() => {
     const fetchTableData = async () => {
@@ -57,12 +104,18 @@ const InfoGatheringStep = ({
       );
 
       if (tableInput && tableInput.dataFetcher) {
-        setIsLoading(true);
+        setLoadingState(tableInput.setting, true);
         try {
           const data = await tableInput.dataFetcher({
             ...settingsRef.current,
             ...inputValues,
           });
+          if (
+            !data.success &&
+            data.message?.toLowerCase().includes("session expired")
+          ) {
+            navigate("/");
+          }
           if (data.success && data.data.length > 0) {
             setTableData({
               availableColumns: tableInput.availableColumns,
@@ -75,7 +128,7 @@ const InfoGatheringStep = ({
             navigate("/");
           }
         } finally {
-          setIsLoading(false);
+          setLoadingState(tableInput.setting, false);
         }
       } else {
         setTableData(null);
@@ -126,40 +179,51 @@ const InfoGatheringStep = ({
     onComplete(completedInputs);
   };
 
+  /**
+   *
+   * @param {OnboardWizardStepInput} input
+   * @returns
+   */
   const renderInput = (input) => {
+    const isLoading = loadingStates[input.setting];
+
     switch (input.inputType) {
       case "text":
       case "number":
-        return (
-          <TextField
-            fullWidth
-            type={input.inputType}
-            value={inputValues[input.setting] || ""}
-            onChange={(e) => handleInputChange(e, input.setting)}
-            label={input.inputLabel}
-            variant="outlined"
-            margin="normal"
-          />
-        );
       case "picklist":
         return (
-          <FormControl fullWidth variant="outlined" margin="normal">
-            <InputLabel>{input.inputLabel}</InputLabel>
-            <Select
-              value={inputValues[input.setting] || ""}
-              onChange={(e) => handleInputChange(e, input.setting)}
-              label={input.inputLabel}
-            >
-              <MenuItem value="">
-                <em>Select an option</em>
-              </MenuItem>
-              {input.options?.map((option, index) => (
-                <MenuItem key={index} value={option}>
-                  {option}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <>
+            {isLoading && <CircularProgress size={20} />}
+            {input.inputType === "picklist" ? (
+              <FormControl fullWidth variant="outlined" margin="normal">
+                <InputLabel>{input.inputLabel}</InputLabel>
+                <Select
+                  value={inputValues[input.setting] || ""}
+                  onChange={(e) => handleInputChange(e, input.setting)}
+                  label={input.inputLabel}
+                >
+                  <MenuItem value="">
+                    <em>Select an option</em>
+                  </MenuItem>
+                  {input.options?.map((option, index) => (
+                    <MenuItem key={index} value={option}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            ) : (
+              <TextField
+                fullWidth
+                type={input.inputType}
+                value={inputValues[input.setting] || ""}
+                onChange={(e) => handleInputChange(e, input.setting)}
+                label={input.inputLabel}
+                variant="outlined"
+                margin="normal"
+              />
+            )}
+          </>
         );
       case "table":
         return (
@@ -183,16 +247,41 @@ const InfoGatheringStep = ({
             )}
           </Box>
         );
+      case "criteria":
+        return (
+          <Box sx={{ mt: 2, mb: 2 }}>
+            {isLoading ? (
+              <CircularProgress />
+            ) : (
+              criteriaData && (
+                <FilterContainer
+                  initialFilterContainer={criteriaData.filterContainer}
+                  filterFields={criteriaData.filterFields}
+                  filterOperatorMapping={criteriaData.filterOperatorMapping}
+                  hasNameField={criteriaData.hasNameField}
+                  onLogicChange={handleCriteriaChange}
+                  onValueChange={handleCriteriaChange}
+                />
+              )
+            )}
+          </Box>
+        );
       default:
         return null;
     }
   };
 
+  /**
+   * @param {OnboardWizardStepInput} input
+   * @param {number} index
+   */
   const shouldRenderInput = (input, index) => {
     if (!input.renderEval) return true;
     if (index === 0) return true; // Always render the first input
-
-    return input.renderEval(inputValues);
+    const shouldRender = input.renderEval(
+      input.inputType === "criteria" ? tableData : inputValues
+    );
+    return shouldRender;
   };
 
   return (

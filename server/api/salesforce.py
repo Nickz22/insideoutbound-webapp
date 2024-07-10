@@ -22,7 +22,7 @@ from server.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 from server.cache import load_tokens
 
 
-def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
+def fetch_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     """
     Fetches the field describe info from Salesforce for the Task object and creates CriteriaField instances.
 
@@ -38,12 +38,17 @@ def get_criteria_fields(sobject_type: str) -> List[CriteriaField]:
                 name=field["name"],
                 type="string" if field["type"] != "int" else "number",
                 options=(
-                    [picklist for picklist in field["picklistValues"] if picklist["active"]]
-                    if field["type"] == "picklist" else []
+                    [
+                        picklist
+                        for picklist in field["picklistValues"]
+                        if picklist["active"]
+                    ]
+                    if field["type"] == "picklist"
+                    else []
                 ),
             )
             for field in fields_data
-            if field["type"] in ("string", "picklist", "int")
+            if field["type"] in ("string", "picklist", "combobox", "int")
         ]
         api_response.data = criteria_fields
         api_response.success = True
@@ -618,9 +623,9 @@ def fetch_event_fields() -> ApiResponse:
         api_response.success = True
         api_response.data = sobject_field_models
     else:
-        raise Exception(
-            f"Failed to fetch Event fields ({response.status_code}): {get_http_error_message(response)}"
-        )
+        api_response.message = f"Failed to fetch Event fields ({response.status_code}): {get_http_error_message(response)}"
+        api_response.status_code = response.status_code
+
     return api_response
 
 
@@ -652,6 +657,7 @@ def _construct_where_clause_from_filter(filter_container):
 def _fetch_object_fields(object_name, credentials):
     try:
         access_token, instance_url = credentials
+        api_response = ApiResponse(data=[], message="", success=False)
         if not access_token or not instance_url:
             raise Exception("Session expired")
         headers = {"Authorization": f"Bearer {access_token}"}
@@ -661,18 +667,15 @@ def _fetch_object_fields(object_name, credentials):
         )
         if response.status_code == 200:
             fields = response.json()["fields"]
-            return ApiResponse(
-                success=True,
-                data=fields,
-                message=None,
-                status_code=200,
-            )
+            api_response.success = True
+            api_response.data = fields
+            api_response.status_code = 200
         else:
-            raise Exception(
-                f"Failed to fetch {object_name} fields ({response.status_code}): {response.json().get('message', 'An error occurred')}"
-            )
+            api_response.message = f"Failed to fetch {object_name} fields ({response.status_code}): {get_http_error_message(response)}"
+            api_response.status_code = response.status_code
     except Exception as e:
         raise Exception(format_error_message(e))
+    return api_response
 
 
 def _fetch_sobjects(soql_query, credentials):
