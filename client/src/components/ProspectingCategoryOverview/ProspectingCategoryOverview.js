@@ -13,6 +13,11 @@ import {
 import FilterContainer from "../FilterContainer/FilterContainer";
 import { FILTER_OPERATOR_MAPPING } from "src/utils/c";
 
+/**
+ * @typedef {import('types').FilterContainer} FilterContainer
+ * @typedef {import('types').CriteriaField} CriteriaField
+ */
+
 const theme = createTheme({
   palette: {
     background: {
@@ -51,11 +56,18 @@ const theme = createTheme({
   },
 });
 
+/**
+ * @param {{ proposedFilterContainers: FilterContainer[], onSave: Function, taskFilterFields: CriteriaField[], onFilterChange: Function}} props
+ */
 const ProspectingCategoryOverview = ({
   proposedFilterContainers,
   onSave,
   taskFilterFields,
+  onFilterChange,
 }) => {
+  /**
+   * @type {[FilterContainer[], Function]}
+   */
   const [filterContainers, setFilterContainers] = useState([]);
 
   useEffect(() => {
@@ -75,10 +87,12 @@ const ProspectingCategoryOverview = ({
           {filterContainers.map((filterContainer, filterIndex) => (
             <Grid item xs={12} lg={6} key={filterIndex}>
               <FilterContainer
-                filterContainer={filterContainer}
+                initialFilterContainer={filterContainer}
                 filterFields={taskFilterFields}
                 filterOperatorMapping={FILTER_OPERATOR_MAPPING}
                 hasNameField={true}
+                onLogicChange={onFilterChange}
+                onValueChange={onFilterChange}
               />
             </Grid>
           ))}

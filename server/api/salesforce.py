@@ -6,11 +6,6 @@ from server.models import (
     Contact,
     Account,
     Task,
-    TaskModel,
-    TaskSObject,
-    Opportunity,
-    OpportunitySObject,
-    Event,
     CriteriaField,
     FilterContainer,
     SObjectFieldModel,
@@ -210,7 +205,9 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
         # Process in batches
         for i in range(0, len(contact_ids), batch_size):
             batch_contact_ids = contact_ids[i : i + batch_size]
-            additional_filter = f"WhoId IN ('{','.join(batch_contact_ids)}')"
+            additional_filter = "WhoId IN ({})".format(
+                ", ".join(map(lambda id: f"'{id}'", batch_contact_ids))
+            )
 
             # Fetch tasks by criteria for the current batch
             batch_tasks = fetch_contact_tasks_by_criteria_from_date(
@@ -407,16 +404,14 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
         for i in range(0, len(contact_ids), batch_size):
             batch_contact_ids = contact_ids[i : i + batch_size]
             joined_contact_ids = "','".join(batch_contact_ids)
-            soql_query = f"SELECT Id, WhoId, WhatId, Subject, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= '{start}' ORDER BY StartDateTime ASC"
+            soql_query = f"SELECT Id, WhoId, WhatId, Subject, CreatedDate, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= {start} ORDER BY StartDateTime ASC"
 
             response = _fetch_sobjects(soql_query, load_tokens())
             for event in response.data:
                 account_id = contact_by_id.get(event.get("WhoId")).account_id
                 if account_id not in events_by_account_id:
                     events_by_account_id[account_id] = []
-                events_by_account_id[account_id].append(
-                    Event.from_sobject(EventSObject(**event))
-                )
+                events_by_account_id[account_id].append(event)
 
         api_response.data = events_by_account_id
         api_response.message = "Events fetched successfully."
@@ -448,13 +443,11 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
         for i in range(0, len(account_ids), batch_size):
             batch_ids = account_ids[i : i + batch_size]
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
-            soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= '{start}' AND AccountId IN ({joined_ids})"
+            soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids})"
 
             response = _fetch_sobjects(soql_query, load_tokens())
             for opportunity in response.data:
-                api_response.data.append(
-                    Opportunity.from_sobject(OpportunitySObject(**opportunity))
-                )
+                api_response.data.append(opportunity)
 
         api_response.success = True
         api_response.message = "Opportunities fetched successfully."

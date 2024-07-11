@@ -124,43 +124,6 @@ class Contact:
 
 
 @dataclass
-class OpportunitySObject:
-    Id: str
-    Name: str
-    Amount: int
-    AccountId: str
-    StageName: str
-    CreatedDate: str
-
-    def to_dict(self):
-        return asdict(self)
-
-
-@dataclass
-class Opportunity:
-    id: str
-    account_id: str
-    name: str
-    amount: int
-    created_date: datetime
-    status: str
-
-    @classmethod
-    def from_sobject(cls, sobject: OpportunitySObject):
-        return cls(
-            id=sobject.Id,
-            account_id=sobject.AccountId,
-            name=sobject.Name,
-            amount=sobject.Amount,
-            created_date=parse_date_with_timezone(sobject.CreatedDate),
-            status=sobject.StageName,
-        )
-
-    def to_dict(self):
-        return convert_to_dict(asdict(self))
-
-
-@dataclass
 class Activation:
     id: str
     account: Account
@@ -175,7 +138,7 @@ class Activation:
     days_engaged: Optional[int] = None
     engaged_date: Optional[date] = None
     last_outbound_engagement: Optional[date] = None
-    opportunity: Optional[Opportunity] = None
+    opportunity: Optional[dict] = None
     status: Optional[str] = "Activated"
 
     def to_dict(self):
@@ -215,12 +178,12 @@ class Settings:
     meetings_criteria: FilterContainer
     meeting_object: str
     activities_per_contact: int
-    cooloff_period: int
     contacts_per_account: int
     tracking_period: int
     activate_by_meeting: bool
     activate_by_opportunity: bool
     salesforce_user_id = None
+    teamMemberIds = Optional[List[str]]
     latest_date_queried: Optional[datetime] = None
     skip_account_criteria: Optional[FilterContainer] = None
     skip_opportunity_criteria: Optional[FilterContainer] = None
@@ -293,12 +256,12 @@ class SettingsModel:
         activateByOpportunity=None,
         activitiesPerContact=None,
         contactsPerAccount=None,
-        cooloffPeriod=None,
         criteria=None,
         inactivityThreshold=None,
         meetingObject=None,
         meetingsCriteria=None,
         trackingPeriod=None,
+        teamMemberIds=None,
         salesforceUserId=None,
         skipAccountCriteria=None,
         skipOpportunityCriteria=None,
@@ -318,6 +281,8 @@ class SettingsModel:
                 filter_container=settings.meetings_criteria
             )
             self.trackingPeriod = settings.tracking_period
+            self.teamMemberIds = settings.teamMemberIds
+            self.salesforceUserId = settings.salesforce_user_id
             self.skipAccountCriteria = (
                 FilterContainerModel(filter_container=settings.skip_account_criteria)
                 if settings.skip_account_criteria
@@ -339,7 +304,9 @@ class SettingsModel:
             self.inactivityThreshold = inactivityThreshold
             self.meetingObject = meetingObject
             self.meetingsCriteria = meetingsCriteria
+            self.teamMemberIds = teamMemberIds
             self.trackingPeriod = trackingPeriod
+            self.salesforceUserId = salesforceUserId
             self.skipAccountCriteria = skipAccountCriteria
             self.skipOpportunityCriteria = skipOpportunityCriteria
 
@@ -354,6 +321,7 @@ class SettingsModel:
             "meetingObject": self.meetingObject,
             "meetingsCriteria": self.meetingsCriteria.to_dict(),
             "trackingPeriod": self.trackingPeriod,
+            "salesforceUserId": self.salesforceUserId,
             "skipAccountCriteria": (
                 self.skipAccountCriteria.to_dict() if self.skipAccountCriteria else None
             ),

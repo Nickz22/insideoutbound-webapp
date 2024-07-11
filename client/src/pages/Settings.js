@@ -222,7 +222,7 @@ const Settings = () => {
               {settings.criteria.map((criteriaContainer, index) => (
                 <Grid item xs={12} md={6} key={index}>
                   <FilterContainer
-                    filterContainer={criteriaContainer}
+                    initialFilterContainer={criteriaContainer}
                     onLogicChange={(newContainer) => {
                       const newCriteria = [...settings.criteria];
                       newCriteria[index] = newContainer;
@@ -271,11 +271,8 @@ const Settings = () => {
               </Grid>
             </Grid>
             <Box sx={{ mt: 2 }}>
-              {/*
-               * ensure filter value and logic change are saving the criteria
-               */}
               <FilterContainer
-                filterContainer={settings.meetingsCriteria}
+                initialFilterContainer={settings.meetingsCriteria}
                 onLogicChange={(newContainer) =>
                   handleChange("meetingsCriteria", newContainer)
                 }

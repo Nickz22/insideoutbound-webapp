@@ -203,7 +203,6 @@ const Onboard = () => {
         gatheringResponses["inactivityThreshold"]?.value,
         10
       ), // Tracking Period
-      cooloffPeriod: parseInt(gatheringResponses["cooloffPeriod"]?.value, 10), // Cooloff Period
       criteria: filters,
       meetingObject: gatheringResponses["meetingObject"]?.value,
       meetingsCriteria: gatheringResponses["meetingsCriteria"]?.value,
@@ -218,7 +217,7 @@ const Onboard = () => {
       trackingPeriod: parseInt(gatheringResponses["trackingPeriod"]?.value, 10),
       activateByMeeting: gatheringResponses["activateByMeeting"]?.value,
       activateByOpportunity: gatheringResponses["activateByOpportunity"]?.value,
-      teamMemberIds: gatheringResponses["teamMemberIds"]?.value,
+      teamMemberIds: gatheringResponses["teamMemberIds"]?.value?.map(salesforceUser => salesforceUser.id),
       salesforceUserId: gatheringResponses["salesforceUserId"]?.value,
     };
   };
@@ -250,6 +249,42 @@ const Onboard = () => {
     handleNext();
   };
 
+  /**
+   * @param {FilterContainer} filterContainer
+   */
+  const handleProspectingFilterChanged = (filterContainer) => {
+    setFilters(
+      /** @param {FilterContainer[]} prev */
+      (prev) =>
+        prev.map((prevFilterContainer) => {
+          const isSameFilter =
+            prevFilterContainer?.name === filterContainer.name;
+          return isSameFilter ? filterContainer : prevFilterContainer;
+        })
+    );
+    try {
+      setGatheringResponses(
+        /** @param {{ [key: string]: any }} prev */
+        (prev) => {
+          const newResponses = { ...prev };
+          newResponses["criteria"].value = prev["criteria"].value.map(
+            /**
+             * @param {FilterContainer} prevCriteria
+             */
+            (prevCriteria) => {
+              const isSameCriteria =
+                prevCriteria?.name === filterContainer.name;
+              return isSameCriteria ? filterContainer : prevCriteria;
+            }
+          );
+          return newResponses;
+        }
+      );
+    } catch (e) {
+      console.error("Error updating criteria", e);
+    }
+  };
+
   const setSelectedColumns = useCallback((newColumns) => {
     setCategoryFormTableData((prev) => ({ ...prev, columns: newColumns }));
   }, []);
@@ -272,7 +307,7 @@ const Onboard = () => {
           categoryFormTableData={categoryFormTableData}
           setSelectedColumns={setSelectedColumns}
           onAddCategory={addCategory}
-          onDone={handleDone}
+          onDone={handleProspectingCategoriesComplete}
           placeholder={`Example: ${getPlaceholder()}`}
         />
       );
@@ -282,6 +317,7 @@ const Onboard = () => {
           proposedFilterContainers={filters}
           onSave={saveSettings}
           taskFilterFields={taskFilterFields.current}
+          onFilterChange={handleProspectingFilterChanged}
         />
       );
     } else {
@@ -327,7 +363,7 @@ const Onboard = () => {
     return placeholder;
   };
 
-  const handleDone = async () => {
+  const handleProspectingCategoriesComplete = async () => {
     const selectedColumns = categoryFormTableData.columns;
     const filterContainersPromises = Array.from(categories.entries()).map(
       async ([category, tasks]) => {
@@ -349,6 +385,14 @@ const Onboard = () => {
 
     const filterContainers = await Promise.all(filterContainersPromises);
     setFilters(filterContainers);
+    setGatheringResponses(
+      /** @param {{ [key: string]: any }} prev */
+      (prev) => {
+        const newResponses = { ...prev };
+        newResponses["criteria"] = { value: filterContainers };
+        return newResponses;
+      }
+    );
     handleNext();
   };
 

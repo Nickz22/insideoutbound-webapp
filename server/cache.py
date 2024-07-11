@@ -11,7 +11,6 @@ from server.models import (
     Account,
     ProspectingMetadata,
     Activation,
-    Opportunity,
     ApiResponse,
     Settings,
 )
@@ -116,12 +115,6 @@ def deserialize_account(data):
 
 def deserialize_prospecting_metadata(data):
     return [ProspectingMetadata(**meta) for meta in data]
-
-
-def deserialize_opportunity(data):
-    if data:
-        return Opportunity(id=data["id"], name=data["name"])
-    return None
 
 
 def load_inactive_activations() -> ApiResponse:

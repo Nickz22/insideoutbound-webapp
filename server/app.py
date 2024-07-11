@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, redirect, request
 from flask_cors import CORS
 import requests, os
+from datetime import datetime
+from collections import defaultdict
 
 from server.engine.activation_engine import update_activation_states
 from server.services.setting_service import define_criteria_from_events_or_tasks
@@ -159,20 +161,80 @@ def oauth_callback():
         return jsonify(error_details), 500
 
 
-@app.route("/load_prospecting_activities", methods=["GET"])
-def load_prospecting_activities():
-    api_response = ApiResponse(data=[], message="", success=False)
+@app.route("/load_prospecting_activity", methods=["GET"])
+def load_prospecting_activity():
+    api_response = ApiResponse(data={}, message="", success=False)
     try:
-
         response = update_activation_states()
 
-        api_response.success = response.success
-        api_response.message = response.message
-        api_response.data = response.data
+        if response.success:
+            activations = response.data
+            today = datetime.now().date()
+
+            # Initialize summary data
+            summary = {
+                "total_activations": len(activations),
+                "activations_today": 0,
+                "total_tasks": 0,
+                "total_events": 0,
+                "total_contacts": 0,
+                "total_accounts": 0,
+                "total_deals": 0,
+                "total_pipeline_value": 0,
+            }
+
+            account_contacts = defaultdict(set)
+
+            for activation in activations:
+                # Count activations today
+                if activation.activated_date.date() == today:
+                    summary["activations_today"] += 1
+
+                # Count tasks
+                summary["total_tasks"] += len(activation.task_ids)
+
+                # Count events
+                summary["total_events"] += len(activation.event_ids)
+
+                # Count unique contacts per account
+                account_id = activation.account.id
+                account_contacts[account_id].update(activation.active_contact_ids)
+
+                # Count deals and pipeline value
+                if activation.opportunity:
+                    summary["total_deals"] += 1
+                    summary["total_pipeline_value"] += activation.opportunity.get(
+                        "Amount", 0
+                    )
+
+            # Calculate averages
+            summary["total_contacts"] = sum(
+                len(contacts) for contacts in account_contacts.values()
+            )
+            summary["total_accounts"] = len(account_contacts)
+            summary["avg_tasks_per_contact"] = (
+                summary["total_tasks"] / summary["total_contacts"]
+                if summary["total_contacts"] > 0
+                else 0
+            )
+            summary["avg_contacts_per_account"] = (
+                summary["total_contacts"] / summary["total_accounts"]
+                if summary["total_accounts"] > 0
+                else 0
+            )
+
+            api_response.data = {"summary": summary, "raw_data": activations}
+            api_response.success = True
+            api_response.message = "Prospecting activity data loaded successfully"
+        else:
+            api_response.message = response.message
 
         status_code = get_status_code(api_response)
     except Exception as e:
-        api_response.message = f"Failed to load prospecting activities: {str(e)}"
+        api_response.message = (
+            f"Failed to load prospecting activities data: {format_error_message(e)}"
+        )
+        print(api_response.message)
         status_code = get_status_code(api_response)
 
     return jsonify(api_response.__dict__), status_code

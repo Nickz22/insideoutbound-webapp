@@ -150,7 +150,7 @@ class TestActivationLogic(unittest.TestCase):
 
         mock_sobject_fetch.side_effect = response_based_on_query
         activations = self.assert_and_return_payload(
-            self.app.get("/load_prospecting_activities")
+            self.app.get("/load_prospecting_activity")
         )
 
         self.assertEqual(5, len(activations))
@@ -171,7 +171,7 @@ class TestActivationLogic(unittest.TestCase):
 
         mock_sobject_fetch.side_effect = response_based_on_query
         activations = self.assert_and_return_payload(
-            self.app.get("/load_prospecting_activities")
+            self.app.get("/load_prospecting_activity")
         )
         self.assertEqual(2, len(activations))
 
@@ -199,7 +199,7 @@ class TestActivationLogic(unittest.TestCase):
         mock_sobject_fetch.side_effect = response_based_on_query
 
         activations = self.assert_and_return_payload(
-            self.app.get("/load_prospecting_activities")
+            self.app.get("/load_prospecting_activity")
         )
 
         meeting_set_activation = next(
@@ -218,7 +218,7 @@ class TestActivationLogic(unittest.TestCase):
         )
         add_mock_response("fetch_accounts_not_in_ids", [])
 
-        increment_activations_response = self.app.get("/load_prospecting_activities")
+        increment_activations_response = self.app.get("/load_prospecting_activity")
         payload = json.loads(increment_activations_response.data)
         self.assertEqual(
             increment_activations_response.status_code, 200, payload["message"]
@@ -241,7 +241,7 @@ class TestActivationLogic(unittest.TestCase):
         self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
 
         mock_sobject_fetch.side_effect = response_based_on_query
-        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activity"))
 
         activations = (
             load_active_activations_order_by_first_prospecting_activity_asc().data
@@ -256,7 +256,7 @@ class TestActivationLogic(unittest.TestCase):
 
         self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
 
-        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activity"))
 
         inactive_activations = load_inactive_activations().data
 
@@ -270,7 +270,7 @@ class TestActivationLogic(unittest.TestCase):
         self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
         mock_sobject_fetch.side_effect = response_based_on_query
         # initial account activation
-        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activity"))
 
         activations = (
             load_active_activations_order_by_first_prospecting_activity_asc().data
@@ -289,7 +289,7 @@ class TestActivationLogic(unittest.TestCase):
         self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
 
         # inactivate the Accounts
-        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activity"))
 
         inactive_activations = load_inactive_activations().data
 
@@ -302,7 +302,7 @@ class TestActivationLogic(unittest.TestCase):
         )
 
         # assert that new activations are created for the previously activated accounts
-        self.assert_and_return_payload(self.app.get("/load_prospecting_activities"))
+        self.assert_and_return_payload(self.app.get("/load_prospecting_activity"))
 
         active_activations = (
             load_active_activations_order_by_first_prospecting_activity_asc().data

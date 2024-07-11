@@ -115,29 +115,6 @@ def find_unresponsive_activations(
 
     return response
 
-
-# Positive Testing steps:
-#     1. Mock activations with a last_prospecting_activity of yesterday
-#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the inactivity_threshold
-#     3. Assert activations are returned with incremented Prospecting Metadata
-
-# Positive Testing steps (Opportunity Created):
-#     1. Mock activations with a last_prospecting_activity of yesterday
-#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the inactivity_threshold
-#     3. Mock api return results to return 1 opportunity per Account
-#     4. Assert activations are returned with Opportunity Created status
-
-# Positive Testing steps (Meeting Set):
-#     1. Mock activations with a last_prospecting_activity of yesterday
-#     2. Mock api return results to return 3 tasks per Account, 2 of which are within the inactivity_threshold
-#     3. Mock api return results to return 1 event per Account
-#     4. Assert activations are returned with Meeting Set status
-
-
-# Negative Testing steps:
-#     1. Mock activations with a last_prospecting_activity of 2 days ago
-#     2. Mock api return results to return 3 tasks per Account, 2 of which are outside of the inactivity_threshold
-#     3. Assert activations are returned with no additional Prospecting Metadata
 def increment_existing_activations(activations: list[Activation], settings: Settings):
     """
     Processes a list of activation objects and updates their counters based on criteria specified in the settings.
@@ -206,7 +183,7 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                 activations_by_account_id[account_id] = activation
                 # rollup prospecting metadata via criteria_name_by_task_id
 
-        opportunities_by_account_id = group_by(opportunities, "account_id")
+        opportunities_by_account_id = group_by(opportunities, "AccountId")
 
         for account_id in activations_by_account_id:
             activation = activations_by_account_id[account_id]
@@ -219,7 +196,8 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                         is_model_date_field_within_window(
                             event,
                             activation.first_prospecting_activity,
-                            settings["inactivity_threshold"],
+                            settings.inactivity_threshold,
+                            date_field="CreatedDate"
                         )
                         and activation.status == "Activated"
                     ):
@@ -232,6 +210,7 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                         opportunity,
                         activation.first_prospecting_activity,
                         settings.inactivity_threshold,
+                        date_field="CreatedDate"
                     ) and activation.status in ["Activated", "Meeting Set"]:
                         activation.opportunity = opportunities[0]
                         activation.status = "Opportunity Created"
@@ -364,7 +343,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                             task_ids=task_ids,
                             opportunity=qualifying_opportunity,
                             event_ids=(
-                                [qualifying_event.id] if qualifying_event else None
+                                [qualifying_event["Id"]] if qualifying_event else None
                             ),
                             status=(
                                 "Opportunity Created"
@@ -397,7 +376,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     first_prospecting_activity=first_prospecting_activity.date(),
                     last_prospecting_activity=task.created_date.date(),
                     opportunity=qualifying_opportunity,
-                    event_ids=[qualifying_event.id] if qualifying_event else None,
+                    event_ids=[qualifying_event["Id"]] if qualifying_event else None,
                     task_ids=task_ids,
                     status=(
                         "Opportunity Created"
@@ -474,7 +453,7 @@ def get_qualifying_event(events, start_date, tracking_period) -> Event:
     qualifying_event = None
     for event in events:
         if is_model_date_field_within_window(
-            event, start_date, tracking_period, "start_datetime"
+            event, start_date, tracking_period, "StartDateTime"
         ):
             qualifying_event = event
             break
@@ -484,7 +463,7 @@ def get_qualifying_event(events, start_date, tracking_period) -> Event:
 def get_qualifying_opportunity(opportunities, start_date, tracking_period):
     qualifying_opportunity = None
     for opportunity in opportunities:
-        if is_model_date_field_within_window(opportunity, start_date, tracking_period):
+        if is_model_date_field_within_window(opportunity, start_date, tracking_period, date_field="CreatedDate"):
             qualifying_opportunity = opportunity
             break
     return qualifying_opportunity

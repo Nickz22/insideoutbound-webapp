@@ -9,84 +9,90 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
 } from "@mui/material";
 
 import MetricCard from "../components/MetricCard/MetricCard";
-import DiagramCard from "../components/DiagramCard/DiagramCard";
-import ConversionRatesChart from "../components/ConversionRatesChart/ConversionRatesChart";
-import FunnelChart from "../components/FunnelChart/FunnelChart";
-
-/**
- * @typedef {import('@mui/material/Select').SelectChangeEvent<string>} SelectChangeEvent
- */
 
 const Prospecting = () => {
-  /** @type {[string, Function]} */
   const [period, setPeriod] = useState("");
   const [view, setView] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [summaryData, setSummaryData] = useState(null);
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
+
   useEffect(() => {
     const fetchData = async () => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       setLoading(true);
-      const response = await axios.get(
-        "http://localhost:8000/load_prospecting_activities",
-        {
-          validateStatus: function () {
-            return true;
-          },
-        }
-      );
-      switch (response.status) {
-        case 200:
-          console.log(response.data);
-          break;
-        case 400:
-          if (
-            response.data?.message.toLowerCase().includes("session expired")
-          ) {
-            navigate("/");
-          } else {
-            setError(response.data.message);
+      try {
+        const response = await axios.get(
+          "http://localhost:8000/load_prospecting_activity",
+          {
+            validateStatus: function () {
+              return true;
+            },
           }
-          break;
-        default:
-          setError(response.data.message);
-          break;
+        );
+        switch (response.status) {
+          case 200:
+            setSummaryData(response.data.data.summary);
+            break;
+          case 400:
+            if (
+              response.data?.message.toLowerCase().includes("session expired")
+            ) {
+              navigate("/");
+            } else {
+              setError(response.data.message);
+            }
+            break;
+          default:
+            setError(response.data.message);
+            break;
+        }
+      } catch (err) {
+        setError("An error occurred while fetching data.");
+      } finally {
+        setLoading(false);
+        inFlightRef.current = false;
       }
-
-      setLoading(false);
-      inFlightRef.current = false;
     };
 
     fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [navigate]);
 
-  /**
-   * Handles changes to the period select component.
-   * @param {SelectChangeEvent} event
-   */
   const handlePeriodChange = (event) => {
     setPeriod(event.target.value);
   };
 
-  /**
-   * @param {SelectChangeEvent} event
-   **/
   const handleViewChange = (event) => {
     setView(event.target.value);
   };
 
-  return loading ? (
-    <p>Loading...</p>
-  ) : error ? (
-    <Alert severity="error">{error}</Alert> // Display error message
-  ) : (
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
+  }
+
+  return (
     <Box sx={{ padding: "24px" }}>
       <Box
         sx={{
@@ -135,40 +141,60 @@ const Prospecting = () => {
       </Box>
       <Grid container spacing={2}>
         <Grid item xs={12} sm={6} md={4} lg={4}>
-          <MetricCard title="Accounts Approached" value="86" subText="" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={4}>
-          <MetricCard title="Opportunities Created" value="7" subText="" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={4}>
-          <MetricCard title="Pipeline Generated" value="$210,000" subText="" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={4}>
-          <MetricCard title="Avg Contacts Per Account" value="4.8" subText="" />
-        </Grid>
-        <Grid item xs={12} sm={6} md={4} lg={4}>
           <MetricCard
-            title="Avg Activities Per Contact"
-            value="7.3"
+            title="Total Activations"
+            value={summaryData.total_activations.toString()}
             subText=""
           />
         </Grid>
         <Grid item xs={12} sm={6} md={4} lg={4}>
           <MetricCard
-            title="Prospecting Cycle Time"
-            value="11.6 Days"
+            title="Activations Today"
+            value={summaryData.activations_today.toString()}
             subText=""
           />
         </Grid>
-        <Grid item xs={12} sm={6} md={6} lg={6}>
-          <DiagramCard title="Conversion Rates">
-            <ConversionRatesChart />
-          </DiagramCard>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
+          <MetricCard
+            title="Total Tasks"
+            value={summaryData.total_tasks.toString()}
+            subText=""
+          />
         </Grid>
-        <Grid item xs={12} sm={6} md={6} lg={6}>
-          <DiagramCard title="Prospecting Funnel">
-            <FunnelChart />
-          </DiagramCard>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
+          <MetricCard
+            title="Total Events"
+            value={summaryData.total_events.toString()}
+            subText=""
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
+          <MetricCard
+            title="Avg Tasks Per Contact"
+            value={summaryData.avg_tasks_per_contact.toFixed(2)}
+            subText=""
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
+          <MetricCard
+            title="Avg Contacts Per Account"
+            value={summaryData.avg_contacts_per_account.toFixed(2)}
+            subText=""
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
+          <MetricCard
+            title="Total Deals"
+            value={summaryData.total_deals.toString()}
+            subText=""
+          />
+        </Grid>
+        <Grid item xs={12} sm={6} md={4} lg={4}>
+          <MetricCard
+            title="Total Pipeline Value"
+            value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+            subText=""
+          />
         </Grid>
       </Grid>
     </Box>

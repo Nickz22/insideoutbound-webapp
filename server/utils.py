@@ -71,7 +71,10 @@ def is_model_date_field_within_window(
     :param date_field: The date field to check
     """
     end_date = start_date + timedelta(days=period_days)
-    model_date_value = getattr(sobject_model, date_field)
+    if isinstance(sobject_model, dict):
+        model_date_value = datetime.strptime(sobject_model[date_field], "%Y-%m-%dT%H:%M:%S.%f%z").replace(tzinfo=None)
+    else:
+        model_date_value = getattr(sobject_model, date_field)
     return start_date <= model_date_value <= end_date
 
 

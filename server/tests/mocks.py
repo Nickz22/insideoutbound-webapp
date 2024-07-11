@@ -5,7 +5,7 @@ from server.tests.c import (
     mock_tasks_for_criteria_with_contains_content,  # 3
     mock_tasks_for_criteria_with_unique_values_content,  # 3
 )
-from server.models import TaskSObject, OpportunitySObject
+from server.models import TaskSObject
 from typing import List, Dict
 from datetime import datetime
 
@@ -206,14 +206,14 @@ def get_five_mock_accounts():
 
 
 def get_mock_opportunity_for_account(account_id):
-    return OpportunitySObject(
-        Id=f"mock_opportunity_id_{random.randint(1000, 9999)}",
-        Name=f"Mock Opportunity",
-        AccountId=account_id,
-        Amount=round(random.uniform(1000, 100000), 2),
-        StageName="Prospecting",
-        CreatedDate=today,
-    ).to_dict()
+    return {
+        "Id": f"mock_opportunity_id_{random.randint(1000, 9999)}",
+        "Name": "Mock Opportunity",
+        "AccountId": account_id,
+        "Amount": round(random.uniform(1000, 100000), 2),
+        "StageName": "Prospecting",
+        "CreatedDate": today,
+    }
 
 
 def get_mock_event_for_contact(contact_id):

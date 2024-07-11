@@ -70,6 +70,7 @@ const ProspectingCategoryForm = ({
           tableData={tableData}
           onSelectionChange={handleTableSelectionChange}
           onColumnsChange={setSelectedColumns}
+          paginate={true}
         />
         <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-start" }}>
           <Button
