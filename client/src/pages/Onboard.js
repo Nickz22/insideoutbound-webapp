@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Dialog, DialogContent, Box, Typography } from "@mui/material";
+import { Dialog, DialogContent, Box, Typography, Paper } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
 import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
+import ProgressTracker from "../components/ProgressTracker/ProgressTracker";
 import {
   fetchSalesforceTasksByUserIds,
   fetchTaskFields,
@@ -18,7 +19,6 @@ import {
  * @typedef {import('types').Settings} Settings
  * @typedef {import('types').FilterContainer} FilterContainer
  * @typedef {import('types').ApiResponse} ApiResponse
- * @typedef {import('types').Task} Task
  * @typedef {import('types').TableData} TableData
  */
 
@@ -74,9 +74,12 @@ const Onboard = () => {
     data: [],
     selectedIds: new Set(),
   });
+  /** @type {[SObject[], Function]} */
   const [tasks, setTasks] = useState([]);
   const taskSObjectFields = useRef([]);
   const taskFilterFields = useRef([]);
+  /** @type {[boolean, Function]} */
+  const [canNavigateToStep, setCanNavigateToStep] = useState({});
 
   useEffect(() => {
     const setInitialCategoryFormTableData = async () => {
@@ -193,6 +196,20 @@ const Onboard = () => {
     }
   }, [isTransitioning]);
 
+  useEffect(() => {
+    setCanNavigateToStep((prev) => ({
+      ...prev,
+      [step]: true,
+      [step + 1]: true,
+    }));
+  }, [step]);
+
+  const handleStepClick = (clickedStep) => {
+    if (canNavigateToStep[clickedStep]) {
+      setStep(clickedStep);
+    }
+  };
+
   /**
    * Formats the settings data from the form responses.
    * @returns {Settings} The formatted settings data.
@@ -217,7 +234,9 @@ const Onboard = () => {
       trackingPeriod: parseInt(gatheringResponses["trackingPeriod"]?.value, 10),
       activateByMeeting: gatheringResponses["activateByMeeting"]?.value,
       activateByOpportunity: gatheringResponses["activateByOpportunity"]?.value,
-      teamMemberIds: gatheringResponses["teamMemberIds"]?.value?.map(salesforceUser => salesforceUser.id),
+      teamMemberIds: gatheringResponses["teamMemberIds"]?.value?.map(
+        (salesforceUser) => salesforceUser.id
+      ),
       salesforceUserId: gatheringResponses["salesforceUserId"]?.value,
     };
   };
@@ -325,6 +344,14 @@ const Onboard = () => {
     }
   };
 
+  const getProgressSteps = () => {
+    return [
+      ...ONBOARD_WIZARD_STEPS,
+      { title: "Prospecting Categories" },
+      { title: "Review" },
+    ];
+  };
+
   /**
    *
    * @param {string} category
@@ -338,11 +365,13 @@ const Onboard = () => {
     }
 
     const newCategories = new Map(categories);
+    /** @type {SObject[]} */
     const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.id));
     newCategories.set(category, selectedTasks);
     setCategories(newCategories);
 
     // Remove selected tasks from the available tasks list
+    /** @type {SObject[]} */
     const remainingTasks = tasks.filter(
       (task) => !selectedTaskIds.has(task.id)
     );
@@ -441,26 +470,55 @@ const Onboard = () => {
   };
 
   return (
-    <Dialog
-      open
-      onClose={() => {
-        console.log("closing");
-      }}
-      PaperProps={{
-        style: dialogStyle,
-      }}
-      fullWidth
-      maxWidth={isLargeDialogStep() ? "lg" : "sm"}
-    >
-      <DialogContent
-        style={{
-          padding: isLargeDialogStep() ? "24px" : "16px",
-          transition: "padding 0.3s ease-in-out",
+    <Box sx={{ display: "flex", height: "100vh" }}>
+      <Paper
+        elevation={3}
+        sx={{
+          width: "250px",
+          height: "100vh",
+          position: "fixed",
+          left: 0,
+          top: 0,
+          zIndex: 1301,
+          padding: "16px",
+          backgroundColor: "rgba(255, 255, 255, 0.9)",
+          backdropFilter: "blur(5px)",
+          overflowY: "auto",
         }}
       >
-        {renderStep()}
-      </DialogContent>
-    </Dialog>
+        <ProgressTracker
+          steps={getProgressSteps()}
+          currentStep={step}
+          onStepClick={handleStepClick}
+          canNavigateToStep={canNavigateToStep}
+          orientation="vertical"
+        />
+      </Paper>
+      <Box sx={{ flexGrow: 1, marginLeft: "250px" }}>
+        <Dialog
+          open
+          onClose={() => {
+            console.log("closing");
+          }}
+          PaperProps={{
+            style: dialogStyle,
+          }}
+          fullWidth
+          maxWidth={false}
+        >
+          <DialogContent
+            style={{
+              padding: isLargeDialogStep() ? "24px" : "16px",
+              transition: "padding 0.3s ease-in-out",
+              height: "100%",
+              overflow: "auto",
+            }}
+          >
+            {renderStep()}
+          </DialogContent>
+        </Dialog>
+      </Box>
+    </Box>
   );
 };
 
