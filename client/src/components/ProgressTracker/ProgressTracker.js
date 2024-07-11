@@ -21,9 +21,6 @@ const ProgressTracker = ({
           </Step>
         ))}
       </Stepper>
-      <Typography variant="caption" display="block" textAlign="center" mt={2}>
-        Step {currentStep} of {steps.length}
-      </Typography>
     </Box>
   );
 };
