@@ -20,6 +20,7 @@ import {
  * @typedef {import('types').FilterContainer} FilterContainer
  * @typedef {import('types').ApiResponse} ApiResponse
  * @typedef {import('types').TableData} TableData
+ * @typedef {import('types').TableColumn} TableColumn
  */
 
 import {
@@ -78,8 +79,6 @@ const Onboard = () => {
   const [tasks, setTasks] = useState([]);
   const taskSObjectFields = useRef([]);
   const taskFilterFields = useRef([]);
-  /** @type {[boolean, Function]} */
-  const [canNavigateToStep, setCanNavigateToStep] = useState({});
 
   useEffect(() => {
     const setInitialCategoryFormTableData = async () => {
@@ -196,16 +195,8 @@ const Onboard = () => {
     }
   }, [isTransitioning]);
 
-  useEffect(() => {
-    setCanNavigateToStep((prev) => ({
-      ...prev,
-      [step]: true,
-      [step + 1]: true,
-    }));
-  }, [step]);
-
   const handleStepClick = (clickedStep) => {
-    if (canNavigateToStep[clickedStep]) {
+    if (clickedStep < step) {
       setStep(clickedStep);
     }
   };
@@ -304,9 +295,16 @@ const Onboard = () => {
     }
   };
 
-  const setSelectedColumns = useCallback((newColumns) => {
-    setCategoryFormTableData((prev) => ({ ...prev, columns: newColumns }));
-  }, []);
+  const setSelectedColumns = useCallback(
+    /** @param {TableColumn[]} newColumns */
+    (newColumns) => {
+      setCategoryFormTableData(
+        /** @param {TableData} prev */
+        (prev) => ({ ...prev, columns: newColumns })
+      );
+    },
+    []
+  );
 
   const renderStep = () => {
     if (step <= ONBOARD_WIZARD_STEPS.length) {
@@ -490,7 +488,6 @@ const Onboard = () => {
           steps={getProgressSteps()}
           currentStep={step}
           onStepClick={handleStepClick}
-          canNavigateToStep={canNavigateToStep}
           orientation="vertical"
         />
       </Paper>

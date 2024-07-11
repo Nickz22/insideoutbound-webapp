@@ -5,7 +5,6 @@ const ProgressTracker = ({
   steps,
   currentStep,
   onStepClick,
-  canNavigateToStep,
   orientation = "horizontal",
 }) => {
   return (
@@ -15,7 +14,7 @@ const ProgressTracker = ({
           <Step key={index}>
             <StepButton
               onClick={() => onStepClick(index + 1)}
-              disabled={!canNavigateToStep[index + 1]}
+              disabled={index + 1 > currentStep}
             >
               <Typography variant="body2">{step.title}</Typography>
             </StepButton>

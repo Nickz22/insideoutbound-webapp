@@ -207,7 +207,9 @@ const InfoGatheringStep = ({
               <FormControl fullWidth variant="outlined" margin="normal">
                 <InputLabel>{input.inputLabel}</InputLabel>
                 <Select
-                  value={inputValues[input.setting] || ""}
+                  value={
+                    inputValues[input.setting] || settings[input.setting] || ""
+                  }
                   onChange={(e) => handleInputChange(e, input.setting)}
                   label={input.inputLabel}
                 >
@@ -225,7 +227,7 @@ const InfoGatheringStep = ({
               <TextField
                 fullWidth
                 type={input.inputType}
-                value={inputValues[input.setting] || ""}
+                value={inputValues[input.setting] || settings[input.setting] || ""}
                 onChange={(e) => handleInputChange(e, input.setting)}
                 label={input.inputLabel}
                 variant="outlined"
