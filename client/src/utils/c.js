@@ -136,12 +136,11 @@ export const ONBOARD_WIZARD_STEPS = [
       },
     ],
     descriptionRenderer: (description, inputValues) => {
-
       const values = [
         inputValues?.contactsPerAccount,
         inputValues?.trackingPeriod,
       ];
-      
+
       return description.replace(/_/g, (match, offset) => {
         const index = description.slice(0, offset).match(/_/g)?.length || 0;
         return values[index] || "_";
@@ -196,14 +195,19 @@ export const ONBOARD_WIZARD_STEPS = [
   },
   {
     title: "Define an Approach",
-    description: `
-    The next few questions will help us understand when to consider an Account "approached".
-    <br><br>
-    First, are meetings a strong indication of an Account being 'approached'?
-    `,
+    description: `The next few questions will help us understand when to consider an Account 'approached'.`,
     inputs: [
       {
+        setting: "activateByOpportunity",
+        inputType: "picklist",
+        inputLabel:
+          "Does a new opportunity indicate an approach?",
+        options: ["Yes", "No"],
+      },
+      {
         setting: "activateByMeeting",
+        inputLabel:
+          "Does a new meeting indicate an approached?",
         inputType: "picklist",
         options: ["Yes", "No"],
       },
@@ -212,7 +216,6 @@ export const ONBOARD_WIZARD_STEPS = [
         inputType: "picklist",
         inputLabel: "How are meetings recorded?",
         options: [
-          "We have an opportunity stage for that",
           "We use the task object for that",
           "We use the event object for that",
         ],
