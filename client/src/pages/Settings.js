@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import {
   Box,
@@ -45,6 +45,8 @@ const Settings = () => {
   const [taskFilterFields, setTaskFilterFields] = useState();
   const [eventFilterFields, setEventFilterFields] = useState();
   const [isLoading, setIsLoading] = useState(true);
+  const [criteria, setCriteria] = useState([]);
+  const [updateTrigger, setUpdateTrigger] = useState(0);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -91,7 +93,7 @@ const Settings = () => {
     saveSettings({ ...settings, [field]: value });
   };
 
-  const saveSettings = async (updatedSettings) => {
+  const saveSettings = useCallback(async (updatedSettings) => {
     setSaving(true);
     setSaveSuccess(false);
     try {
@@ -102,14 +104,53 @@ const Settings = () => {
     } finally {
       setSaving(false);
     }
-  };
+  }, []);
 
-  const handleDeleteFilter = async (index) => {
-    const newCriteria = settings.criteria.filter((_, i) => i !== index);
-    const updatedSettings = { ...settings, criteria: newCriteria };
-    setSettings(updatedSettings);
-    await saveSettings(updatedSettings);
-  };
+  useEffect(() => {
+    if (settings.criteria) {
+      setCriteria(settings.criteria);
+    }
+  }, [settings.criteria]);
+
+  const handleDeleteFilter = useCallback(
+    (index) => {
+      setCriteria((prevCriteria) => {
+        const newCriteria = prevCriteria.filter((_, i) => i !== index);
+        const updatedSettings = { ...settings, criteria: newCriteria };
+        saveSettings(updatedSettings);
+        setUpdateTrigger((prev) => prev + 1);
+        return newCriteria;
+      });
+    },
+    [settings, saveSettings]
+  );
+
+  const handleAddCriteria = useCallback(() => {
+    setCriteria((prevCriteria) => {
+      const newCriteria = [
+        ...prevCriteria,
+        { filters: [], filterLogic: "", name: "" },
+      ];
+      const updatedSettings = { ...settings, criteria: newCriteria };
+      saveSettings(updatedSettings);
+      setUpdateTrigger((prev) => prev + 1);
+      return newCriteria;
+    });
+  }, [settings, saveSettings]);
+
+  const handleCriteriaChange = useCallback(
+    (index, newContainer) => {
+      setCriteria((prevCriteria) => {
+        const newCriteria = [...prevCriteria];
+        newCriteria[index] = newContainer;
+        const updatedSettings = { ...settings, criteria: newCriteria };
+        saveSettings(updatedSettings);
+        setUpdateTrigger((prev) => prev + 1);
+        return newCriteria;
+      });
+    },
+    [settings, saveSettings]
+  );
 
   if (isLoading) {
     return (
@@ -216,21 +257,23 @@ const Settings = () => {
             Prospecting Activity Criteria
           </Typography>
           <Grid container spacing={2}>
-            {settings.criteria.map((criteriaContainer, index) => (
-              <Grid item xs={12} md={6} key={index}>
+            {criteria.map((criteriaContainer, index) => (
+              <Grid
+                item
+                xs={12}
+                md={6}
+                key={`criteria-${index}-${updateTrigger}`}
+              >
                 <Box sx={{ position: "relative" }}>
                   <FilterContainer
+                    key={`filter-${index}-${updateTrigger}`}
                     initialFilterContainer={criteriaContainer}
-                    onLogicChange={(newContainer) => {
-                      const newCriteria = [...settings.criteria];
-                      newCriteria[index] = newContainer;
-                      handleChange("criteria", newCriteria);
-                    }}
-                    onValueChange={(newContainer) => {
-                      const newCriteria = [...settings.criteria];
-                      newCriteria[index] = newContainer;
-                      handleChange("criteria", newCriteria);
-                    }}
+                    onLogicChange={(newContainer) =>
+                      handleCriteriaChange(index, newContainer)
+                    }
+                    onValueChange={(newContainer) =>
+                      handleCriteriaChange(index, newContainer)
+                    }
                     filterFields={taskFilterFields}
                     filterOperatorMapping={FILTER_OPERATOR_MAPPING}
                     hasNameField={true}
@@ -246,16 +289,7 @@ const Settings = () => {
               </Grid>
             ))}
           </Grid>
-          <Button
-            variant="outlined"
-            onClick={() =>
-              handleChange("criteria", [
-                ...settings.criteria,
-                { filters: [], filterLogic: "", name: "" },
-              ])
-            }
-            sx={{ mt: 2 }}
-          >
+          <Button variant="outlined" onClick={handleAddCriteria} sx={{ mt: 2 }}>
             Add Criteria
           </Button>
         </CardContent>
@@ -283,6 +317,9 @@ const Settings = () => {
             <FilterContainer
               initialFilterContainer={settings.meetingsCriteria}
               onLogicChange={(newContainer) =>
+                handleChange("meetingsCriteria", newContainer)
+              }
+              onValueChange={(newContainer) =>
                 handleChange("meetingsCriteria", newContainer)
               }
               filterFields={eventFilterFields}
