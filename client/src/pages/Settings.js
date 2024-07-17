@@ -22,7 +22,7 @@ import {
   fetchTaskFilterFields,
 } from "../components/Api/Api";
 import { FILTER_OPERATOR_MAPPING } from "../utils/c";
-import FilterContainer from "../components/FilterContainer/FilterContainer"; // Assuming you have this component
+import FilterContainer from "../components/FilterContainer/FilterContainer";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -43,54 +43,48 @@ const Settings = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [taskFilterFields, setTaskFilterFields] = useState();
   const [eventFilterFields, setEventFilterFields] = useState();
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    const fetchAndSetFilterFields = async () => {
+    const fetchInitialData = async () => {
       try {
-        const taskFilterFields = await fetchTaskFilterFields();
-        const eventFilterFields = await fetchEventFilterFields();
+        setIsLoading(true);
+        // Fetch filter fields
+        const [
+          taskFilterFieldsResponse,
+          eventFilterFieldsResponse,
+          settingsResponse,
+        ] = await Promise.all([
+          fetchTaskFilterFields(),
+          fetchEventFilterFields(),
+          axios.get("http://localhost:8000/get_settings"),
+        ]);
 
-        switch (taskFilterFields.statusCode) {
-          case 200:
-            break;
-          case 400:
-            if (
-              taskFilterFields.data?.message
-                .toLowerCase()
-                .includes("session expired")
-            ) {
-              navigate("/");
-            } else {
-              console.error(taskFilterFields.data.message);
-            }
-            break;
-          default:
-            console.error(taskFilterFields.data.message);
-            break;
+        if (taskFilterFieldsResponse.statusCode === 200) {
+          setTaskFilterFields(taskFilterFieldsResponse.data);
+        } else if (
+          taskFilterFieldsResponse.statusCode === 400 &&
+          taskFilterFieldsResponse.data?.message
+            .toLowerCase()
+            .includes("session expired")
+        ) {
+          navigate("/");
+          return;
+        } else {
+          console.error(taskFilterFieldsResponse.data.message);
         }
 
-        setTaskFilterFields(taskFilterFields.data);
-        setEventFilterFields(eventFilterFields.data);
+        setEventFilterFields(eventFilterFieldsResponse.data);
+        setSettings(settingsResponse.data);
       } catch (error) {
-        console.error("Error fetching filter fields:", error);
+        console.error("Error fetching initial data:", error);
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    fetchAndSetFilterFields();
-  }, []);
-
-  useEffect(() => {
-    // Fetch initial settings
-    const fetchSettings = async () => {
-      try {
-        const response = await axios.get("http://localhost:8000/get_settings");
-        setSettings(response.data);
-      } catch (error) {
-        console.error("Error fetching settings:", error);
-      }
-    };
-    fetchSettings();
-  }, []);
+    fetchInitialData();
+  }, [navigate]);
 
   const handleChange = (field, value) => {
     setSettings((prev) => ({ ...prev, [field]: value }));
@@ -110,206 +104,208 @@ const Settings = () => {
     }
   };
 
-  return (
-    taskFilterFields &&
-    eventFilterFields && (
-      <Box sx={{ width: "100%", mt: 2 }}>
-        <Card sx={{ mb: 2 }}>
-          <CardContent sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom marginBottom={2}>
-              General Settings
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  label="Inactivity Threshold (days)"
-                  type="number"
-                  value={settings.inactivityThreshold}
-                  onChange={(e) =>
-                    handleChange(
-                      "inactivityThreshold",
-                      parseInt(e.target.value)
-                    )
-                  }
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  label="Cooloff Period (days)"
-                  type="number"
-                  value={settings.cooloffPeriod}
-                  onChange={(e) =>
-                    handleChange("cooloffPeriod", parseInt(e.target.value))
-                  }
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  label="Activities per Contact"
-                  type="number"
-                  value={settings.activitiesPerContact}
-                  onChange={(e) =>
-                    handleChange(
-                      "activitiesPerContact",
-                      parseInt(e.target.value)
-                    )
-                  }
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  label="Contacts per Account"
-                  type="number"
-                  value={settings.contactsPerAccount}
-                  onChange={(e) =>
-                    handleChange("contactsPerAccount", parseInt(e.target.value))
-                  }
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <TextField
-                  fullWidth
-                  label="Tracking Period (days)"
-                  type="number"
-                  value={settings.trackingPeriod}
-                  onChange={(e) =>
-                    handleChange("trackingPeriod", parseInt(e.target.value))
-                  }
-                />
-              </Grid>
-            </Grid>
-            <Grid container spacing={2} marginTop={2}>
-              <Grid item xs={12} sm={6} md={4}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={settings.activateByOpportunity}
-                      onChange={(e) =>
-                        handleChange("activateByOpportunity", e.target.checked)
-                      }
-                    />
-                  }
-                  label="Activate by Opportunity"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={settings.activateByMeeting}
-                      onChange={(e) =>
-                        handleChange("activateByMeeting", e.target.checked)
-                      }
-                    />
-                  }
-                  label="Activate by Meeting"
-                />
-              </Grid>
-            </Grid>
-          </CardContent>
-        </Card>
-
-        <Card sx={{ mb: 2 }}>
-          <CardContent sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Prospecting Activity Criteria
-            </Typography>
-            <Grid container spacing={2}>
-              {settings.criteria.map((criteriaContainer, index) => (
-                <Grid item xs={12} md={6} key={index}>
-                  <FilterContainer
-                    initialFilterContainer={criteriaContainer}
-                    onLogicChange={(newContainer) => {
-                      const newCriteria = [...settings.criteria];
-                      newCriteria[index] = newContainer;
-                      handleChange("criteria", newCriteria);
-                    }}
-                    filterFields={taskFilterFields}
-                    filterOperatorMapping={FILTER_OPERATOR_MAPPING}
-                    hasNameField={true}
-                  />
-                </Grid>
-              ))}
-            </Grid>
-            <Button
-              variant="outlined"
-              onClick={() =>
-                handleChange("criteria", [
-                  ...settings.criteria,
-                  { filters: [], filterLogic: "", name: "" },
-                ])
-              }
-              sx={{ mt: 2 }}
-            >
-              Add Criteria
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Meeting Criteria
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Select
-                  fullWidth
-                  value={settings.meetingObject}
-                  onChange={(e) =>
-                    handleChange("meetingObject", e.target.value)
-                  }
-                  label="Meeting Object"
-                >
-                  <MenuItem value="Task">Task</MenuItem>
-                  <MenuItem value="Event">Event</MenuItem>
-                </Select>
-              </Grid>
-            </Grid>
-            <Box sx={{ mt: 2 }}>
-              <FilterContainer
-                initialFilterContainer={settings.meetingsCriteria}
-                onLogicChange={(newContainer) =>
-                  handleChange("meetingsCriteria", newContainer)
-                }
-                filterFields={eventFilterFields}
-                filterOperatorMapping={FILTER_OPERATOR_MAPPING}
-              />
-            </Box>
-          </CardContent>
-        </Card>
-
-        <Snackbar
-          anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-          open={saving || saveSuccess}
-          autoHideDuration={2000}
-          onClose={() => setSaveSuccess(false)}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              bgcolor: "background.paper",
-              borderRadius: 1,
-              p: 1,
-            }}
-          >
-            {saving ? (
-              <CircularProgress size={24} sx={{ mr: 1 }} />
-            ) : (
-              <CheckCircleOutlineIcon color="success" sx={{ mr: 1 }} />
-            )}
-            <Typography>
-              {saving ? "Saving..." : "Saved successfully"}
-            </Typography>
-          </Box>
-        </Snackbar>
+  if (isLoading) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
+        <CircularProgress />
       </Box>
-    )
+    );
+  }
+
+  return (
+    <Box sx={{ width: "100%", mt: 2 }}>
+      <Card sx={{ mb: 2 }}>
+        <CardContent sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom marginBottom={2}>
+            General Settings
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                fullWidth
+                label="Inactivity Threshold (days)"
+                type="number"
+                value={settings.inactivityThreshold}
+                onChange={(e) =>
+                  handleChange("inactivityThreshold", parseInt(e.target.value))
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                fullWidth
+                label="Cooloff Period (days)"
+                type="number"
+                value={settings.cooloffPeriod}
+                onChange={(e) =>
+                  handleChange("cooloffPeriod", parseInt(e.target.value))
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                fullWidth
+                label="Activities per Contact"
+                type="number"
+                value={settings.activitiesPerContact}
+                onChange={(e) =>
+                  handleChange("activitiesPerContact", parseInt(e.target.value))
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                fullWidth
+                label="Contacts per Account"
+                type="number"
+                value={settings.contactsPerAccount}
+                onChange={(e) =>
+                  handleChange("contactsPerAccount", parseInt(e.target.value))
+                }
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                fullWidth
+                label="Tracking Period (days)"
+                type="number"
+                value={settings.trackingPeriod}
+                onChange={(e) =>
+                  handleChange("trackingPeriod", parseInt(e.target.value))
+                }
+              />
+            </Grid>
+          </Grid>
+          <Grid container spacing={2} marginTop={2}>
+            <Grid item xs={12} sm={6} md={4}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={settings.activateByOpportunity}
+                    onChange={(e) =>
+                      handleChange("activateByOpportunity", e.target.checked)
+                    }
+                  />
+                }
+                label="Activate by Opportunity"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={settings.activateByMeeting}
+                    onChange={(e) =>
+                      handleChange("activateByMeeting", e.target.checked)
+                    }
+                  />
+                }
+                label="Activate by Meeting"
+              />
+            </Grid>
+          </Grid>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 2 }}>
+        <CardContent sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Prospecting Activity Criteria
+          </Typography>
+          <Grid container spacing={2}>
+            {settings.criteria.map((criteriaContainer, index) => (
+              <Grid item xs={12} md={6} key={index}>
+                <FilterContainer
+                  initialFilterContainer={criteriaContainer}
+                  onLogicChange={(newContainer) => {
+                    const newCriteria = [...settings.criteria];
+                    newCriteria[index] = newContainer;
+                    handleChange("criteria", newCriteria);
+                  }}
+                  filterFields={taskFilterFields}
+                  filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+                  hasNameField={true}
+                />
+              </Grid>
+            ))}
+          </Grid>
+          <Button
+            variant="outlined"
+            onClick={() =>
+              handleChange("criteria", [
+                ...settings.criteria,
+                { filters: [], filterLogic: "", name: "" },
+              ])
+            }
+            sx={{ mt: 2 }}
+          >
+            Add Criteria
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Meeting Criteria
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Select
+                fullWidth
+                value={settings.meetingObject}
+                onChange={(e) => handleChange("meetingObject", e.target.value)}
+                label="Meeting Object"
+              >
+                <MenuItem value="Task">Task</MenuItem>
+                <MenuItem value="Event">Event</MenuItem>
+              </Select>
+            </Grid>
+          </Grid>
+          <Box sx={{ mt: 2 }}>
+            <FilterContainer
+              initialFilterContainer={settings.meetingsCriteria}
+              onLogicChange={(newContainer) =>
+                handleChange("meetingsCriteria", newContainer)
+              }
+              filterFields={eventFilterFields}
+              filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+            />
+          </Box>
+        </CardContent>
+      </Card>
+
+      <Snackbar
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        open={saving || saveSuccess}
+        autoHideDuration={2000}
+        onClose={() => setSaveSuccess(false)}
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            bgcolor: "background.paper",
+            borderRadius: 1,
+            p: 1,
+          }}
+        >
+          {saving ? (
+            <CircularProgress size={24} sx={{ mr: 1 }} />
+          ) : (
+            <CheckCircleOutlineIcon color="success" sx={{ mr: 1 }} />
+          )}
+          <Typography>{saving ? "Saving..." : "Saved successfully"}</Typography>
+        </Box>
+      </Snackbar>
+    </Box>
   );
 };
 

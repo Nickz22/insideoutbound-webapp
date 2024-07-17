@@ -377,7 +377,7 @@ export const ONBOARD_WIZARD_STEPS = [
             );
             const filterFieldsResponse = Array.from(
               tableData.selectedIds
-            )[0].startsWith("00T")
+            )[0]?.startsWith("00T")
               ? await fetchTaskFilterFields()
               : await fetchEventFilterFields();
 

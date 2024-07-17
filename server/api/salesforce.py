@@ -16,6 +16,8 @@ from server.models import (
 from server.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 from server.cache import load_tokens
 
+VALID_FIELD_TYPES = ("string", "picklist", "combobox", "int")
+
 
 def fetch_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     """
@@ -43,7 +45,7 @@ def fetch_criteria_fields(sobject_type: str) -> List[CriteriaField]:
                 ),
             )
             for field in fields_data
-            if field["type"] in ("string", "picklist", "combobox", "int")
+            if field["type"] in VALID_FIELD_TYPES or field["name"] == "Id"
         ]
         api_response.data = criteria_fields
         api_response.success = True
@@ -587,6 +589,7 @@ def fetch_task_fields() -> ApiResponse:
     sobject_field_models = [
         SObjectFieldModel(type=entry["type"], name=entry["name"], label=entry["label"])
         for entry in response.data
+        if entry["type"] in VALID_FIELD_TYPES or entry["name"] == "Id"
     ]
 
     if response.success:
@@ -610,6 +613,7 @@ def fetch_event_fields() -> ApiResponse:
     sobject_field_models = [
         SObjectFieldModel(type=entry["type"], name=entry["name"], label=entry["label"])
         for entry in response.data
+        if entry["type"] in VALID_FIELD_TYPES or entry["name"] == "Id"
     ]
 
     if response.success:
