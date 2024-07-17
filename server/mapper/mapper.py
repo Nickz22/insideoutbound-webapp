@@ -75,15 +75,23 @@ def convert_filter_container_to_filter_container_model(
 def convert_settings_model_to_settings(sm: SettingsModel) -> Settings:
     return Settings(
         inactivity_threshold=sm.inactivityThreshold,
-        criteria=[
-            convert_filter_container_model_to_filter_container(
-                FilterContainerModel(**fc)
-            )
-            for fc in sm.criteria
-        ],
+        criteria=(
+            [
+                convert_filter_container_model_to_filter_container(
+                    FilterContainerModel(**fc)
+                )
+                for fc in sm.criteria
+            ]
+            if len(sm.criteria) > 0
+            else [FilterContainer(name="", filters=[], filter_logic="")]
+        ),
         meeting_object=sm.meetingObject,
-        meetings_criteria=convert_filter_container_model_to_filter_container(
-            FilterContainerModel(**sm.meetingsCriteria)
+        meetings_criteria=(
+            convert_filter_container_model_to_filter_container(
+                FilterContainerModel(**sm.meetingsCriteria)
+            )
+            if sm.meetingsCriteria is not None
+            else FilterContainer(name="", filters=[], filter_logic="")
         ),
         activities_per_contact=sm.activitiesPerContact,
         contacts_per_account=sm.contactsPerAccount,

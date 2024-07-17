@@ -14,8 +14,10 @@ import {
   Snackbar,
   Select,
   MenuItem,
+  IconButton,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
+import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
 import {
   fetchEventFilterFields,
@@ -28,7 +30,6 @@ const Settings = () => {
   const navigate = useNavigate();
   const [settings, setSettings] = useState({
     inactivityThreshold: 0,
-    cooloffPeriod: 0,
     criteria: [],
     meetingObject: "",
     meetingsCriteria: { filters: [], filterLogic: "", name: "" },
@@ -49,7 +50,6 @@ const Settings = () => {
     const fetchInitialData = async () => {
       try {
         setIsLoading(true);
-        // Fetch filter fields
         const [
           taskFilterFieldsResponse,
           eventFilterFieldsResponse,
@@ -104,6 +104,13 @@ const Settings = () => {
     }
   };
 
+  const handleDeleteFilter = async (index) => {
+    const newCriteria = settings.criteria.filter((_, i) => i !== index);
+    const updatedSettings = { ...settings, criteria: newCriteria };
+    setSettings(updatedSettings);
+    await saveSettings(updatedSettings);
+  };
+
   if (isLoading) {
     return (
       <Box
@@ -135,17 +142,6 @@ const Settings = () => {
                 value={settings.inactivityThreshold}
                 onChange={(e) =>
                   handleChange("inactivityThreshold", parseInt(e.target.value))
-                }
-              />
-            </Grid>
-            <Grid item xs={12} sm={6} md={4}>
-              <TextField
-                fullWidth
-                label="Cooloff Period (days)"
-                type="number"
-                value={settings.cooloffPeriod}
-                onChange={(e) =>
-                  handleChange("cooloffPeriod", parseInt(e.target.value))
                 }
               />
             </Grid>
@@ -222,17 +218,31 @@ const Settings = () => {
           <Grid container spacing={2}>
             {settings.criteria.map((criteriaContainer, index) => (
               <Grid item xs={12} md={6} key={index}>
-                <FilterContainer
-                  initialFilterContainer={criteriaContainer}
-                  onLogicChange={(newContainer) => {
-                    const newCriteria = [...settings.criteria];
-                    newCriteria[index] = newContainer;
-                    handleChange("criteria", newCriteria);
-                  }}
-                  filterFields={taskFilterFields}
-                  filterOperatorMapping={FILTER_OPERATOR_MAPPING}
-                  hasNameField={true}
-                />
+                <Box sx={{ position: "relative" }}>
+                  <FilterContainer
+                    initialFilterContainer={criteriaContainer}
+                    onLogicChange={(newContainer) => {
+                      const newCriteria = [...settings.criteria];
+                      newCriteria[index] = newContainer;
+                      handleChange("criteria", newCriteria);
+                    }}
+                    onValueChange={(newContainer) => {
+                      const newCriteria = [...settings.criteria];
+                      newCriteria[index] = newContainer;
+                      handleChange("criteria", newCriteria);
+                    }}
+                    filterFields={taskFilterFields}
+                    filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+                    hasNameField={true}
+                  />
+                  <IconButton
+                    aria-label="delete"
+                    onClick={() => handleDeleteFilter(index)}
+                    sx={{ position: "absolute", top: 0, right: 0 }}
+                  >
+                    <CloseIcon />
+                  </IconButton>
+                </Box>
               </Grid>
             ))}
           </Grid>
