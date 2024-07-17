@@ -75,7 +75,6 @@ def load_settings() -> Settings:
             return settings
     return None
 
-
 def save_settings(settings):
     def default_converter(o):
         if isinstance(o, date):

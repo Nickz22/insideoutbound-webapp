@@ -182,8 +182,8 @@ class Settings:
     tracking_period: int
     activate_by_meeting: bool
     activate_by_opportunity: bool
-    salesforce_user_id = None
-    teamMemberIds = Optional[List[str]]
+    salesforce_user_id: Optional[str]
+    team_member_ids: Optional[List[str]] = None
     latest_date_queried: Optional[datetime] = None
     skip_account_criteria: Optional[FilterContainer] = None
     skip_opportunity_criteria: Optional[FilterContainer] = None
@@ -281,7 +281,7 @@ class SettingsModel:
                 filter_container=settings.meetings_criteria
             )
             self.trackingPeriod = settings.tracking_period
-            self.teamMemberIds = settings.teamMemberIds
+            self.teamMemberIds = settings.team_member_ids
             self.salesforceUserId = settings.salesforce_user_id
             self.skipAccountCriteria = (
                 FilterContainerModel(filter_container=settings.skip_account_criteria)
@@ -320,6 +320,7 @@ class SettingsModel:
             "inactivityThreshold": self.inactivityThreshold,
             "meetingObject": self.meetingObject,
             "meetingsCriteria": self.meetingsCriteria.to_dict(),
+            "teamMemberIds": self.teamMemberIds,
             "trackingPeriod": self.trackingPeriod,
             "salesforceUserId": self.salesforceUserId,
             "skipAccountCriteria": (

@@ -98,4 +98,6 @@ def convert_settings_model_to_settings(sm: SettingsModel) -> Settings:
         tracking_period=sm.trackingPeriod,
         activate_by_meeting=sm.activateByMeeting,
         activate_by_opportunity=sm.activateByOpportunity,
+        team_member_ids=sm.teamMemberIds,
+        salesforce_user_id=sm.salesforceUserId,
     )

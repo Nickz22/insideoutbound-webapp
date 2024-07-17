@@ -22,9 +22,11 @@ import { useNavigate } from "react-router-dom";
 import {
   fetchEventFilterFields,
   fetchTaskFilterFields,
+  fetchSalesforceUsers,
 } from "../components/Api/Api";
 import { FILTER_OPERATOR_MAPPING } from "../utils/c";
 import FilterContainer from "../components/FilterContainer/FilterContainer";
+import CustomTable from "../components/CustomTable/CustomTable";
 import { debounce } from "lodash";
 
 const Settings = () => {
@@ -39,6 +41,8 @@ const Settings = () => {
     trackingPeriod: 0,
     activateByMeeting: false,
     activateByOpportunity: false,
+    userRole: "",
+    teamMemberIds: [],
   });
 
   const [saving, setSaving] = useState(false);
@@ -47,6 +51,8 @@ const Settings = () => {
   const [eventFilterFields, setEventFilterFields] = useState();
   const [isLoading, setIsLoading] = useState(true);
   const [criteria, setCriteria] = useState([]);
+  const [tableData, setTableData] = useState(null);
+  const [isTableLoading, setIsTableLoading] = useState(false);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -77,8 +83,24 @@ const Settings = () => {
         }
 
         setEventFilterFields(eventFilterFieldsResponse.data);
-        setSettings(settingsResponse.data);
+
+        // Set the default userRole based on teamMemberIds
+        const teamMemberIds = settingsResponse.data.teamMemberIds || [];
+        const defaultUserRole =
+          teamMemberIds.length > 0
+            ? "I manage a team"
+            : "I am an individual contributor";
+
+        setSettings({
+          ...settingsResponse.data,
+          userRole: settingsResponse.data.userRole || defaultUserRole,
+        });
+
         setCriteria(settingsResponse.data.criteria || []);
+
+        if (teamMemberIds.length > 0) {
+          await fetchTeamMembersData(teamMemberIds);
+        }
       } catch (error) {
         console.error("Error fetching initial data:", error);
       } finally {
@@ -89,14 +111,45 @@ const Settings = () => {
     fetchInitialData();
   }, [navigate]);
 
+  const fetchTeamMembersData = async (selectedIds = []) => {
+    setIsTableLoading(true);
+    try {
+      const response = await fetchSalesforceUsers();
+      if (response.success) {
+        const columns = [
+          { id: "select", label: "Select", dataType: "select" },
+          { id: "photoUrl", label: "", dataType: "image" },
+          { id: "firstName", label: "First Name", dataType: "string" },
+          { id: "lastName", label: "Last Name", dataType: "string" },
+          { id: "email", label: "Email", dataType: "string" },
+          { id: "role", label: "Role", dataType: "string" },
+          { id: "username", label: "Username", dataType: "string" },
+        ];
+        setTableData({
+          columns,
+          data: response.data,
+          selectedIds: new Set(selectedIds),
+          availableColumns: columns,
+        });
+      } else {
+        console.error("Error fetching Salesforce users:", response.message);
+      }
+    } catch (error) {
+      console.error("Error fetching Salesforce users:", error);
+    } finally {
+      setIsTableLoading(false);
+    }
+  };
+
   const debouncedSaveSettings = useMemo(
     () =>
-      debounce(async (updatedSettings) => {
+      debounce(async (settings) => {
+        const { userRole, ...settingsToSave } = settings;
         setSaving(true);
         try {
           await axios.post(
             "http://localhost:8000/save_settings",
-            updatedSettings
+            settingsToSave
           );
           setSaveSuccess(true);
         } catch (error) {
@@ -112,6 +165,16 @@ const Settings = () => {
     (field, value) => {
       setSettings((prev) => {
         const updatedSettings = { ...prev, [field]: value };
+
+        if (field === "userRole") {
+          if (value === "I manage a team") {
+            fetchTeamMembersData(prev.teamMemberIds);
+          } else {
+            setTableData(null);
+            updatedSettings.teamMemberIds = [];
+          }
+        }
+
         debouncedSaveSettings(updatedSettings);
         return updatedSettings;
       });
@@ -164,6 +227,36 @@ const Settings = () => {
     },
     [debouncedSaveSettings]
   );
+
+  const handleTableSelectionChange = useCallback(
+    (selectedIds) => {
+      const teamMemberIds = Array.from(selectedIds);
+      setSettings((prev) => {
+        const updatedSettings = {
+          ...prev,
+          teamMemberIds,
+          userRole:
+            teamMemberIds.length > 0
+              ? "I manage a team"
+              : "I am an individual contributor",
+        };
+        debouncedSaveSettings(updatedSettings);
+        return updatedSettings;
+      });
+      setTableData((prev) => ({
+        ...prev,
+        selectedIds,
+      }));
+    },
+    [debouncedSaveSettings]
+  );
+
+  const handleColumnsChange = useCallback((newColumns) => {
+    setTableData((prev) => ({
+      ...prev,
+      columns: newColumns,
+    }));
+  }, []);
 
   if (isLoading) {
     return (
@@ -334,6 +427,48 @@ const Settings = () => {
               filterOperatorMapping={FILTER_OPERATOR_MAPPING}
             />
           </Box>
+        </CardContent>
+      </Card>
+
+      <Card sx={{ mb: 2 }}>
+        <CardContent sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom marginBottom={2}>
+            User Role and Team Members
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Select
+                fullWidth
+                value={settings.userRole}
+                onChange={(e) => handleChange("userRole", e.target.value)}
+                label="User Role"
+              >
+                <MenuItem value="I manage a team">I manage a team</MenuItem>
+                <MenuItem value="I am an individual contributor">
+                  I am an individual contributor
+                </MenuItem>
+              </Select>
+            </Grid>
+          </Grid>
+          {settings.userRole === "I manage a team" && (
+            <Box sx={{ mt: 2 }}>
+              <Typography variant="subtitle1" gutterBottom>
+                Select Team Members
+              </Typography>
+              {isTableLoading ? (
+                <CircularProgress />
+              ) : (
+                tableData && (
+                  <CustomTable
+                    tableData={tableData}
+                    onSelectionChange={handleTableSelectionChange}
+                    onColumnsChange={handleColumnsChange}
+                    paginate={true}
+                  />
+                )
+              )}
+            </Box>
+          )}
         </CardContent>
       </Card>
 
