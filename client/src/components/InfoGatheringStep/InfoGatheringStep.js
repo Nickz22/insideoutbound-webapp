@@ -41,10 +41,23 @@ const InfoGatheringStep = ({
   const [criteriaData, setCriteriaData] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
   const settingsRef = useRef(settings);
+  const [renderedDescription, setRenderedDescription] = useState("");
 
   useEffect(() => {
     settingsRef.current = settings;
   }, [settings]);
+
+  useEffect(() => {
+    if (stepData.descriptionRenderer) {
+      const newDescription = stepData.descriptionRenderer(
+        stepData.description,
+        inputValues
+      );
+      setRenderedDescription(newDescription);
+    } else {
+      setRenderedDescription(stepData.description);
+    }
+  }, [stepData, inputValues]);
 
   /**
    * @param {string} inputSetting
@@ -227,7 +240,9 @@ const InfoGatheringStep = ({
               <TextField
                 fullWidth
                 type={input.inputType}
-                value={inputValues[input.setting] || settings[input.setting] || ""}
+                value={
+                  inputValues[input.setting] || settings[input.setting] || ""
+                }
                 onChange={(e) => handleInputChange(e, input.setting)}
                 label={input.inputLabel}
                 variant="outlined"
@@ -302,7 +317,7 @@ const InfoGatheringStep = ({
           {stepData.title}
         </Typography>
         <Typography variant="body1" paragraph>
-          {parse(stepData.description)}
+          {parse(renderedDescription)}
         </Typography>
         <Grid container spacing={2}>
           {stepData.inputs.map(

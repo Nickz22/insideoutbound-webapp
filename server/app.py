@@ -319,6 +319,7 @@ def get_salesforce_user_id():
         response.message = (
             f"Failed to retrieve Salesforce users: {format_error_message(e)}"
         )
+        print(response.message)
 
     return jsonify(response.__dict__), get_status_code(response)
 

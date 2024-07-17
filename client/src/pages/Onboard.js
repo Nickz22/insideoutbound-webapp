@@ -446,8 +446,8 @@ const Onboard = () => {
     border: "1px solid #e0e0e0",
     ...(isLargeDialogStep()
       ? {
-          maxWidth: "90vw",
-          width: "90vw",
+          maxWidth: "60vw",
+          width: "60vw",
           maxHeight: "90vh",
           height: "90vh",
         }

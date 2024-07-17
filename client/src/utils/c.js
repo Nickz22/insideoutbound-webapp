@@ -136,10 +136,12 @@ export const ONBOARD_WIZARD_STEPS = [
       },
     ],
     descriptionRenderer: (description, inputValues) => {
+
       const values = [
-        inputValues.contactsPerAccount,
-        inputValues.trackingPeriod,
+        inputValues?.contactsPerAccount,
+        inputValues?.trackingPeriod,
       ];
+      
       return description.replace(/_/g, (match, offset) => {
         const index = description.slice(0, offset).match(/_/g)?.length || 0;
         return values[index] || "_";
