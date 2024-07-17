@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import {
   Box,
@@ -25,6 +25,7 @@ import {
 } from "../components/Api/Api";
 import { FILTER_OPERATOR_MAPPING } from "../utils/c";
 import FilterContainer from "../components/FilterContainer/FilterContainer";
+import { debounce } from "lodash";
 
 const Settings = () => {
   const navigate = useNavigate();
@@ -46,7 +47,6 @@ const Settings = () => {
   const [eventFilterFields, setEventFilterFields] = useState();
   const [isLoading, setIsLoading] = useState(true);
   const [criteria, setCriteria] = useState([]);
-  const [updateTrigger, setUpdateTrigger] = useState(0);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -78,6 +78,7 @@ const Settings = () => {
 
         setEventFilterFields(eventFilterFieldsResponse.data);
         setSettings(settingsResponse.data);
+        setCriteria(settingsResponse.data.criteria || []);
       } catch (error) {
         console.error("Error fetching initial data:", error);
       } finally {
@@ -88,41 +89,49 @@ const Settings = () => {
     fetchInitialData();
   }, [navigate]);
 
-  const handleChange = (field, value) => {
-    setSettings((prev) => ({ ...prev, [field]: value }));
-    saveSettings({ ...settings, [field]: value });
-  };
+  const debouncedSaveSettings = useMemo(
+    () =>
+      debounce(async (updatedSettings) => {
+        setSaving(true);
+        try {
+          await axios.post(
+            "http://localhost:8000/save_settings",
+            updatedSettings
+          );
+          setSaveSuccess(true);
+        } catch (error) {
+          console.error("Error saving settings:", error);
+        } finally {
+          setSaving(false);
+        }
+      }, 500),
+    []
+  );
 
-  const saveSettings = useCallback(async (updatedSettings) => {
-    setSaving(true);
-    setSaveSuccess(false);
-    try {
-      await axios.post("http://localhost:8000/save_settings", updatedSettings);
-      setSaveSuccess(true);
-    } catch (error) {
-      console.error("Error saving settings:", error);
-    } finally {
-      setSaving(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (settings.criteria) {
-      setCriteria(settings.criteria);
-    }
-  }, [settings.criteria]);
+  const handleChange = useCallback(
+    (field, value) => {
+      setSettings((prev) => {
+        const updatedSettings = { ...prev, [field]: value };
+        debouncedSaveSettings(updatedSettings);
+        return updatedSettings;
+      });
+    },
+    [debouncedSaveSettings]
+  );
 
   const handleDeleteFilter = useCallback(
     (index) => {
       setCriteria((prevCriteria) => {
         const newCriteria = prevCriteria.filter((_, i) => i !== index);
-        const updatedSettings = { ...settings, criteria: newCriteria };
-        saveSettings(updatedSettings);
-        setUpdateTrigger((prev) => prev + 1);
+        setSettings((prev) => {
+          const updatedSettings = { ...prev, criteria: newCriteria };
+          debouncedSaveSettings(updatedSettings);
+          return updatedSettings;
+        });
         return newCriteria;
       });
     },
-    [settings, saveSettings]
+    [debouncedSaveSettings]
   );
 
   const handleAddCriteria = useCallback(() => {
@@ -131,25 +140,29 @@ const Settings = () => {
         ...prevCriteria,
         { filters: [], filterLogic: "", name: "" },
       ];
-      const updatedSettings = { ...settings, criteria: newCriteria };
-      saveSettings(updatedSettings);
-      setUpdateTrigger((prev) => prev + 1);
+      setSettings((prev) => {
+        const updatedSettings = { ...prev, criteria: newCriteria };
+        debouncedSaveSettings(updatedSettings);
+        return updatedSettings;
+      });
       return newCriteria;
     });
-  }, [settings, saveSettings]);
+  }, [debouncedSaveSettings]);
 
   const handleCriteriaChange = useCallback(
     (index, newContainer) => {
       setCriteria((prevCriteria) => {
         const newCriteria = [...prevCriteria];
         newCriteria[index] = newContainer;
-        const updatedSettings = { ...settings, criteria: newCriteria };
-        saveSettings(updatedSettings);
-        setUpdateTrigger((prev) => prev + 1);
+        setSettings((prev) => {
+          const updatedSettings = { ...prev, criteria: newCriteria };
+          debouncedSaveSettings(updatedSettings);
+          return updatedSettings;
+        });
         return newCriteria;
       });
     },
-    [settings, saveSettings]
+    [debouncedSaveSettings]
   );
 
   if (isLoading) {
@@ -258,15 +271,10 @@ const Settings = () => {
           </Typography>
           <Grid container spacing={2}>
             {criteria.map((criteriaContainer, index) => (
-              <Grid
-                item
-                xs={12}
-                md={6}
-                key={`criteria-${index}-${updateTrigger}`}
-              >
+              <Grid item xs={12} md={6} key={`criteria-${index}`}>
                 <Box sx={{ position: "relative" }}>
                   <FilterContainer
-                    key={`filter-${index}-${updateTrigger}`}
+                    key={`filter-${index}`}
                     initialFilterContainer={criteriaContainer}
                     onLogicChange={(newContainer) =>
                       handleCriteriaChange(index, newContainer)

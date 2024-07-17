@@ -6,6 +6,7 @@ from collections import defaultdict
 
 from server.engine.activation_engine import update_activation_states
 from server.services.setting_service import define_criteria_from_events_or_tasks
+from server.helpers.activation_helper import generate_summary
 from server.api.salesforce import (
     fetch_criteria_fields,
     fetch_task_fields,
@@ -21,6 +22,7 @@ from server.cache import (
     save_tokens,
     load_settings,
     save_settings,
+    load_active_activations_order_by_first_prospecting_activity_asc,
 )
 from server.constants import SESSION_EXPIRED
 from server.models import ApiResponse, SettingsModel, TableColumn
@@ -161,69 +163,36 @@ def oauth_callback():
         return jsonify(error_details), 500
 
 
-@app.route("/load_prospecting_activity", methods=["GET"])
-def load_prospecting_activity():
+@app.route("/get_prospecting_activities", methods=["GET"])
+def get_prospecting_activities():
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        activations = (
+            load_active_activations_order_by_first_prospecting_activity_asc().data
+        )
+        response.data = {
+            "summary": generate_summary(activations),
+            "raw_data": activations,
+        }
+        response.success = True
+    except Exception as e:
+        response.message = (
+            f"Failed to retrieve prospecting activities: {format_error_message(e)}"
+        )
+
+    return jsonify(response.__dict__), get_status_code(response)
+
+
+@app.route("/fetch_prospecting_activity", methods=["GET"])
+def fetch_prospecting_activity():
     api_response = ApiResponse(data={}, message="", success=False)
     try:
         response = update_activation_states()
 
         if response.success:
             activations = response.data
-            today = datetime.now().date()
-
-            # Initialize summary data
-            summary = {
-                "total_activations": len(activations),
-                "activations_today": 0,
-                "total_tasks": 0,
-                "total_events": 0,
-                "total_contacts": 0,
-                "total_accounts": 0,
-                "total_deals": 0,
-                "total_pipeline_value": 0,
-            }
-
-            account_contacts = defaultdict(set)
-
-            for activation in activations:
-                # Count activations today
-                if activation.activated_date.date() == today:
-                    summary["activations_today"] += 1
-
-                # Count tasks
-                summary["total_tasks"] += len(activation.task_ids)
-
-                # Count events
-                summary["total_events"] += len(activation.event_ids)
-
-                # Count unique contacts per account
-                account_id = activation.account.id
-                account_contacts[account_id].update(activation.active_contact_ids)
-
-                # Count deals and pipeline value
-                if activation.opportunity:
-                    summary["total_deals"] += 1
-                    summary["total_pipeline_value"] += activation.opportunity.get(
-                        "Amount", 0
-                    )
-
-            # Calculate averages
-            summary["total_contacts"] = sum(
-                len(contacts) for contacts in account_contacts.values()
-            )
-            summary["total_accounts"] = len(account_contacts)
-            summary["avg_tasks_per_contact"] = (
-                summary["total_tasks"] / summary["total_contacts"]
-                if summary["total_contacts"] > 0
-                else 0
-            )
-            summary["avg_contacts_per_account"] = (
-                summary["total_contacts"] / summary["total_accounts"]
-                if summary["total_accounts"] > 0
-                else 0
-            )
-
-            api_response.data = {"summary": summary, "raw_data": activations}
+            
+            api_response.data = {"summary": generate_summary(activations), "raw_data": activations}
             api_response.success = True
             api_response.message = "Prospecting activity data loaded successfully"
         else:

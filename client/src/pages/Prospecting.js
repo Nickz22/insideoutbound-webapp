@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -10,7 +10,10 @@ import {
   Select,
   MenuItem,
   CircularProgress,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+import RefreshIcon from "@mui/icons-material/Refresh";
 
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
@@ -25,20 +28,17 @@ const Prospecting = () => {
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchData = async () => {
+  const fetchData = useCallback(
+    async (endpoint) => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       setLoading(true);
       try {
-        const response = await axios.get(
-          "http://localhost:8000/load_prospecting_activity",
-          {
-            validateStatus: function () {
-              return true;
-            },
-          }
-        );
+        const response = await axios.get(`http://localhost:8000/${endpoint}`, {
+          validateStatus: function () {
+            return true;
+          },
+        });
         switch (response.status) {
           case 200:
             setSummaryData(response.data.data.summary);
@@ -63,10 +63,17 @@ const Prospecting = () => {
         setLoading(false);
         inFlightRef.current = false;
       }
-    };
+    },
+    [navigate]
+  );
 
-    fetchData();
-  }, [navigate]);
+  useEffect(() => {
+    fetchData("get_prospecting_activities");
+  }, [fetchData]);
+
+  const handleRefresh = () => {
+    fetchData("fetch_prospecting_activity");
+  };
 
   const handlePeriodChange = (event) => {
     setPeriod(event.target.value);
@@ -192,10 +199,7 @@ const Prospecting = () => {
   );
 
   const renderDetailedView = () => (
-    <CustomTable
-      tableData={tableData}
-      paginate={true}
-    />
+    <CustomTable tableData={tableData} paginate={true} />
   );
 
   return (
@@ -228,7 +232,10 @@ const Prospecting = () => {
             <MenuItem value="Q4">Q4</MenuItem>
           </Select>
         </FormControl>
-        <FormControl variant="outlined" sx={{ minWidth: 120 }}>
+        <FormControl
+          variant="outlined"
+          sx={{ minWidth: 120, marginRight: "16px" }}
+        >
           <InputLabel id="view-label">View</InputLabel>
           <Select
             labelId="view-label"
@@ -241,6 +248,11 @@ const Prospecting = () => {
             <MenuItem value="Detailed">Detailed</MenuItem>
           </Select>
         </FormControl>
+        <Tooltip title="Refresh data from org">
+          <IconButton onClick={handleRefresh} color="primary">
+            <RefreshIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
       {view === "Summary" ? renderSummaryView() : renderDetailedView()}
     </Box>
