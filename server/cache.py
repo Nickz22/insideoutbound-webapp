@@ -75,6 +75,7 @@ def load_settings() -> Settings:
             return settings
     return None
 
+
 def save_settings(settings):
     def default_converter(o):
         if isinstance(o, date):
@@ -213,6 +214,7 @@ def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResp
                     id=entry["id"],
                     account=account,
                     activated_date=datetime.fromisoformat(entry["activated_date"]),
+                    activated_by_id=entry.get("activated_by_id"),
                     active_contact_ids=entry["active_contact_ids"],
                     prospecting_metadata=prospecting_metadata,
                     days_activated=entry.get("days_activated"),

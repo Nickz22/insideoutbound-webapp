@@ -25,7 +25,7 @@ from server.cache import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
 from server.constants import SESSION_EXPIRED
-from server.models import ApiResponse, SettingsModel, TableColumn
+from server.models import ApiResponse, SettingsModel, TableColumn, Activation
 from server.mapper.mapper import convert_settings_model_to_settings
 from server.utils import format_error_message
 
@@ -176,6 +176,35 @@ def get_prospecting_activities():
         }
         response.success = True
     except Exception as e:
+        error_msg = format_error_message(e)
+        print(f"Failed to retrieve prospecting activities: {error_msg}")
+        response.message = f"Failed to retrieve prospecting activities: {error_msg}"
+
+    return jsonify(response.__dict__), get_status_code(response)
+
+
+@app.route("/get_prospecting_activities_filtered_by_ids", methods=["GET"])
+def get_prospecting_activities_filtered_by_ids():
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        activation_ids = request.args.getlist("activation_ids[]")
+        if not activation_ids:
+            response.message = "No activation IDs provided"
+        else:
+            activations = (
+                load_active_activations_order_by_first_prospecting_activity_asc().data
+            )
+            filtered_activations = [
+                activation
+                for activation in activations
+                if activation.id in activation_ids
+            ]
+            response.data = {
+                "summary": generate_summary(filtered_activations),
+                "raw_data": filtered_activations,
+            }
+            response.success = True
+    except Exception as e:
         response.message = (
             f"Failed to retrieve prospecting activities: {format_error_message(e)}"
         )
@@ -191,8 +220,11 @@ def fetch_prospecting_activity():
 
         if response.success:
             activations = response.data
-            
-            api_response.data = {"summary": generate_summary(activations), "raw_data": activations}
+
+            api_response.data = {
+                "summary": generate_summary(activations),
+                "raw_data": activations,
+            }
             api_response.success = True
             api_response.message = "Prospecting activity data loaded successfully"
         else:
@@ -227,6 +259,7 @@ def get_settings():
         settings_model = SettingsModel(settings=load_settings())
         return jsonify(settings_model.to_dict()), 200
     except Exception as e:
+        print(f"Failed to retrieve settings: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
 

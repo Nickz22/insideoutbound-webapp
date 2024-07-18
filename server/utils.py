@@ -1,7 +1,7 @@
 import uuid, traceback
 from dataclasses import is_dataclass
 from typing import Any, Set
-from datetime import timedelta, datetime, timezone
+from datetime import timedelta, datetime, date
 from functools import reduce
 import re
 
@@ -72,7 +72,9 @@ def is_model_date_field_within_window(
     """
     end_date = start_date + timedelta(days=period_days)
     if isinstance(sobject_model, dict):
-        model_date_value = datetime.strptime(sobject_model[date_field], "%Y-%m-%dT%H:%M:%S.%f%z").replace(tzinfo=None)
+        model_date_value = datetime.strptime(
+            sobject_model[date_field], "%Y-%m-%dT%H:%M:%S.%f%z"
+        ).replace(tzinfo=None)
     else:
         model_date_value = getattr(sobject_model, date_field)
     return start_date <= model_date_value <= end_date
@@ -80,6 +82,13 @@ def is_model_date_field_within_window(
 
 def dt_to_soql_format(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+
+
+def parse_date_from_string(salesforce_datetime_str: str) -> date:
+    """
+    Takes a date string formatted as 'YYYY-MM-DDTHH:MM:SS' and returns a date object.
+    """
+    return datetime.strptime(salesforce_datetime_str, "%Y-%m-%dT%H:%M:%S").date()
 
 
 def parse_date_with_timezone(date_str) -> datetime:

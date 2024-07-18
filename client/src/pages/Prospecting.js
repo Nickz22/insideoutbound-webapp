@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import {
@@ -14,7 +20,10 @@ import {
   Tooltip,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
-
+import {
+  fetchSalesforceUsers,
+  generateActivationSummary,
+} from "src/components/Api/Api";
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
 
@@ -25,6 +34,9 @@ const Prospecting = () => {
   const [error, setError] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [rawData, setRawData] = useState([]);
+  const [activatedByUsers, setActivatedByUsers] = useState([]);
+  const [filteredSummaryData, setFilteredSummaryData] = useState(null);
+  const [selectedActivatedBy, setSelectedActivatedBy] = useState("");
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
 
@@ -42,6 +54,7 @@ const Prospecting = () => {
         switch (response.status) {
           case 200:
             setSummaryData(response.data.data.summary);
+            setFilteredSummaryData(response.data.data.summary);
             setRawData(response.data.data.raw_data || []);
             break;
           case 400:
@@ -71,6 +84,24 @@ const Prospecting = () => {
     fetchData("get_prospecting_activities");
   }, [fetchData]);
 
+  useEffect(() => {
+    const fetchAndSetActivatedByUsers = async () => {
+      if (summaryData && rawData.length > 0) {
+        const activatedByIds = new Set(
+          rawData.map((item) => item.activated_by_id)
+        );
+        const salesforceUsers = (await fetchSalesforceUsers()).data;
+        const filteredUsers = salesforceUsers.filter((user) =>
+          activatedByIds.has(user.id)
+        );
+
+        setActivatedByUsers(filteredUsers);
+      }
+    };
+
+    fetchAndSetActivatedByUsers();
+  }, [summaryData, rawData]);
+
   const handleRefresh = () => {
     fetchData("fetch_prospecting_activity");
   };
@@ -83,24 +114,35 @@ const Prospecting = () => {
     setView(event.target.value);
   };
 
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
-  }
+  const handleActivatedByChange = (event) => {
+    setSelectedActivatedBy(event.target.value);
+  };
 
-  if (error) {
-    return <Alert severity="error">{error}</Alert>;
-  }
+  const filteredData = useMemo(() => {
+    if (!selectedActivatedBy) return rawData;
+    return rawData.filter(
+      (item) => item.activated_by_id === selectedActivatedBy
+    );
+  }, [selectedActivatedBy, rawData]);
+
+  useEffect(() => {
+    const fetchFilteredSummaryData = async () => {
+      if (selectedActivatedBy) {
+        setLoading(true);
+        const newSummary = (
+          await generateActivationSummary(filteredData.map((item) => item.id))
+        ).data.summary;
+        setLoading(false);
+        setFilteredSummaryData(newSummary);
+      } else {
+        setFilteredSummaryData(summaryData);
+      }
+    };
+
+    if (summaryData && rawData.length > 0) {
+      fetchFilteredSummaryData();
+    }
+  }, [selectedActivatedBy, filteredData, summaryData]);
 
   const tableColumns = [
     { id: "id", label: "ID", dataType: "text" },
@@ -127,71 +169,61 @@ const Prospecting = () => {
     },
   ];
 
-  const tableData = {
-    columns: tableColumns,
-    data: rawData.map((item) => ({
-      ...item,
-      "account.name": item.account?.name || "N/A",
-    })),
-    selectedIds: new Set(),
-    availableColumns: tableColumns,
-  };
-
   const renderSummaryView = () => (
     <Grid container spacing={2}>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Activations"
-          value={summaryData.total_activations.toString()}
+          value={filteredSummaryData.total_activations.toString()}
           subText=""
         />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Activations Today"
-          value={summaryData.activations_today.toString()}
+          value={filteredSummaryData.activations_today.toString()}
           subText=""
         />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Tasks"
-          value={summaryData.total_tasks.toString()}
+          value={filteredSummaryData.total_tasks.toString()}
           subText=""
         />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Events"
-          value={summaryData.total_events.toString()}
+          value={filteredSummaryData.total_events.toString()}
           subText=""
         />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Avg Tasks Per Contact"
-          value={summaryData.avg_tasks_per_contact.toFixed(2)}
+          value={filteredSummaryData.avg_tasks_per_contact.toFixed(2)}
           subText=""
         />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Avg Contacts Per Account"
-          value={summaryData.avg_contacts_per_account.toFixed(2)}
+          value={filteredSummaryData.avg_contacts_per_account.toFixed(2)}
           subText=""
         />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Deals"
-          value={summaryData.total_deals.toString()}
+          value={filteredSummaryData.total_deals.toString()}
           subText=""
         />
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Pipeline Value"
-          value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+          value={`$${filteredSummaryData.total_pipeline_value.toLocaleString()}`}
           subText=""
         />
       </Grid>
@@ -199,63 +231,120 @@ const Prospecting = () => {
   );
 
   const renderDetailedView = () => (
-    <CustomTable tableData={tableData} paginate={true} />
+    <CustomTable
+      tableData={{
+        columns: tableColumns,
+        data: filteredData.map((item) => ({
+          ...item,
+          "account.name": item.account?.name || "N/A",
+        })),
+        selectedIds: new Set(),
+        availableColumns: tableColumns,
+      }}
+      paginate={true}
+    />
   );
 
-  return (
-    <Box sx={{ padding: "24px" }}>
+  if (loading) {
+    return (
       <Box
         sx={{
           display: "flex",
-          justifyContent: "flex-end",
-          marginBottom: "16px",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
         }}
       >
-        <FormControl
-          variant="outlined"
-          sx={{ minWidth: 120, marginRight: "16px" }}
-        >
-          <InputLabel id="period-label">Period</InputLabel>
-          <Select
-            labelId="period-label"
-            id="period-select"
-            value={period}
-            onChange={handlePeriodChange}
-            label="Period"
-          >
-            <MenuItem value="">
-              <em>None</em>
-            </MenuItem>
-            <MenuItem value="Q1">Q1</MenuItem>
-            <MenuItem value="Q2">Q2</MenuItem>
-            <MenuItem value="Q3">Q3</MenuItem>
-            <MenuItem value="Q4">Q4</MenuItem>
-          </Select>
-        </FormControl>
-        <FormControl
-          variant="outlined"
-          sx={{ minWidth: 120, marginRight: "16px" }}
-        >
-          <InputLabel id="view-label">View</InputLabel>
-          <Select
-            labelId="view-label"
-            id="view-select"
-            value={view}
-            onChange={handleViewChange}
-            label="View"
-          >
-            <MenuItem value="Summary">Summary</MenuItem>
-            <MenuItem value="Detailed">Detailed</MenuItem>
-          </Select>
-        </FormControl>
-        <Tooltip title="Refresh data from org">
-          <IconButton onClick={handleRefresh} color="primary">
-            <RefreshIcon />
-          </IconButton>
-        </Tooltip>
+        <CircularProgress />
       </Box>
-      {view === "Summary" ? renderSummaryView() : renderDetailedView()}
-    </Box>
+    );
+  }
+
+  if (error) {
+    return <Alert severity="error">{error}</Alert>;
+  }
+
+  return (
+    summaryData &&
+    rawData && (
+      <Box sx={{ padding: "24px" }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: "16px",
+          }}
+        >
+          <FormControl
+            variant="outlined"
+            sx={{ minWidth: 120, marginRight: "16px" }}
+          >
+            <InputLabel id="period-label">Period</InputLabel>
+            <Select
+              labelId="period-label"
+              id="period-select"
+              value={period}
+              onChange={handlePeriodChange}
+              label="Period"
+            >
+              <MenuItem value="">
+                <em>None</em>
+              </MenuItem>
+              <MenuItem value="Q1">Q1</MenuItem>
+              <MenuItem value="Q2">Q2</MenuItem>
+              <MenuItem value="Q3">Q3</MenuItem>
+              <MenuItem value="Q4">Q4</MenuItem>
+            </Select>
+          </FormControl>
+          <FormControl
+            variant="outlined"
+            sx={{ minWidth: 120, marginRight: "16px" }}
+          >
+            <InputLabel id="view-label">View</InputLabel>
+            <Select
+              labelId="view-label"
+              id="view-select"
+              value={view}
+              onChange={handleViewChange}
+              label="View"
+            >
+              <MenuItem value="Summary">Summary</MenuItem>
+              <MenuItem value="Detailed">Detailed</MenuItem>
+            </Select>
+          </FormControl>
+          {activatedByUsers.length > 0 && (
+            <FormControl
+              variant="outlined"
+              sx={{ minWidth: 120, marginRight: "16px" }}
+            >
+              <InputLabel id="activated-by-label">User</InputLabel>
+              <Select
+                labelId="activated-by-label"
+                id="activated-by-select"
+                value={selectedActivatedBy}
+                onChange={handleActivatedByChange}
+                label="Activated By"
+              >
+                <MenuItem value="">
+                  <em>All</em>
+                </MenuItem>
+                {activatedByUsers.map((user) => (
+                  <MenuItem key={user.id} value={user.id}>
+                    {`${user.firstName} ${user.lastName}`}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+          <Tooltip title="Refresh data from org">
+            <IconButton onClick={handleRefresh} color="primary">
+              <RefreshIcon />
+            </IconButton>
+          </Tooltip>
+        </Box>
+        {view === "Summary" ? renderSummaryView() : renderDetailedView()}
+      </Box>
+    )
   );
 };
 

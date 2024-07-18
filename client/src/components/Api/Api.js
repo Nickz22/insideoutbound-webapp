@@ -136,3 +136,19 @@ export const generateCriteria = async (tasksOrEvents, columns) => {
   );
   return { ...response.data, statusCode: response.status };
 };
+
+/**
+ * Summarizes a list of activations in a shape that the Prospecting page can use to show metric cards
+ * @param {string[]} activation_ids
+ * @returns {Promise<ApiResponse>}
+ */
+export const generateActivationSummary = async (activation_ids) => {
+  const response = await axios.get(
+    "http://localhost:8000/get_prospecting_activities_filtered_by_ids",
+    {
+      params: { activation_ids: activation_ids },
+      validateStatus: () => true,
+    }
+  );
+  return { ...response.data, statusCode: response.status };
+};

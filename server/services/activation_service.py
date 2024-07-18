@@ -115,6 +115,7 @@ def find_unresponsive_activations(
 
     return response
 
+
 def increment_existing_activations(activations: list[Activation], settings: Settings):
     """
     Processes a list of activation objects and updates their counters based on criteria specified in the settings.
@@ -197,7 +198,7 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                             event,
                             activation.first_prospecting_activity,
                             settings.inactivity_threshold,
-                            date_field="CreatedDate"
+                            date_field="CreatedDate",
                         )
                         and activation.status == "Activated"
                     ):
@@ -210,7 +211,7 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                         opportunity,
                         activation.first_prospecting_activity,
                         settings.inactivity_threshold,
-                        date_field="CreatedDate"
+                        date_field="CreatedDate",
                     ) and activation.status in ["Activated", "Meeting Set"]:
                         activation.opportunity = opportunities[0]
                         activation.status = "Opportunity Created"
@@ -289,6 +290,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 
             valid_task_ids_by_who_id = {}
             task_ids = []
+            last_valid_task_creator_id = None
 
             for task in all_tasks_under_account:
                 is_task_in_tracking_period = is_model_date_field_within_window(
@@ -299,6 +301,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         valid_task_ids_by_who_id[task.who_id] = []
                         first_prospecting_activity = task.created_date
                     valid_task_ids_by_who_id[task.who_id].append(task.id)
+                    last_valid_task_creator_id = task.owner_id
                     task_ids.append(task.id)
 
                 if not is_task_in_tracking_period:
@@ -337,6 +340,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                                 id=account_id,
                             ),
                             activated_date=first_prospecting_activity,
+                            activated_by_id=last_valid_task_creator_id,
                             active_contact_ids=active_contact_ids,
                             last_prospecting_activity=task.created_date,
                             first_prospecting_activity=first_prospecting_activity,
@@ -373,6 +377,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     account=Account(id=account_id),
                     activated_date=first_prospecting_activity.date(),
                     active_contact_ids=active_contact_ids,
+                    activated_by_id=last_valid_task_creator_id,
                     first_prospecting_activity=first_prospecting_activity.date(),
                     last_prospecting_activity=task.created_date.date(),
                     opportunity=qualifying_opportunity,
@@ -463,7 +468,9 @@ def get_qualifying_event(events, start_date, tracking_period) -> Event:
 def get_qualifying_opportunity(opportunities, start_date, tracking_period):
     qualifying_opportunity = None
     for opportunity in opportunities:
-        if is_model_date_field_within_window(opportunity, start_date, tracking_period, date_field="CreatedDate"):
+        if is_model_date_field_within_window(
+            opportunity, start_date, tracking_period, date_field="CreatedDate"
+        ):
             qualifying_opportunity = opportunity
             break
     return qualifying_opportunity

@@ -307,7 +307,7 @@ def fetch_contact_tasks_by_criteria_from_date(
     """
     api_response = ApiResponse(data=[], message="", success=False)
 
-    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate FROM Task WHERE CreatedDate >= {from_datetime} AND "
+    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND "
     if additional_filter:
         soql_query += f"{additional_filter} AND "
     tasks_by_filter_name = {}
@@ -328,6 +328,7 @@ def fetch_contact_tasks_by_criteria_from_date(
                 contact_task_models.append(
                     Task(
                         id=task.get("Id"),
+                        owner_id=task.get("CreatedById"),
                         who_id=task.get("WhoId"),
                         subject=task.get("Subject"),
                         status=task.get("Status"),
