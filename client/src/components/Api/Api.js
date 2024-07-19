@@ -100,9 +100,12 @@ export const fetchLoggedInSalesforceUserId = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchTaskFields = async () => {
-  const response = await axios.get("http://localhost:8000/get_task_fields", {
-    validateStatus: () => true,
-  });
+  const response = await axios.get(
+    "https://3042-2600-381-cb50-1088-51d3-5aa9-a6f7-e53d.ngrok-free.app/get_task_fields",
+    {
+      validateStatus: () => true,
+    }
+  );
   return { ...response.data, statusCode: response.status };
 };
 

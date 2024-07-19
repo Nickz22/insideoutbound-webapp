@@ -32,8 +32,18 @@ from server.utils import format_error_message
 app = Flask(__name__)
 CORS(
     app,
-    resources={r"/*": {"origins": "http://localhost:3000"}},
+    resources={
+        r"/*": {
+            "origins": [
+                "http://localhost:3000",
+                "https://3042-2600-381-cb50-1088-51d3-5aa9-a6f7-e53d.ngrok-free.app",
+                "https://7cb0-2600-381-cb50-1088-51d3-5aa9-a6f7-e53d.ngrok-free.app",
+            ]
+        }
+    },
     supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
 )
 app.secret_key = os.urandom(24)  # Secure secret key for session management
 
@@ -42,15 +52,25 @@ CLIENT_SECRET = "C3B5CD6936000FEFF40809F74D8260DC2BDA2B3446EF24A1454E39BB13C34BD
 REDIRECT_URI = "http://localhost:8000/oauth/callback"
 
 
-@app.before_request
-def before_request():
-    headers = {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-    }
-    if request.method.lower() == "options":
-        return jsonify(headers), 200
+# @app.before_request
+# def before_request():
+#     headers = {
+#         "Access-Control-Allow-Origin": "*",
+#         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+#         "Access-Control-Allow-Headers": "Content-Type",
+#     }
+#     if request.method.lower() == "options":
+#         return jsonify(headers), 200
+
+
+@app.after_request
+def add_header(response):
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self' https://*.ngrok-free.app; "
+        "script-src 'self' 'unsafe-inline' https://*.ngrok-free.app; "
+        "style-src 'self' 'unsafe-inline' https://*.ngrok-free.app"
+    )
+    return response
 
 
 @app.route("/store_code_verifier", methods=["POST"])
