@@ -407,43 +407,47 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardContent sx={{ p: 2 }}>
-          <Typography variant="h6" gutterBottom>
-            Meeting Criteria
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={6}>
-              <Select
-                fullWidth
-                value={settings.meetingObject}
-                onChange={(e) => handleChange("meetingObject", e.target.value)}
-                label="Meeting Object"
-              >
-                <MenuItem value="Task">Task</MenuItem>
-                <MenuItem value="Event">Event</MenuItem>
-              </Select>
+      {settings.activateByMeeting && (
+        <Card>
+          <CardContent sx={{ p: 2 }}>
+            <Typography variant="h6" gutterBottom>
+              Meeting Criteria
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid item xs={12} sm={6}>
+                <Select
+                  fullWidth
+                  value={settings.meetingObject}
+                  onChange={(e) =>
+                    handleChange("meetingObject", e.target.value)
+                  }
+                  label="Meeting Object"
+                >
+                  <MenuItem value="Task">Task</MenuItem>
+                  <MenuItem value="Event">Event</MenuItem>
+                </Select>
+              </Grid>
             </Grid>
-          </Grid>
-          <Box sx={{ mt: 2 }}>
-            <FilterContainer
-              initialFilterContainer={settings.meetingsCriteria}
-              onLogicChange={(newContainer) =>
-                handleChange("meetingsCriteria", newContainer)
-              }
-              onValueChange={(newContainer) =>
-                handleChange("meetingsCriteria", newContainer)
-              }
-              filterFields={
-                settings.meetingObject === "Event"
-                  ? eventFilterFields
-                  : taskFilterFields
-              }
-              filterOperatorMapping={FILTER_OPERATOR_MAPPING}
-            />
-          </Box>
-        </CardContent>
-      </Card>
+            <Box sx={{ mt: 2 }}>
+              <FilterContainer
+                initialFilterContainer={settings.meetingsCriteria}
+                onLogicChange={(newContainer) =>
+                  handleChange("meetingsCriteria", newContainer)
+                }
+                onValueChange={(newContainer) =>
+                  handleChange("meetingsCriteria", newContainer)
+                }
+                filterFields={
+                  settings.meetingObject === "Event"
+                    ? eventFilterFields
+                    : taskFilterFields
+                }
+                filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+              />
+            </Box>
+          </CardContent>
+        </Card>
+      )}
 
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ p: 2 }}>

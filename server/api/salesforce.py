@@ -92,7 +92,10 @@ def fetch_accounts_not_in_ids(account_ids):
 
 
 def fetch_criteria_tasks_by_account_ids_from_date(
-    account_ids: list[str], start: str, criteria: list[FilterContainer]
+    account_ids: list[str],
+    start: str,
+    criteria: list[FilterContainer],
+    salesforce_user_ids: list[str],
 ):
     """
     Takes response from fetch_tasks_by_account_ids_from_date_not_in_ids and organizes the tasks by criteria name.
@@ -110,7 +113,7 @@ def fetch_criteria_tasks_by_account_ids_from_date(
     try:
         tasks_by_criteria_by_account_id = (
             fetch_tasks_by_account_ids_from_date_not_in_ids(
-                account_ids, start, criteria, []
+                account_ids, start, criteria, [], salesforce_user_ids
             ).data
         )
         tasks_by_criteria = {}
@@ -175,6 +178,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     start: str,
     criteria: list[FilterContainer],
     already_counted_task_ids: list[str],
+    salesforce_user_ids: list[str],
 ) -> ApiResponse:
     """
     Fetches tasks from Salesforce based on a list of account IDs, starting from a specific date,
@@ -213,7 +217,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
 
             # Fetch tasks by criteria for the current batch
             batch_tasks = fetch_contact_tasks_by_criteria_from_date(
-                criteria, start, additional_filter
+                criteria, start, additional_filter, salesforce_user_ids
             )
 
             # Merge batch_tasks into tasks_by_criteria_name
@@ -287,7 +291,7 @@ def fetch_tasks_by_user_ids(user_ids):
 
 
 def fetch_contact_tasks_by_criteria_from_date(
-    criteria, from_datetime, additional_filter=None
+    criteria, from_datetime, additional_filter=None, salesforce_user_ids: List[str] = []
 ) -> Dict[str, List[Task]]:
     """
     Fetches tasks from Salesforce based on a list of filtering criteria.
@@ -306,8 +310,8 @@ def fetch_contact_tasks_by_criteria_from_date(
     - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
     """
     api_response = ApiResponse(data=[], message="", success=False)
-
-    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND "
+    joined_user_ids = "','".join(salesforce_user_ids)
+    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND CreatedById IN ('{joined_user_ids}') AND "
     if additional_filter:
         soql_query += f"{additional_filter} AND "
     tasks_by_filter_name = {}
@@ -379,7 +383,9 @@ def fetch_events_by_user_ids(user_ids):
     return api_response
 
 
-def fetch_events_by_account_ids_from_date(account_ids, start):
+def fetch_events_by_account_ids_from_date(
+    account_ids, start, salesforce_user_ids: List[str]
+):
     """
     Fetches events from Salesforce based on a list of account IDs.
 
@@ -407,7 +413,8 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
         for i in range(0, len(contact_ids), batch_size):
             batch_contact_ids = contact_ids[i : i + batch_size]
             joined_contact_ids = "','".join(batch_contact_ids)
-            soql_query = f"SELECT Id, WhoId, WhatId, Subject, CreatedDate, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= {start} ORDER BY StartDateTime ASC"
+            joined_user_ids = "','".join(salesforce_user_ids)
+            soql_query = f"SELECT Id, WhoId, WhatId, Subject, CreatedDate, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= {start} AND CreatedById IN ('{joined_user_ids}')  ORDER BY StartDateTime ASC"
 
             response = _fetch_sobjects(soql_query, load_tokens())
             for event in response.data:
@@ -424,7 +431,9 @@ def fetch_events_by_account_ids_from_date(account_ids, start):
     return api_response
 
 
-def fetch_opportunities_by_account_ids_from_date(account_ids, start):
+def fetch_opportunities_by_account_ids_from_date(
+    account_ids, start, salesforce_user_ids: List[str]
+):
     """
     Fetches opportunities from Salesforce based on a list of account IDs, querying in batches of 150.
 
@@ -446,7 +455,8 @@ def fetch_opportunities_by_account_ids_from_date(account_ids, start):
         for i in range(0, len(account_ids), batch_size):
             batch_ids = account_ids[i : i + batch_size]
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
-            soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids})"
+            joined_user_ids = "','".join(salesforce_user_ids)
+            soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids}) AND CreatedById IN ('{joined_user_ids}') ORDER BY CreatedDate ASC"
 
             response = _fetch_sobjects(soql_query, load_tokens())
             for opportunity in response.data:

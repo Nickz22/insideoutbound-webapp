@@ -18,7 +18,12 @@ from server.cache import (
     upsert_activations,
 )
 from server.models import ApiResponse, Settings, Activation
-from server.utils import add_days, pluck, format_error_message
+from server.utils import (
+    add_days,
+    pluck,
+    format_error_message,
+    get_team_member_salesforce_ids,
+)
 
 
 def update_activation_states():
@@ -26,6 +31,7 @@ def update_activation_states():
 
     try:
         settings: Settings = load_settings()
+        salesforce_user_ids = get_team_member_salesforce_ids(settings)
 
         active_activations: list[Activation] = (
             load_active_activations_order_by_first_prospecting_activity_asc().data
@@ -58,6 +64,7 @@ def update_activation_states():
             activatable_account_ids,
             f"{get_threshold_date_for_activatable_tasks(settings)}T00:00:00Z",
             settings.criteria,
+            salesforce_user_ids
         ).data
 
         contact_ids = set()

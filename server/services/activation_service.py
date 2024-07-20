@@ -16,6 +16,7 @@ from server.utils import (
     pluck,
     format_error_message,
     dt_to_soql_format,
+    get_team_member_salesforce_ids,
 )
 from datetime import datetime
 
@@ -75,6 +76,7 @@ def find_unresponsive_activations(
                 dt_to_soql_format(first_prospecting_activity),
                 settings.criteria,
                 already_counted_task_ids,
+                get_team_member_salesforce_ids(settings),
             ).data
         )
 
@@ -129,6 +131,8 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
     """
     response = ApiResponse(data=[], message="", success=False)
     try:
+        salesforce_user_ids = get_team_member_salesforce_ids(settings)
+
         first_prospecting_activity = dt_to_soql_format(
             activations[0].first_prospecting_activity
         )
@@ -143,15 +147,16 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                 first_prospecting_activity,
                 settings.criteria,
                 already_counted_task_ids,
+                salesforce_user_ids,
             ).data
         )
 
         opportunities = fetch_opportunities_by_account_ids_from_date(
-            account_ids, first_prospecting_activity
+            account_ids, first_prospecting_activity, salesforce_user_ids
         ).data
 
         events_by_account_id = fetch_events_by_account_ids_from_date(
-            account_ids, first_prospecting_activity
+            account_ids, first_prospecting_activity, salesforce_user_ids
         ).data
 
         activations_by_account_id = {
@@ -243,18 +248,23 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     response = ApiResponse(data=[], message="", success=True)
 
     try:
+        salesforce_user_ids = get_team_member_salesforce_ids(settings)
         tasks_by_account_id = get_tasks_by_account_id(tasks_by_criteria, contacts)
         first_prospecting_activity = get_first_prospecting_activity_date(
             tasks_by_criteria
         )
         opportunity_by_account_id = group_by(
             fetch_opportunities_by_account_ids_from_date(
-                list(tasks_by_account_id.keys()), first_prospecting_activity
+                list(tasks_by_account_id.keys()),
+                first_prospecting_activity,
+                salesforce_user_ids,
             ).data,
             "account_id",
         )
         events_by_account_id = fetch_events_by_account_ids_from_date(
-            list(tasks_by_account_id.keys()), first_prospecting_activity
+            list(tasks_by_account_id.keys()),
+            first_prospecting_activity,
+            salesforce_user_ids,
         ).data
 
         task_ids_by_criteria_name = get_task_ids_by_criteria_name(tasks_by_account_id)

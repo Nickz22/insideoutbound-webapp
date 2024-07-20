@@ -124,6 +124,11 @@ class Contact:
     account: Account
 
 
+from dataclasses import dataclass, field, asdict
+from typing import Set, Optional, List, Dict
+from datetime import date
+
+
 @dataclass
 class Activation:
     id: str
@@ -131,79 +136,37 @@ class Activation:
     activated_by_id: str
     active_contact_ids: Set[str]
     task_ids: Set[str]
-    activated_date: date = field(default=None)
-    first_prospecting_activity: date = field(default=None)
-    last_prospecting_activity: date = field(default=None)
+    activated_date: Optional[date] = None
+    first_prospecting_activity: Optional[date] = None
+    last_prospecting_activity: Optional[date] = None
     event_ids: Optional[Set[str]] = None
-    prospecting_metadata: Optional[List['ProspectingMetadata']] = None  # Assuming ProspectingMetadata is defined elsewhere
+    prospecting_metadata: Optional[List["ProspectingMetadata"]] = None
     days_activated: Optional[int] = None
     days_engaged: Optional[int] = None
     engaged_date: Optional[date] = None
     last_outbound_engagement: Optional[date] = None
     opportunity: Optional[Dict] = None
-    status: Optional[str] = "Activated"
+    status: str = "Activated"
 
     def __post_init__(self):
-        self._activated_date = self.activated_date
-        self._first_prospecting_activity = self.first_prospecting_activity
-        self._last_prospecting_activity = self.last_prospecting_activity
-        self._engaged_date = self.engaged_date
-        self._last_outbound_engagement = self.last_outbound_engagement
+        self.activated_date = self._parse_date(self.activated_date)
+        self.first_prospecting_activity = self._parse_date(
+            self.first_prospecting_activity
+        )
+        self.last_prospecting_activity = self._parse_date(
+            self.last_prospecting_activity
+        )
+        self.engaged_date = self._parse_date(self.engaged_date)
+        self.last_outbound_engagement = self._parse_date(self.last_outbound_engagement)
 
-    @property
-    def activated_date(self) -> date:
-        return self._activated_date
-
-    @activated_date.setter
-    def activated_date(self, value):
+    @staticmethod
+    def _parse_date(value):
         if isinstance(value, str):
-            self._activated_date = parse_date_from_string(value)
+            return parse_date_from_string(value)
+        elif isinstance(value, date):
+            return value
         else:
-            self._activated_date = value
-
-    @property
-    def first_prospecting_activity(self) -> date:
-        return self._first_prospecting_activity
-
-    @first_prospecting_activity.setter
-    def first_prospecting_activity(self, value):
-        if isinstance(value, str):
-            self._first_prospecting_activity = parse_date_from_string(value)
-        else:
-            self._first_prospecting_activity = value
-
-    @property
-    def last_prospecting_activity(self) -> date:
-        return self._last_prospecting_activity
-
-    @last_prospecting_activity.setter
-    def last_prospecting_activity(self, value):
-        if isinstance(value, str):
-            self._last_prospecting_activity = parse_date_from_string(value)
-        else:
-            self._last_prospecting_activity = value
-
-    @property
-    def engaged_date(self) -> date:
-        return self._engaged_date
-
-    @engaged_date.setter
-    def engaged_date(self, value):
-        if isinstance(value, str):
-            self._engaged_date = parse_date_from_string(value)
-        else:
-            self._engaged_date = value
-
-    @property
-    def last_outbound_engagement(self) -> date:
-        return self._last_outbound_engagement
-
-    @last_outbound_engagement.setter
-    def last_outbound_engagement(self, value):
-        if isinstance(value, str):
-            self._last_outbound_engagement = parse_date_from_string(value)
-        else:
-            self._last_outbound_engagement = value
+            return None
 
     def to_dict(self):
         return convert_to_dict(asdict(self))
