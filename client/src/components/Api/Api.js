@@ -1,4 +1,11 @@
+// src/Api.js
+
 import axios from "axios";
+import config from "../../config";
+
+const api = axios.create({
+  baseURL: config.apiBaseUrl,
+});
 
 /**
  * @typedef {import('types').ApiResponse} ApiResponse
@@ -10,13 +17,10 @@ import axios from "axios";
  * @returns {Promise<ApiResponse>}
  */
 export const fetchTaskFilterFields = async () => {
-  const response = await axios.get(
-    "http://localhost:8000/get_criteria_fields",
-    {
-      params: { object: "Task" },
-      validateStatus: () => true,
-    }
-  );
+  const response = await api.get("/get_criteria_fields", {
+    params: { object: "Task" },
+    validateStatus: () => true,
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -25,13 +29,10 @@ export const fetchTaskFilterFields = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchEventFilterFields = async () => {
-  const response = await axios.get(
-    "http://localhost:8000/get_criteria_fields",
-    {
-      params: { object: "Event" },
-      validateStatus: () => true,
-    }
-  );
+  const response = await api.get("/get_criteria_fields", {
+    params: { object: "Event" },
+    validateStatus: () => true,
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -40,12 +41,9 @@ export const fetchEventFilterFields = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchSalesforceUsers = async () => {
-  const response = await axios.get(
-    "http://localhost:8000/get_salesforce_users",
-    {
-      validateStatus: () => true,
-    }
-  );
+  const response = await api.get("/get_salesforce_users", {
+    validateStatus: () => true,
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -55,13 +53,10 @@ export const fetchSalesforceUsers = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchSalesforceTasksByUserIds = async (userIds) => {
-  const response = await axios.get(
-    "http://localhost:8000/get_salesforce_tasks_by_user_ids",
-    {
-      params: { user_ids: userIds }, // Use 'params' to send query parameters
-      validateStatus: () => true,
-    }
-  );
+  const response = await api.get("/get_salesforce_tasks_by_user_ids", {
+    params: { user_ids: userIds },
+    validateStatus: () => true,
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -71,13 +66,10 @@ export const fetchSalesforceTasksByUserIds = async (userIds) => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchSalesforceEventsByUserIds = async (userIds) => {
-  const response = await axios.get(
-    "http://localhost:8000/get_salesforce_events_by_user_ids",
-    {
-      params: { user_ids: userIds }, // Use 'params' to send query parameters
-      validateStatus: () => true,
-    }
-  );
+  const response = await api.get("/get_salesforce_events_by_user_ids", {
+    params: { user_ids: userIds },
+    validateStatus: () => true,
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -86,12 +78,9 @@ export const fetchSalesforceEventsByUserIds = async (userIds) => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchLoggedInSalesforceUserId = async () => {
-  const response = await axios.get(
-    "http://localhost:8000/get_salesforce_user_id",
-    {
-      validateStatus: () => true,
-    }
-  );
+  const response = await api.get("/get_salesforce_user_id", {
+    validateStatus: () => true,
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -100,12 +89,9 @@ export const fetchLoggedInSalesforceUserId = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchTaskFields = async () => {
-  const response = await axios.get(
-    "https://3042-2600-381-cb50-1088-51d3-5aa9-a6f7-e53d.ngrok-free.app/get_task_fields",
-    {
-      validateStatus: () => true,
-    }
-  );
+  const response = await api.get("/get_task_fields", {
+    validateStatus: () => true,
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -114,7 +100,7 @@ export const fetchTaskFields = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchEventFields = async () => {
-  const response = await axios.get("http://localhost:8000/get_event_fields", {
+  const response = await api.get("/get_event_fields", {
     validateStatus: () => true,
   });
   return { ...response.data, statusCode: response.status };
@@ -127,8 +113,8 @@ export const fetchEventFields = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const generateCriteria = async (tasksOrEvents, columns) => {
-  const response = await axios.post(
-    "http://localhost:8000/generate_filters",
+  const response = await api.post(
+    "/generate_filters",
     {
       tasksOrEvents: tasksOrEvents,
       selectedColumns: columns,
@@ -146,8 +132,8 @@ export const generateCriteria = async (tasksOrEvents, columns) => {
  * @returns {Promise<ApiResponse>}
  */
 export const generateActivationSummary = async (activation_ids) => {
-  const response = await axios.get(
-    "http://localhost:8000/get_prospecting_activities_filtered_by_ids",
+  const response = await api.get(
+    "/get_prospecting_activities_filtered_by_ids",
     {
       params: { activation_ids: activation_ids },
       validateStatus: () => true,

@@ -1,8 +1,22 @@
 from flask import Flask, jsonify, redirect, request
 from flask_cors import CORS
 import requests, os
-from datetime import datetime
-from collections import defaultdict
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+BASE_SERVER_URL = (
+    os.getenv("FLASK_NGROK_URL")
+    if os.getenv("FLASK_NGROK_URL") != None
+    else "http://localhost:8000"
+)
+
+REACT_APP_URL = (
+    os.getenv("REACT_APP_URL")
+    if os.getenv("REACT_APP_URL") != None
+    else "http://localhost:3000"
+)
 
 from server.engine.activation_engine import update_activation_states
 from server.services.setting_service import define_criteria_from_events_or_tasks
@@ -32,15 +46,7 @@ from server.utils import format_error_message
 app = Flask(__name__)
 CORS(
     app,
-    resources={
-        r"/*": {
-            "origins": [
-                "http://localhost:3000",
-                "https://3042-2600-381-cb50-1088-51d3-5aa9-a6f7-e53d.ngrok-free.app",
-                "https://7cb0-2600-381-cb50-1088-51d3-5aa9-a6f7-e53d.ngrok-free.app",
-            ]
-        }
-    },
+    resources={r"/*": {"origins": [BASE_SERVER_URL, REACT_APP_URL]}},
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -49,18 +55,7 @@ app.secret_key = os.urandom(24)  # Secure secret key for session management
 
 CLIENT_ID = "3MVG9ZF4bs_.MKug8aF61l5hklOzKnQLJ47l7QqY0HZN_Jis82hhCslKFnc2otkBLkOZpjBsIVBaSYojRW.kZ"
 CLIENT_SECRET = "C3B5CD6936000FEFF40809F74D8260DC2BDA2B3446EF24A1454E39BB13C34BD8"
-REDIRECT_URI = "http://localhost:8000/oauth/callback"
-
-
-# @app.before_request
-# def before_request():
-#     headers = {
-#         "Access-Control-Allow-Origin": "*",
-#         "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-#         "Access-Control-Allow-Headers": "Content-Type",
-#     }
-#     if request.method.lower() == "options":
-#         return jsonify(headers), 200
+REDIRECT_URI = f"{BASE_SERVER_URL}/oauth/callback"
 
 
 @app.after_request
@@ -82,6 +77,49 @@ def store_code_verifier():
         return jsonify({"message": "Code verifier stored successfully"}), 200
     else:
         return jsonify({"error": "Code verifier not provided"}), 400
+
+
+@app.route("/oauth/callback")
+def oauth_callback():
+    code = request.args.get("code")
+    code_verifier = load_code_verifier()  # Retrieve the code verifier from the file
+
+    if not code or not code_verifier:
+        return jsonify({"error": "Missing authorization code or verifier"}), 400
+
+    is_sandbox = "test" in request.referrer or "scratch" in request.referrer
+    base_sf_domain = "test" if is_sandbox else "login"
+    token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
+    headers = {"Content-Type": "application/x-www-form-urlencoded"}
+    payload = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": REDIRECT_URI,
+        "client_id": CLIENT_ID,
+        "client_secret": CLIENT_SECRET,
+        "code_verifier": code_verifier,
+    }
+
+    response = requests.post(token_url, headers=headers, data=payload)
+    if response.status_code == 200:
+        token_data = response.json()
+        save_tokens(token_data["access_token"], token_data["instance_url"])
+
+        redirect_url = (
+            f"{REACT_APP_URL}/onboard"
+            if len(load_settings().criteria) == 0
+            else f"{REACT_APP_URL}/app/prospecting"
+        )
+        return redirect(redirect_url)
+        # return redirect(f"{REACT_APP_URL}/onboard")
+    else:
+        error_details = {
+            "error": "Failed to retrieve access token",
+            "status_code": response.status_code,
+            "response_text": response.text,
+        }
+
+        return jsonify(error_details), 500
 
 
 @app.route("/get_criteria_fields", methods=["GET"])
@@ -138,49 +176,6 @@ def generate_filters():
         final_response = jsonify(response.__dict__), 500
 
     return final_response
-
-
-@app.route("/oauth/callback")
-def oauth_callback():
-    code = request.args.get("code")
-    code_verifier = load_code_verifier()  # Retrieve the code verifier from the file
-
-    if not code or not code_verifier:
-        return jsonify({"error": "Missing authorization code or verifier"}), 400
-
-    is_sandbox = "test" in request.referrer or "scratch" in request.referrer
-    base_sf_domain = "test" if is_sandbox else "login"
-    token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
-    headers = {"Content-Type": "application/x-www-form-urlencoded"}
-    payload = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": REDIRECT_URI,
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
-        "code_verifier": code_verifier,
-    }
-
-    response = requests.post(token_url, headers=headers, data=payload)
-    if response.status_code == 200:
-        token_data = response.json()
-        save_tokens(token_data["access_token"], token_data["instance_url"])
-
-        # redirect_url = (
-        #     "http://localhost:3000/onboard"
-        #     if len(load_settings().criteria) == 0
-        #     else "http://localhost:3000/app/prospecting"
-        # )
-        # return redirect(redirect_url)
-        return redirect("http://localhost:3000/onboard")
-    else:
-        error_details = {
-            "error": "Failed to retrieve access token",
-            "status_code": response.status_code,
-            "response_text": response.text,
-        }
-
-        return jsonify(error_details), 500
 
 
 @app.route("/get_prospecting_activities", methods=["GET"])
@@ -357,7 +352,9 @@ def get_task_fields():
         response.data = fetch_task_fields().data
         response.success = True
     except Exception as e:
-        response.message = f"Failed to retrieve task fields: {format_error_message(e)}"
+        error_msg = format_error_message(e)
+        print(error_msg)
+        response.message = f"Failed to retrieve task fields: {error_msg}"
 
     return jsonify(response.__dict__), get_status_code(response)
 

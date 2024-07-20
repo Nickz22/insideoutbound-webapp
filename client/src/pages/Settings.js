@@ -166,13 +166,24 @@ const Settings = () => {
       setSettings((prev) => {
         const updatedSettings = { ...prev, [field]: value };
 
-        if (field === "userRole") {
-          if (value === "I manage a team") {
-            fetchTeamMembersData(prev.teamMemberIds);
-          } else {
-            setTableData(null);
-            updatedSettings.teamMemberIds = [];
-          }
+        switch (field) {
+          case "userRole":
+            if (value === "I manage a team") {
+              fetchTeamMembersData(prev.teamMemberIds);
+            } else {
+              setTableData(null);
+              updatedSettings.teamMemberIds = [];
+            }
+            break;
+          case "meetingObject":
+            if (value !== settings.meetingObject) {
+              updatedSettings.meetingsCriteria = {
+                filters: [],
+                filterLogic: "",
+                name: "",
+              };
+            }
+            break;
         }
 
         debouncedSaveSettings(updatedSettings);
@@ -423,7 +434,11 @@ const Settings = () => {
               onValueChange={(newContainer) =>
                 handleChange("meetingsCriteria", newContainer)
               }
-              filterFields={eventFilterFields}
+              filterFields={
+                settings.meetingObject === "Event"
+                  ? eventFilterFields
+                  : taskFilterFields
+              }
               filterOperatorMapping={FILTER_OPERATOR_MAPPING}
             />
           </Box>

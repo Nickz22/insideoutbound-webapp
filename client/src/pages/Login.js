@@ -3,6 +3,7 @@ import { Button, Box, Container } from "@mui/material";
 import logo from "../assets/images/logo.jpeg";
 import axios from "axios";
 import { generatePKCEChallenge } from "../utils/crypto";
+import config from "../config";
 
 const Login = () => {
   const handleLogin = async (e, loginUrlBase) => {
@@ -11,14 +12,14 @@ const Login = () => {
     const { codeVerifier, codeChallenge } = await generatePKCEChallenge();
     sessionStorage.setItem("code_verifier", codeVerifier);
 
-    await axios.post("http://localhost:8000/store_code_verifier", {
+    await axios.post(`${config.apiBaseUrl}/store_code_verifier`, {
       code_verifier: codeVerifier,
     });
 
     const clientId = process.env.REACT_APP_CLIENT_ID;
-    const redirectUri = `http://localhost:8000/oauth/callback?code_verifier=${encodeURIComponent(
-      codeVerifier
-    )}`;
+    const redirectUri = `${
+      config.apiBaseUrl
+    }/oauth/callback?code_verifier=${encodeURIComponent(codeVerifier)}`;
     const loginUrl = `${loginUrlBase}/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
       redirectUri
     )}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
