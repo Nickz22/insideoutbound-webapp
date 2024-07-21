@@ -261,7 +261,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 first_prospecting_activity,
                 salesforce_user_ids,
             ).data,
-            "account_id",
+            "AccountId",
         )
         events_by_account_id = fetch_events_by_account_ids_from_date(
             list(tasks_by_account_id.keys()),
