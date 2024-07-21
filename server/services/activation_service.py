@@ -198,17 +198,19 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
 
             if events:
                 for event in events:
-                    if (
-                        is_model_date_field_within_window(
-                            event,
-                            activation.first_prospecting_activity,
-                            settings.inactivity_threshold,
-                            date_field="CreatedDate",
-                        )
-                        and activation.status == "Activated"
-                    ):
+                    is_event_within_window = is_model_date_field_within_window(
+                        event,
+                        activation.first_prospecting_activity,
+                        settings.inactivity_threshold,
+                        date_field="CreatedDate",
+                    )
+                    if is_event_within_window and activation.status == "Activated":
                         activation.status = "Meeting Set"
-                        break
+                    elif is_event_within_window:
+                        activation.event_ids = (
+                            [] if activation.event_ids is None else activation.event_ids
+                        )
+                        activation.event_ids.append(event["Id"])
 
             if opportunities:
                 for opportunity in opportunities:
@@ -268,6 +270,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
         ).data
 
         task_ids_by_criteria_name = get_task_ids_by_criteria_name(tasks_by_account_id)
+        contact_by_id = {contact.id: contact for contact in contacts}
         for account_id, tasks_by_criteria_by_who_id in tasks_by_account_id.items():
             all_tasks_under_account = get_all_tasks_under_account(
                 tasks_by_criteria_by_who_id
@@ -346,7 +349,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         Activation(
                             id=generate_unique_id(),
                             account=Account(
-                                name=contacts[active_contact_ids[0]].account.name,
+                                name=contact_by_id[active_contact_ids[0]].account.name,
                                 id=account_id,
                             ),
                             activated_date=first_prospecting_activity,
@@ -384,7 +387,10 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             activations.append(
                 Activation(
                     id=generate_unique_id(),
-                    account=Account(id=account_id),
+                    account=Account(
+                        id=account_id,
+                        name=contact_by_id[active_contact_ids[0]].account.name,
+                    ),
                     activated_date=first_prospecting_activity.date(),
                     active_contact_ids=active_contact_ids,
                     activated_by_id=last_valid_task_creator_id,
