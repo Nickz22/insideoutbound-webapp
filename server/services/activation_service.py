@@ -183,9 +183,9 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                 )
                 if not is_task_within_inactivity_threshold:
                     break
-                activation.task_ids.add(task.id)
+                activation.task_ids.append(task.id)
                 activation.last_prospecting_activity = task.created_date
-                activation.active_contact_ids.add(task.who_id)
+                activation.active_contact_ids.append(task.who_id)
                 activations_by_account_id[account_id] = activation
                 # rollup prospecting metadata via criteria_name_by_task_id
 
@@ -206,7 +206,10 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                     )
                     if is_event_within_window and activation.status == "Activated":
                         activation.status = "Meeting Set"
-                    elif is_event_within_window:
+                    elif is_event_within_window and (
+                        activation.event_ids == None
+                        or event["Id"] not in activation.event_ids
+                    ):
                         activation.event_ids = (
                             [] if activation.event_ids is None else activation.event_ids
                         )
