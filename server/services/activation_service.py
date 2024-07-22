@@ -538,6 +538,8 @@ def get_tasks_by_account_id(tasks_by_criteria, contacts):
 
 def get_qualifying_meeting(meetings, start_date, tracking_period):
     qualifying_meeting = None
+    if len(meetings) == 0:
+        return qualifying_meeting
     is_task = meetings[0].get("Id").startswith("00T")
     for meeting in meetings:
         if is_model_date_field_within_window(
