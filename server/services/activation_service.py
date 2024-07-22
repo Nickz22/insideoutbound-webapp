@@ -447,7 +447,7 @@ def get_meetings_by_account_id(
             list(account_ids),
             first_prospecting_activity,
             salesforce_user_ids,
-            settings,
+            settings.meetings_criteria,
         ).data
     elif settings.meeting_object == "Task":
         meetings_by_criteria_name_by_account_id = (

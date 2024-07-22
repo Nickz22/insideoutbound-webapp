@@ -374,7 +374,10 @@ def fetch_events_by_user_ids(user_ids):
 
 
 def fetch_events_by_account_ids_from_date(
-    account_ids, start, salesforce_user_ids: List[str], settings: Settings
+    account_ids,
+    start,
+    salesforce_user_ids: List[str],
+    meetings_criteria: FilterContainer,
 ):
     """
     Fetches events from Salesforce based on a list of account IDs.
@@ -401,9 +404,7 @@ def fetch_events_by_account_ids_from_date(
     events_by_account_id = {}
 
     try:
-        meeting_criteria_filter = _construct_where_clause_from_filter(
-            settings.meetings_criteria
-        )
+        meeting_criteria_filter = _construct_where_clause_from_filter(meetings_criteria)
         # Process the contact IDs in batches of 150
         for i in range(0, len(contact_ids), batch_size):
             batch_contact_ids = contact_ids[i : i + batch_size]
