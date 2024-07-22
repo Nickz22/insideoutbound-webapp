@@ -8,6 +8,7 @@ from server.models import (
     Task,
     CriteriaField,
     FilterContainer,
+    Settings,
     SObjectFieldModel,
     UserModel,
     UserSObject,
@@ -233,9 +234,9 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
 
         for criteria_name, tasks in tasks_by_criteria_name.items():
             for task in tasks:
-                if task.id in already_counted_task_ids:
+                if task.get("Id") in already_counted_task_ids:
                     continue
-                contact = contact_by_id.get(task.who_id)
+                contact = contact_by_id.get(task.get("WhoId"))
                 if contact:
                     account_id = contact.account_id
                     if (
@@ -292,7 +293,7 @@ def fetch_tasks_by_user_ids(user_ids):
 
 def fetch_contact_tasks_by_criteria_from_date(
     criteria, from_datetime, additional_filter=None, salesforce_user_ids: List[str] = []
-) -> Dict[str, List[Task]]:
+) -> Dict[str, List[Dict]]:
     """
     Fetches tasks from Salesforce based on a list of filtering criteria.
 
@@ -329,18 +330,7 @@ def fetch_contact_tasks_by_criteria_from_date(
                     "WhoId", ""
                 ).upper().startswith("00Q"):
                     continue
-                contact_task_models.append(
-                    Task(
-                        id=task.get("Id"),
-                        owner_id=task.get("CreatedById"),
-                        who_id=task.get("WhoId"),
-                        subject=task.get("Subject"),
-                        status=task.get("Status"),
-                        created_date=parse_date_with_timezone(
-                            task["CreatedDate"].replace("Z", "+00:00")
-                        ),
-                    )
-                )
+                contact_task_models.append(task)
 
             tasks_by_filter_name[filter_container.name] = contact_task_models
 
@@ -384,13 +374,15 @@ def fetch_events_by_user_ids(user_ids):
 
 
 def fetch_events_by_account_ids_from_date(
-    account_ids, start, salesforce_user_ids: List[str]
+    account_ids, start, salesforce_user_ids: List[str], settings: Settings
 ):
     """
     Fetches events from Salesforce based on a list of account IDs.
 
     Parameters:
-    - account_ids (list[str]): A list of account IDs to fetch events for.
+    - account_ids (list[str]): A list of account IDs to fetch events for
+    - start (str): The start date for filtering events via CreatedDate, in ISO format
+    - salesforce_user_ids (list[str]): A list of Salesforce user IDs to filter events by
 
     Returns:
     - dict: A dictionary where each key is an account ID and each value is the list of events fetched from Salesforce
@@ -409,12 +401,16 @@ def fetch_events_by_account_ids_from_date(
     events_by_account_id = {}
 
     try:
+        meeting_criteria_filter = _construct_where_clause_from_filter(
+            settings.meetings_criteria
+        )
         # Process the contact IDs in batches of 150
         for i in range(0, len(contact_ids), batch_size):
             batch_contact_ids = contact_ids[i : i + batch_size]
             joined_contact_ids = "','".join(batch_contact_ids)
             joined_user_ids = "','".join(salesforce_user_ids)
-            soql_query = f"SELECT Id, WhoId, WhatId, Subject, CreatedDate, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= {start} AND CreatedById IN ('{joined_user_ids}')  ORDER BY StartDateTime ASC"
+
+            soql_query = f"SELECT Id, WhoId, WhatId, Subject, CreatedDate, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= {start} AND CreatedById IN ('{joined_user_ids}') AND ({meeting_criteria_filter}) ORDER BY StartDateTime ASC"
 
             response = _fetch_sobjects(soql_query, load_tokens())
             for event in response.data:

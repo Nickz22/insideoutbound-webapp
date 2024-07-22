@@ -15,10 +15,11 @@ from server.utils import (
     group_by,
     pluck,
     format_error_message,
-    dt_to_soql_format,
+    convert_datetime_to_utc_z_format,
+    datetime_to_iso_string_z,
     get_team_member_salesforce_ids,
 )
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def find_unresponsive_activations(
@@ -73,7 +74,7 @@ def find_unresponsive_activations(
         criteria_group_tasks_by_account_id = (
             fetch_tasks_by_account_ids_from_date_not_in_ids(
                 list(account_ids),
-                dt_to_soql_format(first_prospecting_activity),
+                convert_datetime_to_utc_z_format(first_prospecting_activity),
                 settings.criteria,
                 already_counted_task_ids,
                 get_team_member_salesforce_ids(settings),
@@ -92,7 +93,7 @@ def find_unresponsive_activations(
 
             for criteria in criteria_group_tasks_by_account_id[account_id]:
                 for task in criteria_group_tasks_by_account_id[account_id][criteria]:
-                    criteria_name_by_task_id[task.id] = criteria
+                    criteria_name_by_task_id[task.get("Id")] = criteria
                     all_tasks.append(task)
 
             found_prospecting_activity = False
@@ -133,7 +134,7 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
     try:
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
 
-        first_prospecting_activity = dt_to_soql_format(
+        first_prospecting_activity = convert_datetime_to_utc_z_format(
             activations[0].first_prospecting_activity
         )
         activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
@@ -155,9 +156,12 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
             account_ids, first_prospecting_activity, salesforce_user_ids
         ).data
 
-        events_by_account_id = fetch_events_by_account_ids_from_date(
-            account_ids, first_prospecting_activity, salesforce_user_ids
-        ).data
+        meetings_by_account_id = get_meetings_by_account_id(
+            settings,
+            account_ids,
+            first_prospecting_activity,
+            salesforce_user_ids,
+        )
 
         activations_by_account_id = {
             activation.account.id: activation for activation in activations
@@ -170,11 +174,11 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
 
             for criteria in criteria_group_tasks_by_account_id[account_id]:
                 for task in criteria_group_tasks_by_account_id[account_id][criteria]:
-                    criteria_name_by_task_id[task.id] = criteria
+                    criteria_name_by_task_id[task.get("Id")] = criteria
                     all_tasks.append(task)
 
             # opportunity for merge sort implementation
-            all_tasks = sorted(all_tasks, key=lambda x: x.created_date)
+            all_tasks = sorted(all_tasks, key=lambda x: x.get("CreatedDate"))
             for task in all_tasks:
                 is_task_within_inactivity_threshold = is_model_date_field_within_window(
                     task,
@@ -183,9 +187,11 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                 )
                 if not is_task_within_inactivity_threshold:
                     break
-                activation.task_ids.append(task.id)
-                activation.last_prospecting_activity = task.created_date
-                activation.active_contact_ids.append(task.who_id)
+                activation.task_ids.append(task.get("Id"))
+                activation.last_prospecting_activity = datetime.strptime(
+                    task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
+                )
+                activation.active_contact_ids.append(task.get("WhoId"))
                 activations_by_account_id[account_id] = activation
                 # rollup prospecting metadata via criteria_name_by_task_id
 
@@ -194,7 +200,7 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
         for account_id in activations_by_account_id:
             activation = activations_by_account_id[account_id]
             opportunities = opportunities_by_account_id.get(account_id, [])
-            events = events_by_account_id.get(account_id, [])
+            events = meetings_by_account_id.get(account_id, [])
 
             if events:
                 for event in events:
@@ -266,11 +272,12 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             ).data,
             "AccountId",
         )
-        events_by_account_id = fetch_events_by_account_ids_from_date(
-            list(tasks_by_account_id.keys()),
+        meetings_by_account_id = get_meetings_by_account_id(
+            settings,
+            tasks_by_account_id.keys(),
             first_prospecting_activity,
             salesforce_user_ids,
-        ).data
+        )
 
         task_ids_by_criteria_name = get_task_ids_by_criteria_name(tasks_by_account_id)
         contact_by_id = {contact.id: contact for contact in contacts}
@@ -287,13 +294,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             # although the Task API query is sorted already, grouping them potentially breaks a perfect sort
             ## so we'll sort again here to be safe...opportunity for optimization via merge sort
             all_tasks_under_account = sorted(
-                all_tasks_under_account, key=lambda x: x.created_date
+                all_tasks_under_account, key=lambda x: x.get("CreatedDate")
             )
 
-            start_tracking_period = all_tasks_under_account[0].created_date
+            start_tracking_period = all_tasks_under_account[0].get("CreatedDate")
 
-            qualifying_event = get_qualifying_event(
-                events_by_account_id.get(account_id, []),
+            qualifying_event = get_qualifying_meeting(
+                meetings_by_account_id.get(account_id, []),
                 start_tracking_period,
                 settings.tracking_period,
             )
@@ -313,12 +320,14 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     task, start_tracking_period, settings.tracking_period
                 )
                 if is_task_in_tracking_period:
-                    if task.who_id not in valid_task_ids_by_who_id:
-                        valid_task_ids_by_who_id[task.who_id] = []
-                        first_prospecting_activity = task.created_date
-                    valid_task_ids_by_who_id[task.who_id].append(task.id)
-                    last_valid_task_creator_id = task.owner_id
-                    task_ids.append(task.id)
+                    if task.get("WhoId") not in valid_task_ids_by_who_id:
+                        valid_task_ids_by_who_id[task.get("WhoId")] = []
+                        account_first_prospecting_activity = datetime.strptime(
+                            task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
+                        )
+                    valid_task_ids_by_who_id[task.get("WhoId")].append(task.get("Id"))
+                    last_valid_task_creator_id = task.get("OwnerId")
+                    task_ids.append(task.get("Id"))
 
                 if not is_task_in_tracking_period:
                     active_contact_ids = get_active_contact_ids(
@@ -336,14 +345,18 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                             settings.tracking_period + settings.inactivity_threshold,
                         )
                         valid_task_ids_by_who_id.clear()
-                        first_prospecting_activity = None
+                        account_first_prospecting_activity = None
                         task_ids.clear()
                         if is_model_date_field_within_window(
                             task, start_tracking_period, settings.tracking_period
                         ):
-                            valid_task_ids_by_who_id[task.who_id] = [task.id]
-                            first_prospecting_activity = task.created_date
-                            task_ids = [task.id]
+                            valid_task_ids_by_who_id[task.get("WhoId")] = [
+                                task.get("Id")
+                            ]
+                            account_first_prospecting_activity = datetime.strptime(
+                                task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
+                            )
+                            task_ids = [task.get("Id")]
                         continue
 
                     # Can add Prospecting Metadata by
@@ -355,11 +368,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                                 name=contact_by_id[active_contact_ids[0]].account.name,
                                 id=account_id,
                             ),
-                            activated_date=first_prospecting_activity,
+                            activated_date=account_first_prospecting_activity,
                             activated_by_id=last_valid_task_creator_id,
                             active_contact_ids=active_contact_ids,
-                            last_prospecting_activity=task.created_date,
-                            first_prospecting_activity=first_prospecting_activity,
+                            last_prospecting_activity=datetime.strptime(
+                                task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
+                            ),
+                            first_prospecting_activity=account_first_prospecting_activity,
                             task_ids=task_ids,
                             opportunity=qualifying_opportunity,
                             event_ids=(
@@ -394,11 +409,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         id=account_id,
                         name=contact_by_id[active_contact_ids[0]].account.name,
                     ),
-                    activated_date=first_prospecting_activity.date(),
+                    activated_date=account_first_prospecting_activity.date(),
                     active_contact_ids=active_contact_ids,
                     activated_by_id=last_valid_task_creator_id,
-                    first_prospecting_activity=first_prospecting_activity.date(),
-                    last_prospecting_activity=task.created_date.date(),
+                    first_prospecting_activity=account_first_prospecting_activity.date(),
+                    last_prospecting_activity=datetime.strptime(
+                        task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
+                    ).date(),
                     opportunity=qualifying_opportunity,
                     event_ids=[qualifying_event["Id"]] if qualifying_event else None,
                     task_ids=task_ids,
@@ -417,6 +434,43 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     return response
 
 
+# helpers with side effects
+def get_meetings_by_account_id(
+    settings: Settings,
+    account_ids: list[str],
+    first_prospecting_activity: datetime,
+    salesforce_user_ids: list[str],
+):
+    meetings_by_account_id = {}
+    if settings.meeting_object == "Event":
+        meetings_by_account_id = fetch_events_by_account_ids_from_date(
+            list(account_ids),
+            first_prospecting_activity,
+            salesforce_user_ids,
+            settings,
+        ).data
+    elif settings.meeting_object == "Task":
+        meetings_by_criteria_name_by_account_id = (
+            fetch_tasks_by_account_ids_from_date_not_in_ids(
+                list(account_ids),
+                first_prospecting_activity,
+                [settings.meetings_criteria],
+                [],
+                salesforce_user_ids,
+            ).data
+        )
+
+        for (
+            account_id,
+            meetings_by_criteria,
+        ) in meetings_by_criteria_name_by_account_id.items():
+            if account_id not in meetings_by_account_id:
+                meetings_by_account_id[account_id] = []
+            for criteria, meetings in meetings_by_criteria.items():
+                meetings_by_account_id[account_id].extend(meetings)
+    return meetings_by_account_id
+
+
 # helpers
 
 
@@ -427,7 +481,9 @@ def get_task_ids_by_criteria_name(tasks_by_account_id):
             for criteria, tasks in tasks_by_criteria.items():
                 if criteria not in task_ids_by_criteria_name:
                     task_ids_by_criteria_name[criteria] = set()
-                task_ids_by_criteria_name[criteria].update([task.id for task in tasks])
+                task_ids_by_criteria_name[criteria].update(
+                    [task.get("Id") for task in tasks]
+                )
 
     return task_ids_by_criteria_name
 
@@ -444,14 +500,19 @@ def get_first_prospecting_activity_date(tasks_by_criteria):
     first_prospecting_activity = None
     for criteria_key, tasks in tasks_by_criteria.items():
         for task in tasks:
-            first_prospecting_activity = (
-                task.created_date
-                if not first_prospecting_activity
-                else min(first_prospecting_activity, task.created_date)
+            task_created_date = (
+                datetime.strptime(task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z")
+                .astimezone(timezone.utc)
+                .replace(tzinfo=None)
             )
-    return dt_to_soql_format(
-        first_prospecting_activity if first_prospecting_activity else datetime.now()
-    )
+            first_prospecting_activity = (
+                task_created_date
+                if not first_prospecting_activity
+                else min(first_prospecting_activity, task_created_date)
+            )
+    if not first_prospecting_activity:
+        first_prospecting_activity = datetime.now()
+    return datetime_to_iso_string_z(first_prospecting_activity)
 
 
 def get_tasks_by_account_id(tasks_by_criteria, contacts):
@@ -459,29 +520,35 @@ def get_tasks_by_account_id(tasks_by_criteria, contacts):
     contact_by_id = {contact.id: contact for contact in contacts}
     for criteria_key, tasks in tasks_by_criteria.items():
         for task in tasks:
-            contact = contact_by_id.get(task.who_id)
+            contact = contact_by_id.get(task.get("WhoId"))
             if not contact:
                 continue
             account_id = contact.account_id
             if account_id not in tasks_by_account_id.keys():
                 tasks_by_account_id[account_id] = {}
-            if task.who_id not in tasks_by_account_id[account_id]:
-                tasks_by_account_id[account_id][task.who_id] = {}
-            if criteria_key not in tasks_by_account_id[account_id][task.who_id]:
-                tasks_by_account_id[account_id][task.who_id][criteria_key] = []
-            tasks_by_account_id[account_id][task.who_id][criteria_key].append(task)
+            if task.get("WhoId") not in tasks_by_account_id[account_id]:
+                tasks_by_account_id[account_id][task.get("WhoId")] = {}
+            if criteria_key not in tasks_by_account_id[account_id][task.get("WhoId")]:
+                tasks_by_account_id[account_id][task.get("WhoId")][criteria_key] = []
+            tasks_by_account_id[account_id][task.get("WhoId")][criteria_key].append(
+                task
+            )
     return tasks_by_account_id
 
 
-def get_qualifying_event(events, start_date, tracking_period) -> Event:
-    qualifying_event = None
-    for event in events:
+def get_qualifying_meeting(meetings, start_date, tracking_period):
+    qualifying_meeting = None
+    is_task = meetings[0].get("Id").startswith("00T")
+    for meeting in meetings:
         if is_model_date_field_within_window(
-            event, start_date, tracking_period, "StartDateTime"
+            meeting,
+            start_date,
+            tracking_period,
+            "StartDateTime" if not is_task else "CreatedDate",
         ):
-            qualifying_event = event
+            qualifying_meeting = meeting
             break
-    return qualifying_event
+    return qualifying_meeting
 
 
 def get_qualifying_opportunity(opportunities, start_date, tracking_period):

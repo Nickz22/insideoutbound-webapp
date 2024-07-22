@@ -1,7 +1,7 @@
 import uuid, traceback
 from dataclasses import is_dataclass
 from typing import Any, Set
-from datetime import timedelta, datetime, date
+from datetime import timedelta, datetime, date, timezone
 from functools import reduce
 import re
 
@@ -70,7 +70,7 @@ def add_days(date, days):
 
 
 def is_model_date_field_within_window(
-    sobject_model, start_date, period_days, date_field="created_date"
+    sobject_model, start_date, period_days, date_field="CreatedDate"
 ):
     """
     Check if the date field of a model is within a window of days from a start date.
@@ -80,19 +80,32 @@ def is_model_date_field_within_window(
     :param period_days: The number of days in the window
     :param date_field: The date field to check
     """
-    end_date = start_date + timedelta(days=period_days)
+    ## offset-naive start time
+    start_time = (
+        datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S.%f%z")
+        .astimezone(timezone.utc)
+        .replace(tzinfo=None)
+    )
+    end_date = start_time + timedelta(days=period_days)
     if isinstance(sobject_model, dict):
         model_date_value = datetime.strptime(
             sobject_model[date_field], "%Y-%m-%dT%H:%M:%S.%f%z"
         ).replace(tzinfo=None)
     else:
         model_date_value = getattr(sobject_model, date_field)
-    return start_date <= model_date_value <= end_date
+    return start_time <= model_date_value <= end_date
 
 
-def dt_to_soql_format(dt: datetime) -> str:
-    return dt.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+def convert_datetime_to_utc_z_format(datetime_str: str) -> str:
+    # Parse the input string to a datetime object, including milliseconds and timezone
+    dt = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S.%f%z")
+    # Convert to UTC and remove timezone information
+    dt_utc = dt.astimezone(tz=timezone.utc).replace(tzinfo=None)
+    # Format the datetime object to the desired string format
+    return dt_utc.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 
+def datetime_to_iso_string_z(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 def parse_date_from_string(salesforce_datetime_str: str) -> date:
     """

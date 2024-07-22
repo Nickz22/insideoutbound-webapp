@@ -1,5 +1,5 @@
 SESSION_EXPIRED = "session expired"
-WHO_ID = "who_id"
+WHO_ID = "WhoId"
 FILTER_OPERATOR_MAPPING = {
     "string": {
         "contains": "LIKE",
