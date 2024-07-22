@@ -71,7 +71,8 @@ def load_settings() -> Settings:
     if os.path.exists(SETTINGS_FILE):
         with open(SETTINGS_FILE, "r") as file:
             settings = json.load(file, object_hook=custom_decoder)
-            settings = Settings(**settings)
+            if len(settings) > 0:
+                settings = Settings(**settings)
             return settings
     return None
 

@@ -26,7 +26,7 @@ import {
 } from "src/components/Api/Api";
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
-
+import config from "./../config";
 const Prospecting = () => {
   const [period, setPeriod] = useState("");
   const [view, setView] = useState("Summary");
@@ -46,7 +46,7 @@ const Prospecting = () => {
       inFlightRef.current = true;
       setLoading(true);
       try {
-        const response = await axios.get(`http://localhost:8000/${endpoint}`, {
+        const response = await axios.get(`${config.apiBaseUrl}/${endpoint}`, {
           validateStatus: function () {
             return true;
           },

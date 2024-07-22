@@ -104,14 +104,13 @@ def oauth_callback():
     if response.status_code == 200:
         token_data = response.json()
         save_tokens(token_data["access_token"], token_data["instance_url"])
-
+        settings = load_settings()
         redirect_url = (
             f"{REACT_APP_URL}/onboard"
-            if len(load_settings().criteria) == 0
+            if not settings
             else f"{REACT_APP_URL}/app/prospecting"
         )
         return redirect(redirect_url)
-        # return redirect(f"{REACT_APP_URL}/onboard")
     else:
         error_details = {
             "error": "Failed to retrieve access token",

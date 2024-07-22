@@ -12,7 +12,7 @@ import {
   fetchTaskFilterFields,
   generateCriteria,
 } from "../components/Api/Api";
-
+import config from "./../config";
 /**
  * @typedef {import('types').SObject} SObject
  * @typedef {import('types').SObjectField} SObjectField
@@ -426,10 +426,7 @@ const Onboard = () => {
   const saveSettings = async () => {
     try {
       const formattedSettings = formatSettingsData();
-      await axios.post(
-        "http://localhost:8000/save_settings",
-        formattedSettings
-      );
+      await axios.post(`${config.apiBaseUrl}/save_settings`, formattedSettings);
       navigate("/app/settings");
     } catch (error) {
       console.error("Error saving settings:", error);

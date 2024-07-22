@@ -28,7 +28,7 @@ import { FILTER_OPERATOR_MAPPING } from "../utils/c";
 import FilterContainer from "../components/FilterContainer/FilterContainer";
 import CustomTable from "../components/CustomTable/CustomTable";
 import { debounce } from "lodash";
-
+import config from "./../config";
 const Settings = () => {
   const navigate = useNavigate();
   const [settings, setSettings] = useState({
@@ -65,7 +65,7 @@ const Settings = () => {
         ] = await Promise.all([
           fetchTaskFilterFields(),
           fetchEventFilterFields(),
-          axios.get("http://localhost:8000/get_settings"),
+          axios.get(`${config.apiBaseUrl}/get_settings`),
         ]);
 
         if (taskFilterFieldsResponse.statusCode === 200) {
@@ -148,7 +148,7 @@ const Settings = () => {
         setSaving(true);
         try {
           await axios.post(
-            "http://localhost:8000/save_settings",
+            `${config.apiBaseUrl}/save_settings`,
             settingsToSave
           );
           setSaveSuccess(true);
