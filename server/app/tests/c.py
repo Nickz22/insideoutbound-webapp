@@ -1,4 +1,4 @@
-from server.models import TaskSObject
+from server.app.models import TaskSObject
 from datetime import datetime
 
 today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000+0000")

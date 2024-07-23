@@ -1,14 +1,13 @@
 import os, sys
-from server.models import Settings, Event
+from app.data_models import Settings, Activation, Account, ApiResponse
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from server.api.salesforce import (
+from server.app.salesforce_api import (
     fetch_tasks_by_account_ids_from_date_not_in_ids,
     fetch_opportunities_by_account_ids_from_date,
     fetch_events_by_account_ids_from_date,
 )
-from server.models import Activation, Account, ApiResponse
-from server.utils import (
+from app.utils import (
     generate_unique_id,
     add_days,
     is_model_date_field_within_window,

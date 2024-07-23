@@ -3,10 +3,10 @@ import {
   fetchEventFilterFields,
   fetchTaskFilterFields,
   fetchSalesforceUsers,
-  fetchTaskFields,
+  // fetchTaskFields,
   fetchSalesforceTasksByUserIds,
   fetchSalesforceEventsByUserIds,
-  fetchEventFields,
+  // fetchEventFields,
 } from "./../components/Api/Api";
 /**
  * @typedef {import('types').TableData} TableData
@@ -246,14 +246,14 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: "string",
           },
         ],
-        availableColumns: (await fetchTaskFields()).data.map(
-          /** @param {SObjectField} field */
-          (field) => ({
-            id: field.name,
-            label: field.label,
-            dataType: field.type,
-          })
-        ),
+        // availableColumns: (await fetchTaskFields()).data.map(
+        //   /** @param {SObjectField} field */
+        //   (field) => ({
+        //     id: field.name,
+        //     label: field.label,
+        //     dataType: field.type,
+        //   })
+        // ),
         setting: "",
         inputLabel:
           "Select Tasks that should set an Account as 'approached'. We'll create filters from your selections - don't worry, you'll have a chance to confirm them later.",
@@ -313,14 +313,14 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: "string",
           },
         ],
-        availableColumns: (await fetchEventFields()).data.map(
-          /** @param {SObjectField} field */
-          (field) => ({
-            id: field.name,
-            label: field.label,
-            dataType: field.type,
-          })
-        ),
+        // availableColumns: (await fetchEventFields()).data.map(
+        //   /** @param {SObjectField} field */
+        //   (field) => ({
+        //     id: field.name,
+        //     label: field.label,
+        //     dataType: field.type,
+        //   })
+        // ),
         setting: "",
         inputType: "table",
         inputLabel:

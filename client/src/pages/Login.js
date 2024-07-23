@@ -1,9 +1,9 @@
 import React from "react";
 import { Button, Box, Container } from "@mui/material";
 import logo from "../assets/images/logo.jpeg";
-import axios from "axios";
 import { generatePKCEChallenge } from "../utils/crypto";
 import config from "../config";
+import { storeCodeVerifier } from "src/components/Api/Api";
 
 const Login = () => {
   const handleLogin = async (e, loginUrlBase) => {
@@ -12,19 +12,26 @@ const Login = () => {
     const { codeVerifier, codeChallenge } = await generatePKCEChallenge();
     sessionStorage.setItem("code_verifier", codeVerifier);
 
-    await axios.post(`${config.apiBaseUrl}/store_code_verifier`, {
-      code_verifier: codeVerifier,
-    });
+    const isSandbox = loginUrlBase.includes("test.salesforce.com");
 
-    const clientId = process.env.REACT_APP_CLIENT_ID;
-    const redirectUri = `${
-      config.apiBaseUrl
-    }/oauth/callback?code_verifier=${encodeURIComponent(codeVerifier)}`;
-    const loginUrl = `${loginUrlBase}/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
-      redirectUri
-    )}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+    try {
+      const response = await storeCodeVerifier(codeVerifier, isSandbox);
 
-    window.location.href = loginUrl;
+      if (response.statusCode !== 200) {
+        console.error("Failed to start auth session");
+        return;
+      }
+
+      const clientId = process.env.REACT_APP_CLIENT_ID;
+      const redirectUri = `${config.apiBaseUrl}/oauth/callback`;
+      const loginUrl = `${loginUrlBase}/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+        redirectUri
+      )}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+
+      window.location.href = loginUrl;
+    } catch (error) {
+      console.error("Error starting auth session:", error);
+    }
   };
 
   return (

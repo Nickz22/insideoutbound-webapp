@@ -7,10 +7,47 @@ const api = axios.create({
   baseURL: config.apiBaseUrl,
 });
 
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+    if (
+      error.response.status === 401 &&
+      error.response.data.code === "TOKEN_EXPIRED" &&
+      !originalRequest._retry
+    ) {
+      originalRequest._retry = true;
+      try {
+        await axios.post(`${config.apiBaseUrl}/refresh_token`);
+        return api(originalRequest);
+      } catch (error) {
+        // Redirect to login page if refresh fails
+        window.location.href = "/login";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
+api.defaults.withCredentials = true;
 /**
  * @typedef {import('types').ApiResponse} ApiResponse
  * @typedef {import('types').TableColumn} TableColumn
  */
+
+/**
+ * @param {string} codeVerifier
+ * @param {boolean} isSandbox
+ * @returns {Promise<ApiResponse>}
+ */
+export const storeCodeVerifier = async (codeVerifier, isSandbox) => {
+  await api.post(`${config.apiBaseUrl}/store_code_verifier`, {
+    code_verifier: codeVerifier,
+    is_sandbox: isSandbox,
+  });
+
+  return { data: [], success: true, message: "", statusCode: 200 };
+};
 
 /**
  * Fetches filter fields for the Task table, filtered by a Python constants file

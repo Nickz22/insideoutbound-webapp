@@ -1,11 +1,11 @@
 import random
-from server.tests.utils import is_valid_salesforce_query
+from server.app.tests.utils import is_valid_salesforce_query
 from unittest.mock import MagicMock
-from server.tests.c import (
+from server.app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,  # 3
     mock_tasks_for_criteria_with_unique_values_content,  # 3
 )
-from server.models import TaskSObject
+from server.app.models import TaskSObject
 from typing import List, Dict
 from datetime import datetime
 

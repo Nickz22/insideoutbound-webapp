@@ -1,7 +1,11 @@
-from server.models import FilterContainerModel, FilterModel, TableColumn, CriteriaField
-from server.utils import format_error_message
+from app.data_models import (
+    FilterContainerModel,
+    FilterModel,
+    TableColumn,
+    CriteriaField,
+)
+from app.utils import format_error_message, group_by
 from typing import List
-from utils import group_by
 
 filter_blacklist = ["Id", "CreatedDate", "WhoId"]
 
@@ -12,9 +16,7 @@ def define_criteria_from_events_or_tasks(
     column_ids = {column.id for column in columns}  # Set of column IDs to filter by
     task_field_by_name = group_by(task_fields, "name")
     if not records:
-        return FilterContainerModel(
-            name="Common Criteria", filters=[], filterLogic=""
-        )
+        return FilterContainerModel(name="Common Criteria", filters=[], filterLogic="")
 
     try:
         common_keys = column_ids.intersection(records[0].keys())

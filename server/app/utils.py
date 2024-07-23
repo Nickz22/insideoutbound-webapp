@@ -104,8 +104,10 @@ def convert_datetime_to_utc_z_format(datetime_str: str) -> str:
     # Format the datetime object to the desired string format
     return dt_utc.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 
+
 def datetime_to_iso_string_z(dt):
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 def parse_date_from_string(salesforce_datetime_str: str) -> date:
     """
@@ -155,3 +157,8 @@ def surround_numbers_with_underscores(text):
 
 def remove_underscores_from_numbers(text):
     return re.sub(r"_(\d+)_", r"\1", text)
+
+
+# session utils
+def generate_session_id():
+    return str(uuid.uuid4())

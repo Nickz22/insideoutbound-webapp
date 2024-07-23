@@ -1,24 +1,24 @@
 from datetime import datetime
 
-from server.services.activation_service import (
+from app.services.activation_service import (
     compute_activated_accounts,
     increment_existing_activations,
     find_unresponsive_activations,
 )
-from server.api.salesforce import (
+from server.app.salesforce_api import (
     fetch_criteria_tasks_by_account_ids_from_date,
     fetch_accounts_not_in_ids,
     fetch_contacts_by_ids_and_non_null_accounts,
 )
-from server.constants import WHO_ID
-from server.cache import (
+from app.constants import WHO_ID
+from app.cache import (
     save_settings,
     load_settings,
     load_active_activations_order_by_first_prospecting_activity_asc,
     upsert_activations,
 )
-from server.models import ApiResponse, Settings, Activation
-from server.utils import (
+from app.data_models import ApiResponse, Settings, Activation
+from app.utils import (
     add_days,
     pluck,
     format_error_message,
@@ -64,7 +64,7 @@ def update_activation_states():
             activatable_account_ids,
             f"{get_threshold_date_for_activatable_tasks(settings)}T00:00:00Z",
             settings.criteria,
-            salesforce_user_ids
+            salesforce_user_ids,
         ).data
 
         contact_ids = set()
