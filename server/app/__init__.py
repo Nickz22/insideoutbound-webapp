@@ -1,24 +1,22 @@
 from flask import Flask
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from flask_session import Session
+from datetime import timedelta
 from config import Config
 
 db = SQLAlchemy()
-server_session = Session()
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
 
+    # Set up Flask session
+    app.secret_key = Config.SECRET_KEY
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=1)  # Or adjust as needed
+
     # Initialize SQLAlchemy
     db.init_app(app)
-
-    # Configure and initialize Flask-Session
-    app.config["SESSION_TYPE"] = "sqlalchemy"
-    app.config["SESSION_SQLALCHEMY"] = db
-    server_session.init_app(app)
 
     CORS(
         app,

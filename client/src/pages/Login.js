@@ -3,24 +3,27 @@ import { Button, Box, Container } from "@mui/material";
 import logo from "../assets/images/logo.jpeg";
 import { generatePKCEChallenge } from "../utils/crypto";
 import config from "../config";
-import { storeCodeVerifier } from "src/components/Api/Api";
+import { storeCodeVerifier } from "../components/Api/Api"; // Import the API function
 
 const Login = () => {
   const handleLogin = async (e, loginUrlBase) => {
     e.preventDefault();
 
     const { codeVerifier, codeChallenge } = await generatePKCEChallenge();
-    sessionStorage.setItem("code_verifier", codeVerifier);
 
     const isSandbox = loginUrlBase.includes("test.salesforce.com");
 
     try {
+      // Store the code verifier in the Flask session
       const response = await storeCodeVerifier(codeVerifier, isSandbox);
 
       if (response.statusCode !== 200) {
-        console.error("Failed to start auth session");
+        console.error("Failed to start auth session:", response.message);
         return;
       }
+
+      // Store the code verifier in the browser's session storage
+      sessionStorage.setItem("code_verifier", codeVerifier);
 
       const clientId = process.env.REACT_APP_CLIENT_ID;
       const redirectUri = `${config.apiBaseUrl}/oauth/callback`;

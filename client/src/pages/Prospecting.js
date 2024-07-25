@@ -6,7 +6,6 @@ import React, {
   useMemo,
 } from "react";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import {
   Box,
   Alert,
@@ -22,11 +21,12 @@ import {
 import RefreshIcon from "@mui/icons-material/Refresh";
 import {
   fetchSalesforceUsers,
-  generateActivationSummary,
+  fetchProspectingActivities,
+  fetchAndUpdateProspectingActivity,
 } from "src/components/Api/Api";
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
-import config from "./../config";
+
 const Prospecting = () => {
   const [period, setPeriod] = useState("");
   const [view, setView] = useState("Summary");
@@ -41,33 +41,30 @@ const Prospecting = () => {
   const navigate = useNavigate();
 
   const fetchData = useCallback(
-    async (endpoint) => {
+    async (isRefresh = false) => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       setLoading(true);
       try {
-        const response = await axios.get(`${config.apiBaseUrl}/${endpoint}`, {
-          validateStatus: function () {
-            return true;
-          },
-        });
-        switch (response.status) {
+        const response = isRefresh
+          ? await fetchAndUpdateProspectingActivity()
+          : await fetchProspectingActivities();
+
+        switch (response.statusCode) {
           case 200:
-            setSummaryData(response.data.data.summary);
-            setFilteredSummaryData(response.data.data.summary);
-            setRawData(response.data.data.raw_data || []);
+            setSummaryData(response.data.summary);
+            setFilteredSummaryData(response.data.summary);
+            setRawData(response.data.raw_data || []);
             break;
           case 400:
-            if (
-              response.data?.message.toLowerCase().includes("session expired")
-            ) {
+            if (response.message.toLowerCase().includes("session expired")) {
               navigate("/");
             } else {
-              setError(response.data.message);
+              setError(response.message);
             }
             break;
           default:
-            setError(response.data.message);
+            setError(response.message);
             break;
         }
       } catch (err) {
@@ -81,7 +78,7 @@ const Prospecting = () => {
   );
 
   useEffect(() => {
-    fetchData("get_prospecting_activities");
+    fetchData();
   }, [fetchData]);
 
   useEffect(() => {
@@ -90,12 +87,15 @@ const Prospecting = () => {
         const activatedByIds = new Set(
           rawData.map((item) => item.activated_by_id)
         );
-        const salesforceUsers = (await fetchSalesforceUsers()).data;
-        const filteredUsers = salesforceUsers.filter((user) =>
-          activatedByIds.has(user.id)
-        );
-
-        setActivatedByUsers(filteredUsers);
+        const response = await fetchSalesforceUsers();
+        if (response.success) {
+          const filteredUsers = response.data.filter((user) =>
+            activatedByIds.has(user.id)
+          );
+          setActivatedByUsers(filteredUsers);
+        } else {
+          setError("Failed to fetch Salesforce users.");
+        }
       }
     };
 
@@ -103,7 +103,7 @@ const Prospecting = () => {
   }, [summaryData, rawData]);
 
   const handleRefresh = () => {
-    fetchData("fetch_prospecting_activity");
+    fetchData(true);
   };
 
   const handlePeriodChange = (event) => {

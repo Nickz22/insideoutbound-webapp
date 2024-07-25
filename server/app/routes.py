@@ -1,12 +1,6 @@
-from flask import Blueprint, jsonify, redirect, request, session, current_app
-from app import db
-from app.models import User, CodeVerifier, AuthToken, SessionModel
+from flask import Blueprint, jsonify, redirect, request, session
 from app.middleware import token_required
-import logging
-
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
-from app.utils import format_error_message, generate_session_id
+from app.utils import format_error_message
 from app.cache import (
     load_settings,
     save_settings,
@@ -28,9 +22,7 @@ from server.app.salesforce_api import (
     fetch_logged_in_salesforce_user_id,
 )
 import requests
-import json
 from config import Config
-from sqlalchemy.exc import IntegrityError
 
 bp = Blueprint("main", __name__)
 
@@ -44,33 +36,10 @@ def store_code_verifier():
     if not code_verifier:
         return jsonify({"error": "Code verifier not provided"}), 400
 
-    with current_app.app_context():
-        # Create a temporary user
-        temp_user = User(is_sandbox=is_sandbox)
-        db.session.add(temp_user)
-        db.session.commit()
-
-        # Store the code verifier
-        new_code_verifier = CodeVerifier(
-            user_id=temp_user.id, code_verifier=code_verifier
-        )
-        db.session.add(new_code_verifier)
-        db.session.commit()
-
-        # Create a temporary session
-        session_id = generate_session_id()
-        session_data = {"temp_user_id": temp_user.id, "is_temporary": True}
-        expiry = datetime.now() + timedelta(
-            minutes=10
-        )  # Short expiry for temporary session
-        new_session = SessionModel(
-            session_id=session_id, data=json.dumps(session_data).encode(), expiry=expiry
-        )
-        db.session.add(new_session)
-        db.session.commit()
-
-    # Set the session ID in the client-side session
-    session["session_id"] = session_id
+    session["code_verifier"] = code_verifier
+    session["is_sandbox"] = is_sandbox
+    session["is_temporary"] = True
+    session["created_at"] = datetime.now().isoformat()
 
     return jsonify({"message": "Code verifier stored successfully"}), 200
 
@@ -78,98 +47,53 @@ def store_code_verifier():
 @bp.route("/oauth/callback", methods=["GET"])
 def oauth_callback():
     code = request.args.get("code")
-    session_id = session.get("session_id")
 
-    if not code or not session_id:
-        return jsonify({"error": "Missing authorization code or session"}), 400
+    if not code or "code_verifier" not in session:
+        return jsonify({"error": "Missing authorization code or session data"}), 400
 
-    with current_app.app_context():
-        db_session = SessionModel.query.filter_by(session_id=session_id).first()
-        if not db_session or db_session.expiry < datetime.now():
-            return jsonify({"error": "Invalid or expired session"}), 400
+    code_verifier = session.get("code_verifier")
+    is_sandbox = session.get("is_sandbox", False)
 
-        session_data = json.loads(db_session.data)
-        temp_user_id = session_data.get("temp_user_id")
+    base_sf_domain = "test" if is_sandbox else "login"
+    token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
 
-        temp_user = User.query.get(temp_user_id)
-        if not temp_user:
-            return jsonify({"error": "User not found"}), 404
+    payload = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": Config.REDIRECT_URI,
+        "client_id": Config.CLIENT_ID,
+        "client_secret": Config.CLIENT_SECRET,
+        "code_verifier": code_verifier,
+    }
 
-        code_verifier = (
-            CodeVerifier.query.filter_by(user_id=temp_user.id)
-            .order_by(CodeVerifier.id.desc())
-            .first()
-        )
-        if not code_verifier:
-            return jsonify({"error": "Code verifier not found"}), 400
+    response = requests.post(token_url, data=payload)
+    if response.status_code == 200:
+        token_data = response.json()
 
-        base_sf_domain = "test" if temp_user.is_sandbox else "login"
-        token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
+        # Store token data in session
+        session.clear()  # Clear temporary data
+        session["access_token"] = token_data["access_token"]
+        session["refresh_token"] = token_data["refresh_token"]
+        session["instance_url"] = token_data["instance_url"]
+        session["token_expires_at"] = (datetime.now() + timedelta(hours=1)).isoformat()
+        session["salesforce_id"] = token_data.get("id").split("/")[-1]
+        session["email"] = token_data.get("email")
+        session["org_id"] = token_data.get("org_id")
+        session["is_sandbox"] = is_sandbox
+        session.permanent = True
 
-        payload = {
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": Config.REDIRECT_URI,
-            "client_id": Config.CLIENT_ID,
-            "client_secret": Config.CLIENT_SECRET,
-            "code_verifier": code_verifier.code_verifier,
-        }
-
-        response = requests.post(token_url, data=payload)
-        if response.status_code == 200:
-            token_data = response.json()
-            salesforce_id = token_data.get("id").split("/")[-1]
-
-            # Check if a user with this Salesforce ID already exists
-            existing_user = User.query.filter_by(salesforce_id=salesforce_id).first()
-
-            if existing_user:
-                # User exists, update their information
-                user = existing_user
-            else:
-                # No existing user, update the temporary user
-                user = temp_user
-
-            user.salesforce_id = salesforce_id
-            user.email = token_data.get("email")
-            user.org_id = token_data.get("org_id")
-
-            # Save the token
-            new_token = AuthToken(
-                user_id=user.id,
-                access_token=token_data["access_token"],
-                refresh_token=token_data["refresh_token"],
-                instance_url=token_data["instance_url"],
-                expires_at=datetime.now() + timedelta(hours=1),
-            )
-
-            db.session.add(new_token)
-
-            # Update the session to be permanent
-            new_session_data = {"user_id": user.id, "is_temporary": False}
-            db_session.data = json.dumps(new_session_data).encode()
-            db_session.expiry = datetime.now() + timedelta(
-                days=1
-            )  # Set a longer expiry for permanent session
-
-            try:
-                db.session.commit()
-            except IntegrityError:
-                db.session.rollback()
-                return jsonify({"error": "Failed to update user information"}), 500
-
-            settings = load_settings()
-            if not settings or len(settings) == 0:
-                return redirect(f"{Config.REACT_APP_URL}/app/onboard")
-            else:
-                return redirect(f"{Config.REACT_APP_URL}/app/prospecting")
+        settings = load_settings()
+        if not settings or len(settings) == 0:
+            return redirect(f"{Config.REACT_APP_URL}/onboard")
         else:
-            error_details = {
-                "error": "Failed to retrieve access token",
-                "status_code": response.status_code,
-                "response_text": response.text,
-            }
-            return jsonify(error_details), 500
+            return redirect(f"{Config.REACT_APP_URL}/app/prospecting")
+    else:
+        error_details = {
+            "error": "Failed to retrieve access token",
+            "status_code": response.status_code,
+            "response_text": response.text,
+        }
+        return jsonify(error_details), 500
 
 
 @bp.route("/logout")
@@ -180,24 +104,15 @@ def logout():
 
 @bp.route("/refresh_token", methods=["POST"])
 def refresh_token():
-    from app.models import AuthToken
-
-    user_id = session.get("user_id")
-    if not user_id:
-        return jsonify({"error": "User not authenticated"}), 401
-
-    auth_token = (
-        AuthToken.query.filter_by(user_id=user_id).order_by(AuthToken.id.desc()).first()
-    )
-    if not auth_token:
+    if "refresh_token" not in session:
         return jsonify({"error": "No refresh token found"}), 404
 
-    base_sf_domain = "test" if auth_token.user.is_sandbox else "login"
+    base_sf_domain = "test" if session.get("is_sandbox") else "login"
     token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
 
     payload = {
         "grant_type": "refresh_token",
-        "refresh_token": auth_token.refresh_token,
+        "refresh_token": session["refresh_token"],
         "client_id": Config.CLIENT_ID,
         "client_secret": Config.CLIENT_SECRET,
     }
@@ -206,12 +121,11 @@ def refresh_token():
     if response.status_code == 200:
         token_data = response.json()
 
-        # Update the token in the database
-        auth_token.access_token = token_data["access_token"]
-        auth_token.expires_at = datetime.now() + timedelta(
-            seconds=token_data["expires_in"]
-        )
-        db.session.commit()
+        # Update session with new token data
+        session["access_token"] = token_data["access_token"]
+        session["token_expires_at"] = (
+            datetime.now() + timedelta(seconds=token_data["expires_in"])
+        ).isoformat()
 
         return jsonify({"message": "Token refreshed successfully"}), 200
     else:

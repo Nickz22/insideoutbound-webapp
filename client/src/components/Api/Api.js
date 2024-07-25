@@ -50,6 +50,28 @@ export const storeCodeVerifier = async (codeVerifier, isSandbox) => {
 };
 
 /**
+ * Fetches prospecting activities
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchProspectingActivities = async () => {
+  const response = await api.get("/get_prospecting_activities", {
+    validateStatus: () => true,
+  });
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * Fetches and updates prospecting activity data
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchAndUpdateProspectingActivity = async () => {
+  const response = await api.get("/fetch_prospecting_activity", {
+    validateStatus: () => true,
+  });
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
  * Fetches filter fields for the Task table, filtered by a Python constants file
  * @returns {Promise<ApiResponse>}
  */
