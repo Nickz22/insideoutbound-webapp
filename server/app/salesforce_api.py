@@ -319,7 +319,7 @@ def fetch_contact_tasks_by_criteria_from_date(
     """
     api_response = ApiResponse(data=[], message="", success=False)
     joined_user_ids = "','".join(salesforce_user_ids)
-    soql_query = f"SELECT Id, WhoId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND CreatedById IN ('{joined_user_ids}') AND "
+    soql_query = f"SELECT Id, WhoId, OwnerId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND CreatedById IN ('{joined_user_ids}') AND "
     if additional_filter:
         soql_query += f"{additional_filter} AND "
     tasks_by_filter_name = {}
@@ -505,7 +505,11 @@ def fetch_contacts_by_account_ids(account_ids):
                 contact_models.append(
                     Contact(
                         id=contact.get("Id"),
-                        first_name=contact.get("FirstName"),
+                        first_name=(
+                            contact.get("FirstName")
+                            if contact.get("FirstName") != None
+                            else ""
+                        ),
                         last_name=contact.get("LastName"),
                         account_id=contact.get("AccountId"),
                         account=Account(
@@ -551,7 +555,11 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
                 contact_models.append(
                     Contact(
                         id=contact.get("Id"),
-                        first_name=contact.get("FirstName"),
+                        first_name=(
+                            contact.get("FirstName")
+                            if contact.get("FirstName") != None
+                            else ""
+                        ),
                         last_name=contact.get("LastName"),
                         account_id=contact.get("AccountId"),
                         account=Account(

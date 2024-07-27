@@ -356,6 +356,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                                 task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
                             )
                             task_ids = [task.get("Id")]
+                            last_valid_task_creator_id = task.get("OwnerId")
                         continue
 
                     # Can add Prospecting Metadata by

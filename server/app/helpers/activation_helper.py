@@ -19,7 +19,7 @@ def generate_summary(activations: list[Activation]) -> dict:
     account_contacts = defaultdict(set)
 
     for activation in activations:
-        if activation.activated_date.date() == today:
+        if activation.activated_date == today:
             summary["activations_today"] += 1
 
         summary["total_tasks"] += len(activation.task_ids)

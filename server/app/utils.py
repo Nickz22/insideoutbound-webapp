@@ -96,11 +96,14 @@ def is_model_date_field_within_window(
     return start_time <= model_date_value <= end_date
 
 
-def convert_datetime_to_utc_z_format(datetime_str: str) -> str:
-    # Parse the input string to a datetime object, including milliseconds and timezone
-    dt = datetime.strptime(datetime_str, "%Y-%m-%dT%H:%M:%S.%f%z")
+def convert_datetime_to_utc_z_format(dt: datetime) -> str:
+    # Ensure the datetime object is timezone-aware
+    if dt.tzinfo is None:
+        raise ValueError("The datetime instance must be timezone-aware.")
+
     # Convert to UTC and remove timezone information
     dt_utc = dt.astimezone(tz=timezone.utc).replace(tzinfo=None)
+
     # Format the datetime object to the desired string format
     return dt_utc.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 

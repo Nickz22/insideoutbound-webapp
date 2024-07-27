@@ -1,19 +1,50 @@
 from functools import wraps
-from flask import jsonify, session
+from flask import session
 from datetime import datetime
+from app.data_models import AuthenticationError
+from app.database.supabase_connection import get_supabase_client
 
-def token_required(f):
+
+def authenticate(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if 'access_token' not in session:
-            return jsonify({"error": "Unauthorized"}), 401
+        # Salesforce authentication check
+        if "access_token" not in session:
+            raise AuthenticationError("Session expired")
+            # return (
+            #     jsonify({"error": "session expired", "type": "AuthenticationError"}),
+            #     401,
+            # )
 
-        # Check if token is expired
-        if 'token_expires_at' not in session or datetime.now() > datetime.fromisoformat(session['token_expires_at']):
-            return jsonify({"error": "Token has expired", "code": "TOKEN_EXPIRED"}), 401
+        if "token_expires_at" not in session or datetime.now() > datetime.fromisoformat(
+            session["token_expires_at"]
+        ):
+            raise AuthenticationError("Session expired")
+            # return (
+            #     jsonify(
+            #         {
+            #             "error": "session expired",
+            #             "code": "TOKEN_EXPIRED",
+            #             "type": "AuthenticationError",
+            #         }
+            #     ),
+            #     401,
+            # )
 
-        if 'salesforce_id' not in session:
-            return jsonify({"error": "User not found in session"}), 404
+        if "salesforce_id" not in session:
+            raise AuthenticationError("Session expired")
+            # return (
+            #     jsonify(
+            #         {
+            #             "error": "session expired",
+            #             "type": "AuthenticationError",
+            #         }
+            #     ),
+            #     404,
+            # )
+
+        # Supabase authentication check
+        get_supabase_client()
 
         return f(*args, **kwargs)
 

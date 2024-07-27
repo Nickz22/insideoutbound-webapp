@@ -48,18 +48,12 @@ export const checkAuthentication = async () => {
   }
 };
 
-export const handleAuthError = async (error) => {
-  if (
-    error.response?.status === 401 ||
-    error.message === "No authenticated user. Please sign in first."
-  ) {
-    const refreshed = await refreshAuth();
-    if (!refreshed) {
-      // Redirect to login page if refresh fails
-      window.location.href = "/";
-      return false;
-    }
-    return true;
+export const handleAuthError = async () => {
+  const refreshed = await refreshAuth();
+  if (!refreshed) {
+    // Redirect to login page if refresh fails
+    window.location.href = "/";
+    return false;
   }
-  return false;
+  return true;
 };

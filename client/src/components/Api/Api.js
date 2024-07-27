@@ -6,16 +6,30 @@ const api = axios.create({
 });
 
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    if (!originalRequest._retry) {
-      originalRequest._retry = true;
-      const refreshed = await handleAuthError(error);
-      if (refreshed) {
-        return api(originalRequest);
+  async (response) => {
+    // Check if the response contains authentication error information
+    if (response.data && response.data.type === "AuthenticationError") {
+      const originalRequest = response.config;
+      if (!originalRequest._retry) {
+        originalRequest._retry = true;
+        const refreshed = await handleAuthError();
+        if (refreshed) {
+          return api(originalRequest);
+        } else {
+          // Redirect to login page if refresh failed
+          window.location.href = "/";
+          return Promise.reject(response.data);
+        }
       }
+      // If this is already a retry, redirect to login page
+      window.location.href = "/";
+      return Promise.reject(response.data);
     }
+    return response;
+  },
+  (error) => {
+    // For actual errors (network issues, etc.), just log them
+    console.error("Axios error:", error);
     return Promise.reject(error);
   }
 );
@@ -53,9 +67,7 @@ export const storeCodeVerifier = async (codeVerifier, isSandbox) => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchProspectingActivities = async () => {
-  const response = await api.get("/get_prospecting_activities", {
-    validateStatus: () => true,
-  });
+  const response = await api.get("/get_prospecting_activities");
   return { ...response.data, statusCode: response.status };
 };
 
@@ -64,10 +76,14 @@ export const fetchProspectingActivities = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchAndUpdateProspectingActivity = async () => {
-  const response = await api.get("/fetch_prospecting_activity", {
-    validateStatus: () => true,
-  });
-  return { ...response.data, statusCode: response.status };
+  try {
+    const response = await api.post("/fetch_prospecting_activity");
+    return { ...response.data, statusCode: response.status };
+  } catch (error) {
+    // This will catch any errors that weren't handled by the interceptor
+    console.error("Error in fetchAndUpdateProspectingActivity:", error);
+    throw error;
+  }
 };
 
 /**

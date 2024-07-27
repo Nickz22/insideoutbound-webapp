@@ -52,11 +52,12 @@ const Prospecting = () => {
 
         switch (response.statusCode) {
           case 200:
-            setSummaryData(response.data.summary);
-            setFilteredSummaryData(response.data.summary);
-            setRawData(response.data.raw_data || []);
+            setSummaryData(response.data[0].summary);
+            setFilteredSummaryData(response.data[0].summary);
+            setRawData(response.data[0].raw_data || []);
             break;
           case 400:
+          case 401:
             if (response.message.toLowerCase().includes("session expired")) {
               navigate("/");
             } else {

@@ -1,11 +1,11 @@
-from flask import Blueprint, jsonify, redirect, request, session
-from app.middleware import token_required
+from flask import Blueprint, jsonify, redirect, request, session, current_app
+from app.middleware import authenticate
 from app.utils import format_error_message
-from app.cache import (
-    load_settings,
-    save_settings,
+from server.app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
+from server.app.database.settings_selector import load_settings
+from server.app.database.dml import save_settings
 from datetime import datetime, timedelta
 from app.constants import SESSION_EXPIRED
 from app.mapper.mapper import convert_settings_model_to_settings
@@ -23,7 +23,6 @@ from server.app.salesforce_api import (
 )
 import requests
 from config import Config
-import jwt
 
 bp = Blueprint("main", __name__)
 
@@ -94,7 +93,7 @@ def oauth_callback():
             # session["supabase_jwt"] = supabase_jwt
 
             settings = load_settings()
-            if not settings or len(settings) == 0:
+            if not settings:
                 return redirect(f"{Config.REACT_APP_URL}/onboard")
             else:
                 return redirect(f"{Config.REACT_APP_URL}/app/prospecting")
@@ -119,8 +118,14 @@ def logout():
 
 @bp.route("/refresh_token", methods=["POST"])
 def refresh_token():
+    from app.data_models import UserModel, ApiResponse
+
+    response = ApiResponse(data=[], message="", success=False)
+
     if "refresh_token" not in session:
-        return jsonify({"error": "No refresh token found"}), 404
+        response.message = "No refresh token found"
+        response.type = "AuthenticationError"
+        return jsonify(response.to_dict()), 200
 
     base_sf_domain = "test" if session.get("is_sandbox") else "login"
     token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
@@ -132,21 +137,36 @@ def refresh_token():
         "client_secret": Config.CLIENT_SECRET,
     }
 
-    response = requests.post(token_url, data=payload)
-    if response.status_code == 200:
-        token_data = response.json()
+    try:
+        response_sf = requests.post(token_url, data=payload)
+        response_sf.raise_for_status()
+        token_data = response_sf.json()
 
         # Update session with new token data
         session["access_token"] = token_data["access_token"]
+        session["salesforce_id"] = token_data.get("id").split("/")[-1]
+
+        user: UserModel = fetch_logged_in_salesforce_user().data
+
+        session["email"] = user.email
+        session["org_id"] = token_data.get("org_id")
+        session.permanent = True
         session["token_expires_at"] = (datetime.now() + timedelta(hours=1)).isoformat()
 
-        return jsonify({"message": "Token refreshed successfully"}), 200
-    else:
-        return jsonify({"error": "Failed to refresh token"}), response.status_code
+        # Clear the existing Supabase JWT to force regeneration on next request
+        session.pop("supabase_jwt", None)
+
+        response.success = True
+        response.message = "Token refreshed successfully"
+    except requests.exceptions.RequestException as e:
+        response.message = f"Failed to refresh token: {str(e)}"
+        response.type = "AuthenticationError"
+
+    return jsonify(response.to_dict()), 200
 
 
 @bp.route("/get_criteria_fields", methods=["GET"])
-@token_required
+@authenticate
 def get_criteria_fields():
     from app.data_models import ApiResponse
 
@@ -173,7 +193,7 @@ def get_criteria_fields():
 
 
 @bp.route("/generate_filters", methods=["POST"])
-@token_required
+@authenticate
 def generate_filters():
     from app.data_models import ApiResponse, TableColumn
 
@@ -208,7 +228,7 @@ def generate_filters():
 
 
 @bp.route("/get_prospecting_activities", methods=["GET"])
-@token_required
+@authenticate
 def get_prospecting_activities():
     from app.data_models import ApiResponse
 
@@ -217,21 +237,24 @@ def get_prospecting_activities():
         activations = (
             load_active_activations_order_by_first_prospecting_activity_asc().data
         )
-        response.data = {
-            "summary": generate_summary(activations),
-            "raw_data": activations,
-        }
+        response.data = [
+            {
+                "summary": generate_summary(activations),
+                "raw_data": [activation.to_dict() for activation in activations],
+            }
+        ]
         response.success = True
     except Exception as e:
         error_msg = format_error_message(e)
         print(f"Failed to retrieve prospecting activities: {error_msg}")
         response.message = f"Failed to retrieve prospecting activities: {error_msg}"
+        response.type = "UnexpectedError"
 
-    return jsonify(response.__dict__), get_status_code(response)
+    return jsonify(response.to_dict()), 200
 
 
 @bp.route("/get_prospecting_activities_filtered_by_ids", methods=["GET"])
-@token_required
+@authenticate
 def get_prospecting_activities_filtered_by_ids():
     from app.data_models import ApiResponse
 
@@ -259,25 +282,27 @@ def get_prospecting_activities_filtered_by_ids():
             f"Failed to retrieve prospecting activities: {format_error_message(e)}"
         )
 
-    return jsonify(response.__dict__), get_status_code(response)
+    return jsonify(response.to_dict()), get_status_code(response)
 
 
-@bp.route("/fetch_prospecting_activity", methods=["GET"])
-@token_required
+@bp.route("/fetch_prospecting_activity", methods=["POST"])
+@authenticate
 def fetch_prospecting_activity():
-    from app.data_models import ApiResponse
+    from data_models import ApiResponse
 
-    api_response = ApiResponse(data={}, message="", success=False)
+    api_response = ApiResponse(data=[], message="", success=False)
     try:
         response = update_activation_states()
 
         if response.success:
             activations = response.data
 
-            api_response.data = {
-                "summary": generate_summary(activations),
-                "raw_data": activations,
-            }
+            api_response.data = [
+                {
+                    "summary": generate_summary(activations),
+                    "raw_data": activations,
+                }
+            ]
             api_response.success = True
             api_response.message = "Prospecting activity data loaded successfully"
         else:
@@ -291,11 +316,11 @@ def fetch_prospecting_activity():
         print(api_response.message)
         status_code = get_status_code(api_response)
 
-    return jsonify(api_response.__dict__), status_code
+    return jsonify(api_response.to_dict()), status_code
 
 
 @bp.route("/save_settings", methods=["POST"])
-@token_required
+@authenticate
 def commit_settings():
     from app.data_models import ApiResponse, SettingsModel
 
@@ -310,9 +335,9 @@ def commit_settings():
 
 
 @bp.route("/get_settings", methods=["GET"])
-@token_required
+@authenticate
 def get_settings():
-    from app.data_models import ApiResponse, SettingsModel
+    from app.data_models import SettingsModel
 
     try:
         settings_model = SettingsModel(settings=load_settings())
@@ -323,7 +348,7 @@ def get_settings():
 
 
 @bp.route("/get_salesforce_users", methods=["GET"])
-@token_required
+@authenticate
 def get_salesforce_users():
     from app.data_models import ApiResponse
 
@@ -340,7 +365,7 @@ def get_salesforce_users():
 
 
 @bp.route("/get_salesforce_tasks_by_user_ids", methods=["GET"])
-@token_required
+@authenticate
 def get_salesforce_tasks_by_user_ids():
     from app.data_models import ApiResponse
 
@@ -364,7 +389,7 @@ def get_salesforce_tasks_by_user_ids():
 
 
 @bp.route("/get_salesforce_events_by_user_ids", methods=["GET"])
-@token_required
+@authenticate
 def get_salesforce_events_by_user_ids():
     from app.data_models import ApiResponse
 
@@ -384,7 +409,7 @@ def get_salesforce_events_by_user_ids():
 
 
 @bp.route("/get_salesforce_user", methods=["GET"])
-@token_required
+@authenticate
 def get_salesforce_user():
     from app.data_models import ApiResponse
 
@@ -402,7 +427,7 @@ def get_salesforce_user():
 
 
 @bp.route("/get_task_fields", methods=["GET"])
-@token_required
+@authenticate
 def get_task_fields():
     from app.data_models import ApiResponse
 
@@ -419,7 +444,7 @@ def get_task_fields():
 
 
 @bp.route("/get_event_fields", methods=["GET"])
-@token_required
+@authenticate
 def get_event_fields():
     from app.data_models import ApiResponse
 
@@ -430,6 +455,20 @@ def get_event_fields():
         response.message = f"Failed to retrieve event fields: {format_error_message(e)}"
 
     return jsonify(response.__dict__), get_status_code(response)
+
+
+@bp.app_errorhandler(Exception)
+def handle_exception(e):
+    from app.data_models import AuthenticationError
+
+    if isinstance(e, AuthenticationError):
+        return jsonify({"error": str(e), "type": "AuthenticationError"}), 200
+    # Handle other types of errors
+    current_app.logger.error(f"An error occurred: {str(e)}")
+    return (
+        jsonify({"error": "An unexpected error occurred", "type": type(e).__name__}),
+        500,
+    )
 
 
 # helpers

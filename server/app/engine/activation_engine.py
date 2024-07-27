@@ -11,13 +11,13 @@ from server.app.salesforce_api import (
     fetch_contacts_by_ids_and_non_null_accounts,
 )
 from app.constants import WHO_ID
-from app.cache import (
-    save_settings,
-    load_settings,
+from server.app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
-    upsert_activations,
 )
-from app.data_models import ApiResponse, Settings, Activation
+from app.middleware import authenticate
+from server.app.database.settings_selector import load_settings
+from server.app.database.dml import upsert_activations, save_settings
+from app.data_models import ApiResponse, Settings
 from app.utils import (
     add_days,
     pluck,
@@ -26,14 +26,16 @@ from app.utils import (
 )
 
 
+@authenticate
 def update_activation_states():
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        settings: Settings = load_settings()
+
+        settings = load_settings()
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
 
-        active_activations: list[Activation] = (
+        active_activations = (
             load_active_activations_order_by_first_prospecting_activity_asc().data
         )
 
@@ -46,14 +48,15 @@ def update_activation_states():
         if unresponsive_activations and len(unresponsive_activations) > 0:
             upsert_activations(unresponsive_activations)
 
-        active_activations: list[Activation] = [
+        active_activations = [
             a for a in active_activations if a.id not in unresponsive_activations
         ]
 
         if len(active_activations) > 0:
-            upsert_activations(
-                increment_existing_activations(active_activations, settings).data
-            )
+            incremented_activations = increment_existing_activations(
+                active_activations, settings
+            ).data
+            upsert_activations(incremented_activations)
 
         active_account_ids = list(pluck(active_activations, "account.id"))
         activatable_account_ids = list(
@@ -116,9 +119,6 @@ def get_threshold_date_for_activatable_tasks(settings: Settings):
 
     """
     return add_days(
-        datetime.strptime(
-            settings.latest_date_queried or datetime.now().strftime("%Y-%m-%d"),
-            "%Y-%m-%d",
-        ).date(),
+        (settings.latest_date_queried or datetime.now()).date(),
         -(settings.inactivity_threshold + settings.tracking_period),
     )

@@ -1,17 +1,236 @@
 from app.data_models import (
-    Task,
+    Account,
     Settings,
     FilterContainer,
     Filter,
     FilterContainerModel,
     FilterModel,
     SettingsModel,
+    Activation,
+    ProspectingMetadata,
 )
-from datetime import datetime
+from typing import Dict
+from datetime import datetime, date
+import json
+from uuid import UUID
 from app.utils import (
     surround_numbers_with_underscores,
     remove_underscores_from_numbers,
 )
+
+
+def convert_filter(f: Dict) -> Filter:
+    # Convert camelCase to snake_case for data_type
+    f["data_type"] = f.pop("dataType")
+    # Convert options to string if it exists
+    if "options" in f and f["options"] is not None:
+        f["options"] = json.dumps(f["options"])
+    return Filter(**f)
+
+
+def convert_dict_to_filter_container(fc: Dict) -> FilterContainer:
+    # Convert camelCase to snake_case for filter_logic
+    fc["filter_logic"] = surround_numbers_with_underscores(fc.pop("filterLogic"))
+    # Convert each filter in the filters list
+    fc["filters"] = [convert_filter(f) for f in fc["filters"]]
+    return FilterContainer(**fc)
+
+
+def supabase_dict_to_python_settings(row: Dict) -> Settings:
+    # Convert JSON strings back to Python objects
+    if "criteria" in row and row["criteria"]:
+        criteria_list = json.loads(row["criteria"])
+        row["criteria"] = [convert_dict_to_filter_container(fc) for fc in criteria_list]
+
+    # Handle other fields similarly
+    for field in [
+        "meetings_criteria",
+        "skip_account_criteria",
+        "skip_opportunity_criteria",
+    ]:
+        if field in row and row[field]:
+            fc = json.loads(row[field])
+            row[field] = convert_dict_to_filter_container(fc)
+
+    # Convert ISO format string to datetime
+    if "latest_date_queried" in row and row["latest_date_queried"]:
+        row["latest_date_queried"] = datetime.fromisoformat(
+            row["latest_date_queried"].replace("Z", "+00:00")
+        )
+
+    # Convert team_member_ids from JSON string to list if it's not None
+    if "team_member_ids" in row and row["team_member_ids"]:
+        row["team_member_ids"] = json.loads(row["team_member_ids"])
+
+    row["skip_account_criteria"] = (
+        None if row["skip_account_criteria"] == "" else row["skip_account_criteria"]
+    )
+    row["skip_opportunity_criteria"] = (
+        None
+        if row["skip_opportunity_criteria"] == ""
+        else row["skip_opportunity_criteria"]
+    )
+
+    return Settings(**row)
+
+
+def convert_filter_to_dict(f: Filter) -> Dict:
+    f_dict = f.dict(exclude_none=True)
+    f_dict["dataType"] = f_dict.pop("data_type")
+    if "options" in f_dict and f_dict["options"] is not None:
+        f_dict["options"] = json.loads(f_dict["options"])
+    return f_dict
+
+
+def convert_filter_container_to_dict(fc: FilterContainer) -> Dict:
+    fc_dict = fc.dict(exclude_none=True)
+    fc_dict["filterLogic"] = fc_dict.pop("filter_logic")
+    fc_dict["filters"] = [convert_filter_to_dict(f) for f in fc_dict["filters"]]
+    return fc_dict
+
+
+def python_settings_to_supabase_dict(settings: Settings) -> Dict:
+    settings_dict = settings.dict(exclude_none=True)
+
+    # Convert FilterContainer objects to JSON strings
+    if "criteria" in settings_dict:
+        settings_dict["criteria"] = json.dumps(
+            [convert_filter_container_to_dict(fc) for fc in settings_dict["criteria"]]
+        )
+
+    # Handle other fields similarly
+    for field in [
+        "meetings_criteria",
+        "skip_account_criteria",
+        "skip_opportunity_criteria",
+    ]:
+        if field in settings_dict and settings_dict[field]:
+            settings_dict[field] = json.dumps(
+                convert_filter_container_to_dict(settings_dict[field])
+            )
+
+    # Convert datetime to ISO format string
+    if "latest_date_queried" in settings_dict and isinstance(
+        settings_dict["latest_date_queried"], datetime
+    ):
+        settings_dict["latest_date_queried"] = settings_dict[
+            "latest_date_queried"
+        ].isoformat()
+
+    # Convert team_member_ids to JSON string if it's not None
+    if (
+        "team_member_ids" in settings_dict
+        and settings_dict["team_member_ids"] is not None
+    ):
+        settings_dict["team_member_ids"] = json.dumps(settings_dict["team_member_ids"])
+
+    return settings_dict
+
+
+def supabase_dict_to_python_activation(row: Dict) -> Activation:
+    # Convert JSON strings back to Python objects
+    if "prospecting_metadata" in row and row["prospecting_metadata"]:
+        row["prospecting_metadata"] = [
+            ProspectingMetadata(**item)
+            for item in json.loads(row["prospecting_metadata"])
+        ]
+
+    if "opportunity" in row and row["opportunity"]:
+        row["opportunity"] = json.loads(row["opportunity"])
+
+    # Convert array fields to sets
+    for field in ["active_contact_ids", "task_ids", "event_ids"]:
+        if field in row and row[field]:
+            row[field] = set(row[field])
+
+    # Create Account object
+    if "account_id" in row:
+        row["account"] = Account(id=row["account_id"])
+        del row["account_id"]
+
+    # Convert date strings to date objects
+    date_fields = ["activated_date", "engaged_date"]
+    for field in date_fields:
+        if field in row and row[field]:
+            row[field] = datetime.fromisoformat(row[field]).date()
+
+    # convert datetime strings to datetime objects
+    datetime_fields = [
+        "first_prospecting_activity",
+        "last_prospecting_activity",
+        "last_outbound_engagement",
+    ]
+    for field in datetime_fields:
+        if field in row and row[field]:
+            row[field] = datetime.fromisoformat(row[field])
+
+    return Activation(**row)
+
+
+def python_activation_to_supabase_dict(activation: Activation) -> Dict:
+    activation_dict = activation.to_dict()
+
+    # Handle specific fields
+    if "account" in activation_dict:
+        activation_dict["account_id"] = activation_dict["account"]["id"]
+        del activation_dict["account"]
+
+    if "active_contact_ids" in activation_dict:
+        activation_dict["active_contact_ids"] = list(
+            activation_dict["active_contact_ids"]
+        )
+
+    if "task_ids" in activation_dict:
+        activation_dict["task_ids"] = list(activation_dict["task_ids"])
+
+    if "event_ids" in activation_dict:
+        activation_dict["event_ids"] = (
+            list(activation_dict["event_ids"]) if activation_dict["event_ids"] else None
+        )
+
+    if "prospecting_metadata" in activation_dict:
+        activation_dict["prospecting_metadata"] = (
+            json.dumps(
+                [item.dict() for item in activation_dict["prospecting_metadata"]]
+            )
+            if activation_dict["prospecting_metadata"]
+            else None
+        )
+
+    if "opportunity" in activation_dict:
+        activation_dict["opportunity"] = (
+            json.dumps(activation_dict["opportunity"])
+            if activation_dict["opportunity"]
+            else None
+        )
+
+    # Convert datetime, date, and UUID objects to strings
+    for key, value in activation_dict.items():
+        if isinstance(value, (datetime, date)):
+            activation_dict[key] = value.isoformat()
+        elif isinstance(value, UUID):
+            activation_dict[key] = str(value)
+
+    # Ensure only Supabase schema fields are included
+    supabase_fields = [
+        "id",
+        "account_id",
+        "activated_by_id",
+        "active_contact_ids",
+        "task_ids",
+        "activated_date",
+        "first_prospecting_activity",
+        "last_prospecting_activity",
+        "event_ids",
+        "prospecting_metadata",
+        "days_activated",
+        "days_engaged",
+        "engaged_date",
+        "last_outbound_engagement",
+        "opportunity",
+        "status",
+    ]
+    return {k: v for k, v in activation_dict.items() if k in supabase_fields}
 
 
 def convert_filter_model_to_filter(fm: FilterModel) -> Filter:
