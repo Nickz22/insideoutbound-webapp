@@ -8,6 +8,7 @@ export interface Settings {
   skipAccountCriteria?: FilterContainer;
   skipOpportunityCriteria?: FilterContainer;
   activitiesPerContact: number;
+  latestDateQueried: Date;
   contactsPerAccount: number;
   trackingPeriod: number;
   activateByMeeting: boolean;

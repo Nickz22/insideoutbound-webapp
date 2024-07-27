@@ -19,10 +19,11 @@ from server.app.salesforce_api import (
     fetch_salesforce_users,
     fetch_tasks_by_user_ids,
     fetch_events_by_user_ids,
-    fetch_logged_in_salesforce_user_id,
+    fetch_logged_in_salesforce_user,
 )
 import requests
 from config import Config
+import jwt
 
 bp = Blueprint("main", __name__)
 
@@ -46,54 +47,68 @@ def store_code_verifier():
 
 @bp.route("/oauth/callback", methods=["GET"])
 def oauth_callback():
-    code = request.args.get("code")
 
-    if not code or "code_verifier" not in session:
-        return jsonify({"error": "Missing authorization code or session data"}), 400
+    try:
+        code = request.args.get("code")
 
-    code_verifier = session.get("code_verifier")
-    is_sandbox = session.get("is_sandbox", False)
+        if not code or "code_verifier" not in session:
+            return jsonify({"error": "Missing authorization code or session data"}), 400
 
-    base_sf_domain = "test" if is_sandbox else "login"
-    token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
+        code_verifier = session.get("code_verifier")
+        is_sandbox = session.get("is_sandbox", False)
 
-    payload = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": Config.REDIRECT_URI,
-        "client_id": Config.CLIENT_ID,
-        "client_secret": Config.CLIENT_SECRET,
-        "code_verifier": code_verifier,
-    }
+        base_sf_domain = "test" if is_sandbox else "login"
+        token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
 
-    response = requests.post(token_url, data=payload)
-    if response.status_code == 200:
-        token_data = response.json()
-
-        # Store token data in session
-        session.clear()  # Clear temporary data
-        session["access_token"] = token_data["access_token"]
-        session["refresh_token"] = token_data["refresh_token"]
-        session["instance_url"] = token_data["instance_url"]
-        session["token_expires_at"] = (datetime.now() + timedelta(hours=1)).isoformat()
-        session["salesforce_id"] = token_data.get("id").split("/")[-1]
-        session["email"] = token_data.get("email")
-        session["org_id"] = token_data.get("org_id")
-        session["is_sandbox"] = is_sandbox
-        session.permanent = True
-
-        settings = load_settings()
-        if not settings or len(settings) == 0:
-            return redirect(f"{Config.REACT_APP_URL}/onboard")
-        else:
-            return redirect(f"{Config.REACT_APP_URL}/app/prospecting")
-    else:
-        error_details = {
-            "error": "Failed to retrieve access token",
-            "status_code": response.status_code,
-            "response_text": response.text,
+        payload = {
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": Config.REDIRECT_URI,
+            "client_id": Config.CLIENT_ID,
+            "client_secret": Config.CLIENT_SECRET,
+            "code_verifier": code_verifier,
         }
-        return jsonify(error_details), 500
+
+        response = requests.post(token_url, data=payload)
+        if response.status_code == 200:
+            token_data = response.json()
+
+            # Store token data in session
+            session.clear()  # Clear temporary data
+            session["access_token"] = token_data["access_token"]
+            session["refresh_token"] = token_data["refresh_token"]
+            session["instance_url"] = token_data["instance_url"]
+            session["token_expires_at"] = (
+                datetime.now() + timedelta(hours=1)
+            ).isoformat()
+            session["salesforce_id"] = token_data.get("id").split("/")[-1]
+            session["email"] = token_data.get("email")
+            session["org_id"] = token_data.get("org_id")
+            session["is_sandbox"] = is_sandbox
+            session.permanent = True
+
+            # Generate Supabase JWT
+            # supabase_jwt = generate_supabase_jwt(
+            #     session["salesforce_id"], session["email"]
+            # )
+            # session["supabase_jwt"] = supabase_jwt
+
+            settings = load_settings()
+            if not settings or len(settings) == 0:
+                return redirect(f"{Config.REACT_APP_URL}/onboard")
+            else:
+                return redirect(f"{Config.REACT_APP_URL}/app/prospecting")
+        else:
+            error_details = {
+                "error": "Failed to retrieve access token",
+                "status_code": response.status_code,
+                "response_text": response.text,
+            }
+            return jsonify(error_details), 500
+    except Exception as e:
+        error_msg = format_error_message(e)
+        print(error_msg)
+        return jsonify({"error": f"Failed to retrieve access token: {error_msg}"}), 500
 
 
 @bp.route("/logout")
@@ -123,9 +138,7 @@ def refresh_token():
 
         # Update session with new token data
         session["access_token"] = token_data["access_token"]
-        session["token_expires_at"] = (
-            datetime.now() + timedelta(seconds=token_data["expires_in"])
-        ).isoformat()
+        session["token_expires_at"] = (datetime.now() + timedelta(hours=1)).isoformat()
 
         return jsonify({"message": "Token refreshed successfully"}), 200
     else:
@@ -149,12 +162,12 @@ def get_criteria_fields():
             response.success = True
     except Exception as e:
         response.success = False
-        response.message = (
-            f"Failed to retrieve event criteria fields: {format_error_message(e)}"
-        )
+        error_msg = format_error_message(e)
+        print(error_msg)
+        response.message = f"Failed to retrieve event criteria fields: {error_msg}"
 
     return (
-        jsonify(response.__dict__),
+        jsonify(response.to_dict()),
         get_status_code(response),
     )
 
@@ -189,7 +202,7 @@ def generate_filters():
         response.success = False
         response.message = f"Failed to generate filters: {format_error_message(e)}"
         print(response.message)
-        final_response = jsonify(response.__dict__), 500
+        final_response = jsonify(response.to_dict()), 500
 
     return final_response
 
@@ -319,11 +332,11 @@ def get_salesforce_users():
         response.data = fetch_salesforce_users().data
         response.success = True
     except Exception as e:
-        response.message = (
-            f"Failed to retrieve Salesforce users: {format_error_message(e)}"
-        )
+        error_message = format_error_message(e)
+        print(error_message)
+        response.message = f"Failed to retrieve Salesforce users: {error_message}"
 
-    return jsonify(response.__dict__), get_status_code(response)
+    return jsonify(response.to_dict()), get_status_code(response)
 
 
 @bp.route("/get_salesforce_tasks_by_user_ids", methods=["GET"])
@@ -341,9 +354,13 @@ def get_salesforce_tasks_by_user_ids():
             response.data = fetch_tasks_by_user_ids(user_ids).data
             response.success = True
     except Exception as e:
-        response.message = f"Failed to retrieve Salesforce tasks by user IDs: {format_error_message(e)}"
+        error_msg = format_error_message(e)
+        print(error_msg)
+        response.message = (
+            f"Failed to retrieve Salesforce tasks by user IDs: {error_msg}"
+        )
 
-    return jsonify(response.__dict__), get_status_code(response)
+    return jsonify(response.to_dict()), get_status_code(response)
 
 
 @bp.route("/get_salesforce_events_by_user_ids", methods=["GET"])
@@ -366,14 +383,14 @@ def get_salesforce_events_by_user_ids():
     return jsonify(response.__dict__), get_status_code(response)
 
 
-@bp.route("/get_salesforce_user_id", methods=["GET"])
+@bp.route("/get_salesforce_user", methods=["GET"])
 @token_required
-def get_salesforce_user_id():
+def get_salesforce_user():
     from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        response.data = fetch_logged_in_salesforce_user_id().data
+        response.data = [fetch_logged_in_salesforce_user().data]
         response.success = True
     except Exception as e:
         response.message = (
@@ -381,7 +398,7 @@ def get_salesforce_user_id():
         )
         print(response.message)
 
-    return jsonify(response.__dict__), get_status_code(response)
+    return jsonify(response.to_dict()), get_status_code(response)
 
 
 @bp.route("/get_task_fields", methods=["GET"])
@@ -398,7 +415,7 @@ def get_task_fields():
         print(error_msg)
         response.message = f"Failed to retrieve task fields: {error_msg}"
 
-    return jsonify(response.__dict__), get_status_code(response)
+    return jsonify(response.to_dict()), get_status_code(response)
 
 
 @bp.route("/get_event_fields", methods=["GET"])

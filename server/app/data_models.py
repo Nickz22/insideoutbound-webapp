@@ -1,16 +1,15 @@
-from app import db
-from dataclasses import dataclass, asdict
-from typing import List, Literal
+from pydantic import BaseModel
+from typing import List, Optional, Dict, Set
 from datetime import date, datetime
-from typing import List, Optional, Any, Dict, Set
-from app.utils import remove_underscores_from_numbers, parse_date_from_string
+from enum import Enum
 
-@dataclass
+
 class ApiResponse:
-    data: Any
-    message: str
-    success: bool
-    status_code: Optional[int] = 200
+    def __init__(self, data=None, message="", success=False, status_code=None):
+        self.data = data
+        self.message = message
+        self.success = success
+        self.status_code: Optional[int] = 200
 
     def to_dict(self):
         return {
@@ -28,29 +27,29 @@ class ApiResponse:
         }
 
 
-@dataclass
-class CriteriaField:
+class CriteriaField(BaseModel):
     name: str
     type: str
-    options: List[str]
+    options: List[dict]
+
+    def to_dict(self):
+        return self.model_dump()
 
 
-@dataclass
-class ProspectingMetadata:
+class ProspectingMetadata(BaseModel):
     name: str
     first_occurrence: date
     last_occurrence: date
     total: int
 
 
-@dataclass
-class Account:
+class Account(BaseModel):
     id: str
     name: Optional[str] = None
+    owner_id: Optional[str] = None
 
 
-@dataclass
-class Task:
+class Task(BaseModel):
     id: str
     created_date: datetime
     owner_id: str
@@ -60,8 +59,7 @@ class Task:
     task_subtype: Optional[str] = None
 
 
-@dataclass
-class TaskSObject:
+class TaskSObject(BaseModel):
     Id: str
     CreatedDate: date
     WhoId: str
@@ -69,19 +67,8 @@ class TaskSObject:
     Status: str
     TaskSubtype: Optional[str] = None
 
-    def to_dict(self):
-        return {
-            "Id": self.Id,
-            "CreatedDate": self.CreatedDate,
-            "WhoId": self.WhoId,
-            "Subject": self.Subject,
-            "Status": self.Status,
-            "TaskSubtype": self.TaskSubtype,
-        }
 
-
-@dataclass
-class TaskModel:
+class TaskModel(BaseModel):
     id: str
     createdDate: datetime
     whoId: str
@@ -101,8 +88,7 @@ class TaskModel:
         )
 
 
-@dataclass
-class Event:
+class Event(BaseModel):
     id: str
     created_date: date
     who_id: str
@@ -110,12 +96,8 @@ class Event:
     start_datetime: datetime
     end_datetime: datetime
 
-    def to_dict(self):
-        return convert_to_dict(asdict(self))
 
-
-@dataclass
-class Contact:
+class Contact(BaseModel):
     id: str
     first_name: str
     last_name: str
@@ -123,13 +105,7 @@ class Contact:
     account: Account
 
 
-from dataclasses import dataclass, field, asdict
-from typing import Set, Optional, List, Dict
-from datetime import date
-
-
-@dataclass
-class Activation:
+class Activation(BaseModel):
     id: str
     account: Account
     activated_by_id: str
@@ -139,7 +115,7 @@ class Activation:
     first_prospecting_activity: Optional[date] = None
     last_prospecting_activity: Optional[date] = None
     event_ids: Optional[Set[str]] = None
-    prospecting_metadata: Optional[List["ProspectingMetadata"]] = None
+    prospecting_metadata: Optional[List[ProspectingMetadata]] = None
     days_activated: Optional[int] = None
     days_engaged: Optional[int] = None
     engaged_date: Optional[date] = None
@@ -147,32 +123,8 @@ class Activation:
     opportunity: Optional[Dict] = None
     status: str = "Activated"
 
-    def __post_init__(self):
-        self.activated_date = self._parse_date(self.activated_date)
-        self.first_prospecting_activity = self._parse_date(
-            self.first_prospecting_activity
-        )
-        self.last_prospecting_activity = self._parse_date(
-            self.last_prospecting_activity
-        )
-        self.engaged_date = self._parse_date(self.engaged_date)
-        self.last_outbound_engagement = self._parse_date(self.last_outbound_engagement)
 
-    @staticmethod
-    def _parse_date(value):
-        if isinstance(value, str):
-            return parse_date_from_string(value)
-        elif isinstance(value, date):
-            return value
-        else:
-            return None
-
-    def to_dict(self):
-        return convert_to_dict(asdict(self))
-
-
-@dataclass
-class ProspectingEffort:
+class ProspectingEffort(BaseModel):
     id: str
     activation_id: str
     prospecting_metadata: List[ProspectingMetadata]
@@ -181,8 +133,7 @@ class ProspectingEffort:
     tasks: List[Task]
 
 
-@dataclass
-class Filter:
+class Filter(BaseModel):
     field: str
     operator: str
     value: str
@@ -190,15 +141,13 @@ class Filter:
     options: Optional[str] = None
 
 
-@dataclass
-class FilterContainer:
+class FilterContainer(BaseModel):
     name: str
     filters: List[Filter]
     filter_logic: str
 
 
-@dataclass
-class Settings:
+class Settings(BaseModel):
     inactivity_threshold: int
     criteria: List[FilterContainer]
     meetings_criteria: FilterContainer
@@ -215,188 +164,87 @@ class Settings:
     skip_opportunity_criteria: Optional[FilterContainer] = None
 
 
-class FilterModel:
-    def __init__(
-        self,
-        field=None,
-        dataType=None,
-        operator=None,
-        value=None,
-        filter_=None,
-        options: Optional[List[str]] = None,
-    ):
-        if filter_ is not None:
-            # Initialize from Filter object
-            self.field = filter_.field
-            self.dataType = filter_.data_type
-            self.operator = filter_.operator
-            self.value = filter_.value
-            self.options = filter_.options
-        else:
-            # Initialize from individual attributes
-            self.field = field
-            self.dataType = dataType
-            self.operator = operator
-            self.value = value
-            self.options = options
+class FilterModel(BaseModel):
+    field: Optional[str] = None
+    dataType: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[str] = None
+    options: Optional[List[dict]] = None
 
     def to_dict(self):
-        return {
-            "field": self.field,
-            "dataType": self.dataType,
-            "operator": self.operator,
-            "value": self.value,
-            "options": self.options,
-        }
+        return self.model_dump()
 
 
-class FilterContainerModel:
-    def __init__(
-        self, name=None, filters=None, filterLogic=None, filter_container=None
-    ):
-        if filter_container is not None:
-            self.name = filter_container.name
-            self.filters = [
-                FilterModel(filter_=filter_) for filter_ in filter_container.filters
-            ]
-            self.filterLogic = remove_underscores_from_numbers(
-                filter_container.filter_logic
-            )
-        else:
-            self.name = name
-            self.filters = filters
-            self.filterLogic = remove_underscores_from_numbers(filterLogic)
+class FilterContainerModel(BaseModel):
+    name: str
+    filters: List[FilterModel]
+    filterLogic: str
 
     def to_dict(self):
-        return {
-            "name": self.name,
-            "filters": [filter_.to_dict() for filter_ in self.filters],
-            "filterLogic": self.filterLogic,
-        }
+        return self.model_dump()
 
 
-class SettingsModel:
-    def __init__(
-        self,
-        activateByMeeting=None,
-        activateByOpportunity=None,
-        activitiesPerContact=None,
-        contactsPerAccount=None,
-        criteria=None,
-        inactivityThreshold=None,
-        meetingObject=None,
-        meetingsCriteria=None,
-        trackingPeriod=None,
-        teamMemberIds=None,
-        salesforceUserId=None,
-        skipAccountCriteria=None,
-        skipOpportunityCriteria=None,
-        settings=None,
-    ):
-        if settings:
-            self.activateByMeeting = settings.activate_by_meeting
-            self.activateByOpportunity = settings.activate_by_opportunity
-            self.activitiesPerContact = settings.activities_per_contact
-            self.contactsPerAccount = settings.contacts_per_account
-            self.criteria = [
-                FilterContainerModel(filter_container=fc) for fc in settings.criteria
-            ]
-            self.inactivityThreshold = settings.inactivity_threshold
-            self.meetingObject = settings.meeting_object
-            self.meetingsCriteria = FilterContainerModel(
-                filter_container=settings.meetings_criteria
-            )
-            self.trackingPeriod = settings.tracking_period
-            self.teamMemberIds = settings.team_member_ids
-            self.salesforceUserId = settings.salesforce_user_id
-            self.skipAccountCriteria = (
-                FilterContainerModel(filter_container=settings.skip_account_criteria)
-                if settings.skip_account_criteria
-                else None
-            )
-            self.skipOpportunityCriteria = (
-                FilterContainerModel(
-                    filter_container=settings.skip_opportunity_criteria
-                )
-                if settings.skip_opportunity_criteria
-                else None
-            )
-        else:
-            self.activateByMeeting = activateByMeeting
-            self.activateByOpportunity = activateByOpportunity
-            self.activitiesPerContact = activitiesPerContact
-            self.contactsPerAccount = contactsPerAccount
-            self.criteria = criteria
-            self.inactivityThreshold = inactivityThreshold
-            self.meetingObject = meetingObject
-            self.meetingsCriteria = meetingsCriteria
-            self.teamMemberIds = teamMemberIds
-            self.trackingPeriod = trackingPeriod
-            self.salesforceUserId = salesforceUserId
-            self.skipAccountCriteria = skipAccountCriteria
-            self.skipOpportunityCriteria = skipOpportunityCriteria
-
-    def to_dict(self):
-        return {
-            "activateByMeeting": self.activateByMeeting,
-            "activateByOpportunity": self.activateByOpportunity,
-            "activitiesPerContact": self.activitiesPerContact,
-            "contactsPerAccount": self.contactsPerAccount,
-            "criteria": [criterion.to_dict() for criterion in self.criteria],
-            "inactivityThreshold": self.inactivityThreshold,
-            "meetingObject": self.meetingObject,
-            "meetingsCriteria": self.meetingsCriteria.to_dict(),
-            "teamMemberIds": self.teamMemberIds,
-            "trackingPeriod": self.trackingPeriod,
-            "salesforceUserId": self.salesforceUserId,
-            "skipAccountCriteria": (
-                self.skipAccountCriteria.to_dict() if self.skipAccountCriteria else None
-            ),
-            "skipOpportunityCriteria": (
-                self.skipOpportunityCriteria.to_dict()
-                if self.skipOpportunityCriteria
-                else None
-            ),
-        }
+class SettingsModel(BaseModel):
+    activateByMeeting: bool
+    activateByOpportunity: bool
+    activitiesPerContact: int
+    contactsPerAccount: int
+    criteria: List[FilterContainerModel]
+    inactivityThreshold: int
+    meetingObject: str
+    meetingsCriteria: FilterContainerModel
+    trackingPeriod: int
+    teamMemberIds: Optional[List[str]] = None
+    salesforceUserId: Optional[str] = None
+    skipAccountCriteria: Optional[FilterContainerModel] = None
+    skipOpportunityCriteria: Optional[FilterContainerModel] = None
 
 
-@dataclass
-class SObjectFieldModel:
+class DataType(str, Enum):
+    STRING = "string"
+    NUMBER = "number"
+    DATE = "date"
+    DATETIME = "datetime"
+    SELECT = "select"
+    IMAGE = "image"
+
+
+class SObjectFieldModel(BaseModel):
     type: str
     name: str
     label: str
 
     def to_dict(self):
-        return asdict(self)
+        return self.model_dump()
 
 
-@dataclass
-class TableColumn:
+class TableColumn(BaseModel):
     id: str
-    dataType: Literal["string", "number", "date", "datetime", "select", "image"]
+    dataType: DataType
     label: str
 
 
-@dataclass
-class UserSObject:
+class UserSObject(BaseModel):
     Id: str
     Email: str
     Username: str
-    FirstName: str
     LastName: str
     FullPhotoUrl: str
-    Role: str
+    FirstName: Optional[str] = None
+    Role: Optional[str] = None
 
 
-@dataclass
-class UserModel:
+class UserModel(BaseModel):
     id: str
     email: str
     username: str
-    firstName: str
     lastName: str
     photoUrl: str
-    role: str
+    firstName: Optional[str] = None
+    role: Optional[str] = None
+
+    def to_dict(self):
+        return self.model_dump()
 
     @classmethod
     def from_sobject(cls, sobject: UserSObject):
@@ -409,20 +257,3 @@ class UserModel:
             photoUrl=sobject.FullPhotoUrl,
             role=sobject.Role,
         )
-
-    def to_dict(self):
-        return convert_to_dict(asdict(self))
-
-
-def convert_to_dict(obj):
-    if isinstance(obj, (date, datetime)):
-        return obj.isoformat()
-    elif isinstance(obj, set):
-        return list(obj)
-    elif isinstance(obj, dict):
-        return {k: convert_to_dict(v) for k, v in obj.items()}
-    elif isinstance(obj, list):
-        return [convert_to_dict(v) for v in obj]
-    elif hasattr(obj, "to_dict"):
-        return obj.to_dict()
-    return obj

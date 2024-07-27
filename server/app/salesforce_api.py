@@ -15,7 +15,12 @@ from app.data_models import (
 )
 
 from app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
-from app.cache import load_tokens
+from flask import session
+
+
+def get_credentials():
+    return session.get("access_token"), session.get("instance_url")
+
 
 VALID_FIELD_TYPES = ("string", "picklist", "combobox", "int")
 
@@ -30,7 +35,7 @@ def fetch_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        fields_data = _fetch_object_fields(sobject_type, load_tokens()).data
+        fields_data = _fetch_object_fields(sobject_type, get_credentials()).data
         criteria_fields = [
             CriteriaField(
                 name=field["name"],
@@ -76,7 +81,7 @@ def fetch_accounts_not_in_ids(account_ids):
     try:
         soql_query = "SELECT Id FROM Account"
 
-        response = _fetch_sobjects(soql_query, load_tokens())
+        response = _fetch_sobjects(soql_query, get_credentials())
         accounts = [
             Account(id=account.get("Id"), name=account.get("Name"))
             for account in response.data
@@ -151,7 +156,7 @@ def fetch_salesforce_users():
     try:
         soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User"
 
-        response = _fetch_sobjects(soql_query, load_tokens())
+        response = _fetch_sobjects(soql_query, get_credentials())
         for entry in response.data:
 
             entry["Role"] = (
@@ -282,11 +287,13 @@ def fetch_tasks_by_user_ids(user_ids):
 
         api_response.data = [
             {key: value for key, value in entry.items() if key != "attributes"}
-            for entry in _fetch_sobjects(soql_query, load_tokens()).data
+            for entry in _fetch_sobjects(soql_query, get_credentials()).data
         ]
         api_response.success = True
     except Exception as e:
-        raise Exception(format_error_message(e))
+        error_msg = format_error_message(e)
+        print(error_msg)
+        raise Exception(error_msg)
 
     return api_response
 
@@ -324,7 +331,7 @@ def fetch_contact_tasks_by_criteria_from_date(
             contact_task_models = []
             for task in _fetch_sobjects(
                 f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC",
-                load_tokens(),
+                get_credentials(),
             ).data:
                 if not task.get("WhoId", "") or task.get(
                     "WhoId", ""
@@ -364,7 +371,7 @@ def fetch_events_by_user_ids(user_ids):
         soql_query = f"SELECT {','.join(event_fields)} FROM Event WHERE OwnerId IN ('{joined_user_ids}')"
         api_response.data = [
             {key: value for key, value in entry.items() if key != "attributes"}
-            for entry in _fetch_sobjects(soql_query, load_tokens()).data
+            for entry in _fetch_sobjects(soql_query, get_credentials()).data
         ]
         api_response.success = True
     except Exception as e:
@@ -413,7 +420,7 @@ def fetch_events_by_account_ids_from_date(
 
             soql_query = f"SELECT Id, WhoId, WhatId, Subject, CreatedDate, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= {start} AND CreatedById IN ('{joined_user_ids}') AND ({meeting_criteria_filter}) ORDER BY StartDateTime ASC"
 
-            response = _fetch_sobjects(soql_query, load_tokens())
+            response = _fetch_sobjects(soql_query, get_credentials())
             for event in response.data:
                 account_id = contact_by_id.get(event.get("WhoId")).account_id
                 if account_id not in events_by_account_id:
@@ -455,7 +462,7 @@ def fetch_opportunities_by_account_ids_from_date(
             joined_user_ids = "','".join(salesforce_user_ids)
             soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids}) AND CreatedById IN ('{joined_user_ids}') ORDER BY CreatedDate ASC"
 
-            response = _fetch_sobjects(soql_query, load_tokens())
+            response = _fetch_sobjects(soql_query, get_credentials())
             for opportunity in response.data:
                 api_response.data.append(opportunity)
 
@@ -493,7 +500,7 @@ def fetch_contacts_by_account_ids(account_ids):
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
             soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE AccountId IN ({joined_ids})"
 
-            response = _fetch_sobjects(soql_query, load_tokens())
+            response = _fetch_sobjects(soql_query, get_credentials())
             for contact in response.data:
                 contact_models.append(
                     Contact(
@@ -540,7 +547,7 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
             soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
 
-            for contact in _fetch_sobjects(soql_query, load_tokens()).data:
+            for contact in _fetch_sobjects(soql_query, get_credentials()).data:
                 contact_models.append(
                     Contact(
                         id=contact.get("Id"),
@@ -563,10 +570,15 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
     return api_response
 
 
-def fetch_logged_in_salesforce_user_id():
+def fetch_logged_in_salesforce_user():
     api_response = ApiResponse(data=[], message="", success=False)
 
-    access_token, instance_url = load_tokens()
+    access_token, instance_url = get_credentials()
+
+    if not access_token or not instance_url:
+        api_response.message = "No valid Salesforce session found"
+        return api_response
+
     url = f"{instance_url}/services/oauth2/userinfo"
 
     headers = {
@@ -574,14 +586,26 @@ def fetch_logged_in_salesforce_user_id():
         "Content-Type": "application/json",
     }
 
-    response = requests.get(url, headers=headers)
-    if response.status_code == 200:
-        api_response.data = response.json()["user_id"]
-        api_response.success = True
-    else:
-        raise Exception(
-            f"Failed to fetch logged in user ID ({response.status_code}): {get_http_error_message(response)}"
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()  # This will raise an HTTPError for bad responses
+        user_data = response.json()
+        api_response.data = UserModel(
+            id=user_data["user_id"],
+            email=user_data["email"],
+            username=user_data["preferred_username"],
+            lastName=user_data["family_name"],
+            firstName=user_data["given_name"],
+            photoUrl=user_data["picture"],
         )
+        api_response.success = True
+    except requests.exceptions.RequestException as e:
+        api_response.message = f"Failed to fetch logged in user ID: {str(e)}"
+        if (
+            isinstance(e, requests.exceptions.HTTPError)
+            and e.response.status_code == 401
+        ):
+            api_response.message = SESSION_EXPIRED
 
     return api_response
 
@@ -593,7 +617,7 @@ def fetch_task_fields() -> ApiResponse:
 
     api_response = ApiResponse(data=[], message="", success=False)
 
-    response = _fetch_object_fields("Task", load_tokens())
+    response = _fetch_object_fields("Task", get_credentials())
     sobject_field_models = [
         SObjectFieldModel(type=entry["type"], name=entry["name"], label=entry["label"])
         for entry in response.data
@@ -617,7 +641,7 @@ def fetch_event_fields() -> ApiResponse:
 
     api_response = ApiResponse(data=[], message="", success=False)
 
-    response = _fetch_object_fields("Event", load_tokens())
+    response = _fetch_object_fields("Event", get_credentials())
     sobject_field_models = [
         SObjectFieldModel(type=entry["type"], name=entry["name"], label=entry["label"])
         for entry in response.data

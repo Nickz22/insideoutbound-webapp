@@ -24,6 +24,7 @@ import {
   fetchTaskFilterFields,
   fetchSalesforceUsers,
 } from "../components/Api/Api";
+import { fetchSettings } from "../services/SupabaseServices";
 import { FILTER_OPERATOR_MAPPING } from "../utils/c";
 import FilterContainer from "../components/FilterContainer/FilterContainer";
 import CustomTable from "../components/CustomTable/CustomTable";
@@ -65,7 +66,7 @@ const Settings = () => {
         ] = await Promise.all([
           fetchTaskFilterFields(),
           fetchEventFilterFields(),
-          axios.get(`${config.apiBaseUrl}/get_settings`),
+          fetchSettings(),
         ]);
 
         if (taskFilterFieldsResponse.statusCode === 200) {

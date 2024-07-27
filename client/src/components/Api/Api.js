@@ -1,8 +1,6 @@
-// src/Api.js
-
 import axios from "axios";
 import config from "../../config";
-
+import { handleAuthError } from "./../../services/AuthServices";
 const api = axios.create({
   baseURL: config.apiBaseUrl,
 });
@@ -11,18 +9,11 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    if (
-      error.response.status === 401 &&
-      error.response.data.code === "TOKEN_EXPIRED" &&
-      !originalRequest._retry
-    ) {
+    if (!originalRequest._retry) {
       originalRequest._retry = true;
-      try {
-        await axios.post(`${config.apiBaseUrl}/refresh_token`);
+      const refreshed = await handleAuthError(error);
+      if (refreshed) {
         return api(originalRequest);
-      } catch (error) {
-        // Redirect to login page if refresh fails
-        window.location.href = "/login";
       }
     }
     return Promise.reject(error);
@@ -34,6 +25,14 @@ api.defaults.withCredentials = true;
  * @typedef {import('types').ApiResponse} ApiResponse
  * @typedef {import('types').TableColumn} TableColumn
  */
+
+/**
+ * @returns {Promise<ApiResponse>}
+ */
+export const getRefreshToken = async () => {
+  const response = await api.post(`${config.apiBaseUrl}/refresh_token`);
+  return { ...response.data, statusCode: response.status };
+};
 
 /**
  * @param {string} codeVerifier
@@ -107,6 +106,17 @@ export const fetchSalesforceUsers = async () => {
 };
 
 /**
+ * Retrieves the JWT from the server
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchJwt = async () => {
+  const response = await api.get("/get_jwt", {
+    validateStatus: () => true,
+  });
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
  * Fetches Salesforce tasks from the Salesforce API
  * @param {string[]} userIds
  * @returns {Promise<ApiResponse>}
@@ -136,8 +146,8 @@ export const fetchSalesforceEventsByUserIds = async (userIds) => {
  * Fetches the logged in Salesforce user's ID
  * @returns {Promise<ApiResponse>}
  */
-export const fetchLoggedInSalesforceUserId = async () => {
-  const response = await api.get("/get_salesforce_user_id", {
+export const fetchLoggedInSalesforceUser = async () => {
+  const response = await api.get("/get_salesforce_user", {
     validateStatus: () => true,
   });
   return { ...response.data, statusCode: response.status };
@@ -172,16 +182,10 @@ export const fetchEventFields = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const generateCriteria = async (tasksOrEvents, columns) => {
-  const response = await api.post(
-    "/generate_filters",
-    {
-      tasksOrEvents: tasksOrEvents,
-      selectedColumns: columns,
-    },
-    {
-      validateStatus: () => true,
-    }
-  );
+  const response = await api.post("/generate_filters", {
+    tasksOrEvents: tasksOrEvents,
+    selectedColumns: columns,
+  });
   return { ...response.data, statusCode: response.status };
 };
 

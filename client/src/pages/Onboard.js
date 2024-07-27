@@ -1,18 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, Box, Typography, Paper } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import axios from "axios";
 import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
 import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
 import ProgressTracker from "../components/ProgressTracker/ProgressTracker";
 import {
+  fetchLoggedInSalesforceUser,
   fetchSalesforceTasksByUserIds,
   fetchTaskFields,
   fetchTaskFilterFields,
   generateCriteria,
 } from "../components/Api/Api";
-import config from "./../config";
+import {
+  saveSettings as saveSettingsToSupabase,
+  signInOrSignUp,
+  upsertUser,
+} from "../services/SupabaseServices";
+
 /**
  * @typedef {import('types').SObject} SObject
  * @typedef {import('types').SObjectField} SObjectField
@@ -27,7 +32,6 @@ import {
   PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS,
   ONBOARD_WIZARD_STEPS,
 } from "../utils/c";
-import { fetchLoggedInSalesforceUserId } from "../components/Api/Api";
 
 /**
  * @param {{ categoryFormTableData: TableData, setSelectedColumns: Function, onAddCategory: Function, onDone: React.MouseEventHandler, placeholder: string }} props
@@ -142,7 +146,7 @@ const Onboard = () => {
       try {
         if (tasks.length > 0) return;
 
-        const settings = formatSettingsData();
+        const settings = getSettingsFromResponses();
         const salesforceUserIds = [
           ...(settings.teamMemberIds || []),
           settings.salesforceUserId,
@@ -167,25 +171,59 @@ const Onboard = () => {
   }, [gatheringResponses]);
 
   useEffect(() => {
-    const fetchLoggedInSalesforceUserIdAndSet = async () => {
-      const response = await fetchLoggedInSalesforceUserId();
-      if (!response.success) {
-        console.error(
-          `Error fetching logged in Salesforce User Id ${response.message}`
+    const setupAuthAndUser = async () => {
+      try {
+        // 1. Retrieve Salesforce user info
+        const sfResponse = await fetchLoggedInSalesforceUser();
+        if (!sfResponse.success) {
+          console.error(
+            `Error fetching Salesforce User: ${sfResponse.message}`
+          );
+          return;
+        }
+        const { id: salesforceUserId, email, name } = sfResponse.data[0];
+
+        // 2. Attempt to sign in or sign up
+        const signInResult = await signInOrSignUp(
+          email,
+          "generic-password-123",
+          salesforceUserId,
+          name
         );
-        return;
-      }
-      setGatheringResponses(
-        /**
-         * @param {{ [key: string]: any }} prev
-         **/
-        (prev) => ({
+        if (!signInResult.success) {
+          console.error(
+            "Error signing in or signing up user:",
+            signInResult.message
+          );
+          return;
+        }
+
+        console.log("Successfully authenticated with Supabase");
+
+        // 3. Upsert custom User table
+        const upsertResult = await upsertUser(salesforceUserId, email, name);
+        if (!upsertResult.success) {
+          console.error(
+            "Error upserting User to custom table:",
+            upsertResult.message
+          );
+          return;
+        }
+
+        // Update gatheringResponses with Salesforce user ID
+        setGatheringResponses((prev) => ({
           ...prev,
-          salesforceUserId: { value: response.data },
-        })
-      );
+          salesforceUserId: { value: salesforceUserId },
+        }));
+
+        // 4. Now you can proceed with loading or saving settings
+        // This is where you'd call your saveSettings function if needed
+      } catch (error) {
+        console.error("Error in setupAuthAndUser:", error);
+      }
     };
-    fetchLoggedInSalesforceUserIdAndSet();
+
+    setupAuthAndUser();
   }, []);
 
   useEffect(() => {
@@ -201,11 +239,36 @@ const Onboard = () => {
     }
   };
 
+  const saveSettings = async () => {
+    try {
+      /** @type {Settings} */
+      const settings = Object.keys(gatheringResponses).reduce((acc, key) => {
+        acc[key] =
+          gatheringResponses[key].value === "Yes"
+            ? true
+            : gatheringResponses[key].value === "No"
+            ? false
+            : gatheringResponses[key].value;
+        return acc;
+      }, {});
+      const result = await saveSettingsToSupabase(settings);
+
+      if (!result.success) {
+        throw new Error(result.message);
+      }
+
+      console.log("Settings saved successfully");
+      navigate("/app/settings");
+    } catch (error) {
+      console.error("Error saving settings:", error);
+    }
+  };
+
   /**
    * Formats the settings data from the form responses.
-   * @returns {Settings} The formatted settings data.
+   * @returns {Object} The formatted settings data matching the Supabase Settings table structure.
    */
-  const formatSettingsData = () => {
+  const getSettingsFromResponses = () => {
     return {
       inactivityThreshold: parseInt(
         gatheringResponses["inactivityThreshold"]?.value,
@@ -314,7 +377,7 @@ const Onboard = () => {
           stepData={ONBOARD_WIZARD_STEPS[step - 1]}
           onTableDisplay={handleTableDisplay}
           onComplete={handleInfoGatheringComplete}
-          settings={formatSettingsData()}
+          settings={getSettingsFromResponses()}
         />
       );
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
@@ -421,16 +484,6 @@ const Onboard = () => {
       }
     );
     handleNext();
-  };
-
-  const saveSettings = async () => {
-    try {
-      const formattedSettings = formatSettingsData();
-      await axios.post(`${config.apiBaseUrl}/save_settings`, formattedSettings);
-      navigate("/app/settings");
-    } catch (error) {
-      console.error("Error saving settings:", error);
-    }
   };
 
   const isLargeDialogStep = () => {
