@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import axios from "axios";
 import {
   Box,
   Card,
@@ -24,12 +23,11 @@ import {
   fetchTaskFilterFields,
   fetchSalesforceUsers,
 } from "../components/Api/Api";
-import { fetchSettings } from "../services/SupabaseServices";
+import { fetchSettings, saveSettings } from "../services/SupabaseServices";
 import { FILTER_OPERATOR_MAPPING } from "../utils/c";
 import FilterContainer from "../components/FilterContainer/FilterContainer";
 import CustomTable from "../components/CustomTable/CustomTable";
 import { debounce } from "lodash";
-import config from "./../config";
 const Settings = () => {
   const navigate = useNavigate();
   const [settings, setSettings] = useState({
@@ -148,10 +146,7 @@ const Settings = () => {
         const { userRole, ...settingsToSave } = settings;
         setSaving(true);
         try {
-          await axios.post(
-            `${config.apiBaseUrl}/save_settings`,
-            settingsToSave
-          );
+          saveSettings(settingsToSave);
           setSaveSuccess(true);
         } catch (error) {
           console.error("Error saving settings:", error);
