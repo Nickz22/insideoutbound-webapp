@@ -21,7 +21,7 @@ from app.utils import (
 
 def convert_filter(f: Dict) -> Filter:
     # Convert camelCase to snake_case for data_type
-    f["data_type"] = f.pop("dataType")
+    f["data_type"] = f.pop("data_type")
     # Convert options to string if it exists
     if "options" in f and f["options"] is not None:
         f["options"] = json.dumps(f["options"])
@@ -30,7 +30,7 @@ def convert_filter(f: Dict) -> Filter:
 
 def convert_dict_to_filter_container(fc: Dict) -> FilterContainer:
     # Convert camelCase to snake_case for filter_logic
-    fc["filter_logic"] = surround_numbers_with_underscores(fc.pop("filterLogic"))
+    fc["filter_logic"] = fc.pop("filter_logic")
     # Convert each filter in the filters list
     fc["filters"] = [convert_filter(f) for f in fc["filters"]]
     return FilterContainer(**fc)
@@ -75,7 +75,7 @@ def supabase_dict_to_python_settings(row: Dict) -> Settings:
 
 
 def convert_filter_to_dict(f: Filter) -> Dict:
-    f_dict = f.dict(exclude_none=True)
+    f_dict = f.to_dict()
     f_dict["dataType"] = f_dict.pop("data_type")
     if "options" in f_dict and f_dict["options"] is not None:
         f_dict["options"] = json.loads(f_dict["options"])
@@ -83,19 +83,19 @@ def convert_filter_to_dict(f: Filter) -> Dict:
 
 
 def convert_filter_container_to_dict(fc: FilterContainer) -> Dict:
-    fc_dict = fc.dict(exclude_none=True)
+    fc_dict = fc.to_dict()
     fc_dict["filterLogic"] = fc_dict.pop("filter_logic")
     fc_dict["filters"] = [convert_filter_to_dict(f) for f in fc_dict["filters"]]
     return fc_dict
 
 
 def python_settings_to_supabase_dict(settings: Settings) -> Dict:
-    settings_dict = settings.dict(exclude_none=True)
+    settings_dict = settings.to_dict()
 
     # Convert FilterContainer objects to JSON strings
     if "criteria" in settings_dict:
         settings_dict["criteria"] = json.dumps(
-            [convert_filter_container_to_dict(fc) for fc in settings_dict["criteria"]]
+            settings_dict["criteria"] if settings_dict["criteria"] else []
         )
 
     # Handle other fields similarly
@@ -106,7 +106,7 @@ def python_settings_to_supabase_dict(settings: Settings) -> Dict:
     ]:
         if field in settings_dict and settings_dict[field]:
             settings_dict[field] = json.dumps(
-                convert_filter_container_to_dict(settings_dict[field])
+                settings_dict[field] if settings_dict[field] else {}
             )
 
     # Convert datetime to ISO format string

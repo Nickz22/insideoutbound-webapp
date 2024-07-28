@@ -288,7 +288,7 @@ def get_prospecting_activities_filtered_by_ids():
 @bp.route("/fetch_prospecting_activity", methods=["POST"])
 @authenticate
 def fetch_prospecting_activity():
-    from data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     api_response = ApiResponse(data=[], message="", success=False)
     try:
@@ -300,7 +300,7 @@ def fetch_prospecting_activity():
             api_response.data = [
                 {
                     "summary": generate_summary(activations),
-                    "raw_data": activations,
+                    "raw_data": [activation.to_dict() for activation in activations],
                 }
             ]
             api_response.success = True
@@ -461,12 +461,12 @@ def get_event_fields():
 def handle_exception(e):
     from app.data_models import AuthenticationError
 
+    error_msg = format_error_message(e)
+    print(error_msg)
     if isinstance(e, AuthenticationError):
         return jsonify({"error": str(e), "type": "AuthenticationError"}), 200
-    # Handle other types of errors
-    current_app.logger.error(f"An error occurred: {str(e)}")
     return (
-        jsonify({"error": "An unexpected error occurred", "type": type(e).__name__}),
+        jsonify({"error": error_msg, "type": type(e).__name__}),
         500,
     )
 

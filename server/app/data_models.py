@@ -1,7 +1,28 @@
 from pydantic import BaseModel
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict, Set, Any
 from datetime import date, datetime
+from uuid import UUID
 from enum import Enum
+
+
+def serialize_complex_types(obj: Any) -> Any:
+    if isinstance(obj, (set, frozenset)):
+        return list(obj)
+    if isinstance(obj, (date, datetime)):
+        return obj.isoformat()
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, BaseModel):
+        return obj.model_dump()
+    return obj
+
+
+class SerializableModel(BaseModel):
+    def to_dict(self) -> dict:
+        return {
+            key: serialize_complex_types(value)
+            for key, value in self.model_dump().items()
+        }
 
 
 class ApiResponse:
@@ -27,29 +48,26 @@ class ApiResponse:
         }
 
 
-class CriteriaField(BaseModel):
+class CriteriaField(SerializableModel):
     name: str
     type: str
     options: List[dict]
 
-    def to_dict(self):
-        return self.model_dump()
 
-
-class ProspectingMetadata(BaseModel):
+class ProspectingMetadata(SerializableModel):
     name: str
     first_occurrence: date
     last_occurrence: date
     total: int
 
 
-class Account(BaseModel):
+class Account(SerializableModel):
     id: str
     name: Optional[str] = None
     owner_id: Optional[str] = None
 
 
-class Task(BaseModel):
+class Task(SerializableModel):
     id: str
     created_date: datetime
     owner_id: str
@@ -59,7 +77,7 @@ class Task(BaseModel):
     task_subtype: Optional[str] = None
 
 
-class TaskSObject(BaseModel):
+class TaskSObject(SerializableModel):
     Id: str
     CreatedDate: date
     WhoId: str
@@ -68,7 +86,7 @@ class TaskSObject(BaseModel):
     TaskSubtype: Optional[str] = None
 
 
-class TaskModel(BaseModel):
+class TaskModel(SerializableModel):
     id: str
     createdDate: datetime
     whoId: str
@@ -88,7 +106,7 @@ class TaskModel(BaseModel):
         )
 
 
-class Event(BaseModel):
+class Event(SerializableModel):
     id: str
     created_date: date
     who_id: str
@@ -97,7 +115,7 @@ class Event(BaseModel):
     end_datetime: datetime
 
 
-class Contact(BaseModel):
+class Contact(SerializableModel):
     id: str
     first_name: str
     last_name: str
@@ -105,7 +123,7 @@ class Contact(BaseModel):
     account: Account
 
 
-class Activation(BaseModel):
+class Activation(SerializableModel):
     id: str
     account: Account
     activated_by_id: str
@@ -123,21 +141,8 @@ class Activation(BaseModel):
     opportunity: Optional[Dict] = None
     status: str = "Activated"
 
-    def to_dict(self):
-        def serialize(obj):
-            if isinstance(obj, set):
-                return list(obj)
-            if isinstance(obj, date):
-                return obj.isoformat()
-            return obj
 
-        data = self.model_dump()
-        for key, value in data.items():
-            data[key] = serialize(value)
-        return data
-
-
-class ProspectingEffort(BaseModel):
+class ProspectingEffort(SerializableModel):
     id: str
     activation_id: str
     prospecting_metadata: List[ProspectingMetadata]
@@ -146,7 +151,7 @@ class ProspectingEffort(BaseModel):
     tasks: List[Task]
 
 
-class Filter(BaseModel):
+class Filter(SerializableModel):
     field: str
     operator: str
     value: str
@@ -154,13 +159,13 @@ class Filter(BaseModel):
     options: Optional[str] = None
 
 
-class FilterContainer(BaseModel):
+class FilterContainer(SerializableModel):
     name: str
     filters: List[Filter]
     filter_logic: str
 
 
-class Settings(BaseModel):
+class Settings(SerializableModel):
     inactivity_threshold: int
     criteria: List[FilterContainer]
     meetings_criteria: FilterContainer
@@ -177,27 +182,21 @@ class Settings(BaseModel):
     skip_opportunity_criteria: Optional[FilterContainer] = None
 
 
-class FilterModel(BaseModel):
+class FilterModel(SerializableModel):
     field: Optional[str] = None
     dataType: Optional[str] = None
     operator: Optional[str] = None
     value: Optional[str] = None
     options: Optional[List[dict]] = None
 
-    def to_dict(self):
-        return self.model_dump()
 
-
-class FilterContainerModel(BaseModel):
+class FilterContainerModel(SerializableModel):
     name: str
     filters: List[FilterModel]
     filterLogic: str
 
-    def to_dict(self):
-        return self.model_dump()
 
-
-class SettingsModel(BaseModel):
+class SettingsModel(SerializableModel):
     activateByMeeting: bool
     activateByOpportunity: bool
     activitiesPerContact: int
@@ -222,22 +221,19 @@ class DataType(str, Enum):
     IMAGE = "image"
 
 
-class SObjectFieldModel(BaseModel):
+class SObjectFieldModel(SerializableModel):
     type: str
     name: str
     label: str
 
-    def to_dict(self):
-        return self.model_dump()
 
-
-class TableColumn(BaseModel):
+class TableColumn(SerializableModel):
     id: str
     dataType: DataType
     label: str
 
 
-class UserSObject(BaseModel):
+class UserSObject(SerializableModel):
     Id: str
     Email: str
     Username: str
@@ -247,7 +243,7 @@ class UserSObject(BaseModel):
     Role: Optional[str] = None
 
 
-class UserModel(BaseModel):
+class UserModel(SerializableModel):
     id: str
     email: str
     username: str
@@ -255,9 +251,6 @@ class UserModel(BaseModel):
     photoUrl: str
     firstName: Optional[str] = None
     role: Optional[str] = None
-
-    def to_dict(self):
-        return self.model_dump()
 
     @classmethod
     def from_sobject(cls, sobject: UserSObject):

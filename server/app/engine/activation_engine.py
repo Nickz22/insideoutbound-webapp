@@ -26,7 +26,6 @@ from app.utils import (
 )
 
 
-@authenticate
 def update_activation_states():
     api_response = ApiResponse(data=[], message="", success=False)
 
@@ -89,7 +88,7 @@ def update_activation_states():
         today = datetime.now().date()
         settings.latest_date_queried = datetime.strptime(
             today.strftime("%Y-%m-%d"), "%Y-%m-%d"
-        ).date()
+        )
         save_settings(settings)
 
         api_response.data = (

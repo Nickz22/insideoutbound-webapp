@@ -1,23 +1,26 @@
 from flask import session
 from app.database.supabase_connection import get_supabase_client
 from app.data_models import Activation, Settings
-from datetime import date
 from app.middleware import authenticate
-from app.mapper.mapper import python_activation_to_supabase_dict
+from app.mapper.mapper import (
+    python_activation_to_supabase_dict,
+    python_settings_to_supabase_dict,
+)
 
 
 @authenticate
 def upsert_activations(new_activations: list[Activation]):
     try:
         supabase = get_supabase_client()
-        for activation in new_activations:
-            activation_dict = python_activation_to_supabase_dict(activation)
-            activation_dict["activated_by_id"] = session["supabase_user_id"]
-            # Upsert the activation
-            result = supabase.table("Activations").upsert(activation_dict).execute()
+        supabase_activations = [
+            {
+                **python_activation_to_supabase_dict(activation),
+                "activated_by_id": session["supabase_user_id"],
+            }
+            for activation in new_activations
+        ]
 
-            if result.get("error"):
-                raise Exception(f"Error upserting activation: {result['error']}")
+        supabase.table("Activations").upsert(supabase_activations).execute()
 
         return True
     except Exception as e:
@@ -25,20 +28,11 @@ def upsert_activations(new_activations: list[Activation]):
         return False
 
 
-@authenticate
 def save_settings(settings: Settings):
     supabase = get_supabase_client()
 
-    settings_dict = settings.__dict__
-
-    # Convert date objects to ISO format strings
-    for key, value in settings_dict.items():
-        if isinstance(value, date):
-            settings_dict[key] = value.isoformat()
-
-    result = supabase.table("settings").upsert(settings_dict).execute()
-
-    if result.get("error"):
-        raise Exception(f"Error saving settings: {result['error']}")
+    settings_dict = python_settings_to_supabase_dict(settings)
+    settings_dict["id"] = session["supabase_user_id"]
+    supabase.table("Settings").upsert(settings_dict).execute()
 
     return True
