@@ -1,4 +1,7 @@
-from flask import Blueprint, jsonify, redirect, request, session, current_app
+import requests, json
+from flask import Blueprint, jsonify, redirect, request, session
+from urllib.parse import unquote
+from uuid import uuid4
 from app.middleware import authenticate
 from app.utils import format_error_message
 from server.app.database.activation_selector import (
@@ -6,7 +9,7 @@ from server.app.database.activation_selector import (
 )
 from server.app.database.settings_selector import load_settings
 from server.app.database.dml import save_settings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.constants import SESSION_EXPIRED
 from app.mapper.mapper import convert_settings_model_to_settings
 from app.helpers.activation_helper import generate_summary
@@ -21,40 +24,32 @@ from server.app.salesforce_api import (
     fetch_events_by_user_ids,
     fetch_logged_in_salesforce_user,
 )
-import requests
 from config import Config
+from app.database.supabase_connection import (
+    get_supabase_client_with_token,
+    set_supabase_user_client,
+)
+from app.database.session_selector import fetch_supabase_session
+from app.database.supabase_user_selector import fetch_supabase_user
 
 bp = Blueprint("main", __name__)
 
 
-@bp.route("/store_code_verifier", methods=["POST"])
-def store_code_verifier():
-    data = request.json
-    code_verifier = data.get("code_verifier")
-    is_sandbox = data.get("is_sandbox", False)
-
-    if not code_verifier:
-        return jsonify({"error": "Code verifier not provided"}), 400
-
-    session["code_verifier"] = code_verifier
-    session["is_sandbox"] = is_sandbox
-    session["is_temporary"] = True
-    session["created_at"] = datetime.now().isoformat()
-
-    return jsonify({"message": "Code verifier stored successfully"}), 200
-
-
 @bp.route("/oauth/callback", methods=["GET"])
 def oauth_callback():
-
     try:
         code = request.args.get("code")
+        state = request.args.get("state")
 
-        if not code or "code_verifier" not in session:
-            return jsonify({"error": "Missing authorization code or session data"}), 400
+        if not code or not state:
+            return jsonify({"error": "Missing authorization code or state"}), 400
 
-        code_verifier = session.get("code_verifier")
-        is_sandbox = session.get("is_sandbox", False)
+        try:
+            state_data = json.loads(unquote(state))
+            code_verifier = state_data["codeVerifier"]
+            is_sandbox = state_data["isSandbox"]
+        except (json.JSONDecodeError, KeyError):
+            return jsonify({"error": "Invalid state parameter"}), 400
 
         base_sf_domain = "test" if is_sandbox else "login"
         token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
@@ -71,32 +66,17 @@ def oauth_callback():
         response = requests.post(token_url, data=payload)
         if response.status_code == 200:
             token_data = response.json()
-
-            # Store token data in session
-            session.clear()  # Clear temporary data
-            session["access_token"] = token_data["access_token"]
-            session["refresh_token"] = token_data["refresh_token"]
-            session["instance_url"] = token_data["instance_url"]
-            session["token_expires_at"] = (
-                datetime.now() + timedelta(hours=1)
-            ).isoformat()
-            session["salesforce_id"] = token_data.get("id").split("/")[-1]
-            session["email"] = token_data.get("email")
-            session["org_id"] = token_data.get("org_id")
-            session["is_sandbox"] = is_sandbox
-            session.permanent = True
-
-            # Generate Supabase JWT
-            # supabase_jwt = generate_supabase_jwt(
-            #     session["salesforce_id"], session["email"]
-            # )
-            # session["supabase_jwt"] = supabase_jwt
+            session_token = create_user_session(token_data, is_sandbox)
 
             settings = load_settings()
             if not settings:
-                return redirect(f"{Config.REACT_APP_URL}/onboard")
+                return redirect(
+                    f"{Config.REACT_APP_URL}/onboard?session_token={session_token}"
+                )
             else:
-                return redirect(f"{Config.REACT_APP_URL}/app/prospecting")
+                return redirect(
+                    f"{Config.REACT_APP_URL}/app/prospecting?session_token={session_token}"
+                )
         else:
             error_details = {
                 "error": "Failed to retrieve access token",
@@ -118,21 +98,23 @@ def logout():
 
 @bp.route("/refresh_token", methods=["POST"])
 def refresh_token():
-    from app.data_models import UserModel, ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
+    session_token = request.headers.get("X-Session-Token")
+    session = fetch_supabase_session(session_token)
+    session_state = json.loads(session["state"])
 
-    if "refresh_token" not in session:
-        response.message = "No refresh token found"
+    if "refresh_token" not in session_state:
+        response.message = "No refresh token found, please login."
         response.type = "AuthenticationError"
         return jsonify(response.to_dict()), 200
 
-    base_sf_domain = "test" if session.get("is_sandbox") else "login"
+    base_sf_domain = "test" if session_state.get("is_sandbox") else "login"
     token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
-
     payload = {
         "grant_type": "refresh_token",
-        "refresh_token": session["refresh_token"],
+        "refresh_token": session_state["refresh_token"],
         "client_id": Config.CLIENT_ID,
         "client_secret": Config.CLIENT_SECRET,
     }
@@ -141,21 +123,10 @@ def refresh_token():
         response_sf = requests.post(token_url, data=payload)
         response_sf.raise_for_status()
         token_data = response_sf.json()
+        token_data["refresh_token"] = session_state["refresh_token"]
 
-        # Update session with new token data
-        session["access_token"] = token_data["access_token"]
-        session["salesforce_id"] = token_data.get("id").split("/")[-1]
-
-        user: UserModel = fetch_logged_in_salesforce_user().data
-
-        session["email"] = user.email
-        session["org_id"] = token_data.get("org_id")
-        session.permanent = True
-        session["token_expires_at"] = (datetime.now() + timedelta(hours=1)).isoformat()
-
-        # Clear the existing Supabase JWT to force regeneration on next request
-        session.pop("supabase_jwt", None)
-
+        session_token = create_user_session(token_data, session_state["is_sandbox"])
+        response.data = [{"session_token": session_token}]
         response.success = True
         response.message = "Token refreshed successfully"
     except requests.exceptions.RequestException as e:
@@ -476,3 +447,40 @@ def get_status_code(response):
     return (
         200 if response.success else 400 if SESSION_EXPIRED in response.message else 503
     )
+
+
+def create_user_session(token_data, is_sandbox):
+    session_token = str(uuid4())
+    salesforce_id = token_data.get("id").split("/")[-1]
+    supabase_user = fetch_supabase_user(salesforce_id)
+    supabase_user_id = supabase_user.id
+    email = supabase_user.email
+    refresh_token = token_data.get("refresh_token")
+    session_state = {
+        "salesforce_id": salesforce_id,
+        "access_token": token_data["access_token"],
+        "refresh_token": refresh_token,
+        "instance_url": token_data["instance_url"],
+        "email": email,
+        "org_id": token_data.get("org_id"),
+        "is_sandbox": is_sandbox,
+        "supabase_user_id": supabase_user_id,
+    }
+
+    response = get_supabase_client_with_token(
+        email=email,
+        refresh_token=refresh_token,
+        supabase_user_id=supabase_user_id,
+    )
+    session_state["jwt_token"] = response["jwt_token"]
+    supabase = response["client"]
+    set_supabase_user_client(supabase)
+    # Store session data in Supabase
+    now = datetime.now(timezone.utc).astimezone()
+    session_data = {
+        "id": session_token,
+        "expiry": (now + timedelta(hours=1)).isoformat(),
+        "state": json.dumps(session_state),
+    }
+    supabase.table("Session").insert(session_data).execute()
+    return session_token

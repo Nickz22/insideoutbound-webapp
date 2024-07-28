@@ -12,8 +12,51 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
  * @typedef {import('types').Settings} Settings
+ * @typedef {import('types').SalesforceUser} SalesforceUser
  * @typedef {import('types').FilterContainer} FilterContainer
  */
+
+/**
+ * @param {SalesforceUser} salesforceUser
+ * @returns
+ */
+export const setupAuthAndUser = async (salesforceUser) => {
+  try {
+    const { id: salesforceUserId, email, name } = salesforceUser;
+
+    // 2. Attempt to sign in or sign up
+    const signInResult = await signInOrSignUp(
+      email,
+      "generic-password-123",
+      salesforceUserId,
+      name
+    );
+    if (!signInResult.success) {
+      console.error(
+        "Error signing in or signing up user:",
+        signInResult.message
+      );
+      return;
+    }
+
+    console.log("Successfully authenticated with Supabase");
+
+    // 3. Upsert custom User table
+    const upsertResult = await upsertUser(salesforceUserId, email, name);
+    if (!upsertResult.success) {
+      console.error(
+        "Error upserting User to custom table:",
+        upsertResult.message
+      );
+      return;
+    }
+
+    // 4. Now you can proceed with loading or saving settings
+    // This is where you'd call your saveSettings function if needed
+  } catch (error) {
+    console.error("Error in setupAuthAndUser:", error);
+  }
+};
 
 /**
  * Signs in or signs up a user

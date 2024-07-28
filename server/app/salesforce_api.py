@@ -13,13 +13,15 @@ from app.data_models import (
     UserModel,
     UserSObject,
 )
-
+from app.database.supabase_connection import get_session_state
 from app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 from flask import session
 
 
 def get_credentials():
-    return session.get("access_token"), session.get("instance_url")
+    session_state = get_session_state()
+
+    return session_state["access_token"], session_state["instance_url"]
 
 
 VALID_FIELD_TYPES = ("string", "picklist", "combobox", "int")

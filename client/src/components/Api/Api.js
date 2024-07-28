@@ -5,6 +5,34 @@ const api = axios.create({
   baseURL: config.apiBaseUrl,
 });
 
+const getSessionToken = () => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const sessionToken = urlParams.get("session_token");
+
+  if (sessionToken) {
+    localStorage.setItem("sessionToken", sessionToken);
+    // Clean up the URL
+    window.history.replaceState({}, document.title, "/app/prospecting");
+  }
+
+  return localStorage.getItem("sessionToken");
+};
+
+api.interceptors.request.use((config) => {
+  try {
+    const sessionToken = getSessionToken();
+
+    if (sessionToken) {
+      config.headers["X-Session-Token"] = sessionToken;
+    }
+
+    return config;
+  } catch (error) {
+    console.error("Error in request interceptor:", error);
+    return Promise.reject(error);
+  }
+});
+
 api.interceptors.response.use(
   async (response) => {
     // Check if the response contains authentication error information
@@ -45,21 +73,8 @@ api.defaults.withCredentials = true;
  */
 export const getRefreshToken = async () => {
   const response = await api.post(`${config.apiBaseUrl}/refresh_token`);
+  localStorage.setItem("sessionToken", response.data.data[0].session_token);
   return { ...response.data, statusCode: response.status };
-};
-
-/**
- * @param {string} codeVerifier
- * @param {boolean} isSandbox
- * @returns {Promise<ApiResponse>}
- */
-export const storeCodeVerifier = async (codeVerifier, isSandbox) => {
-  await api.post(`${config.apiBaseUrl}/store_code_verifier`, {
-    code_verifier: codeVerifier,
-    is_sandbox: isSandbox,
-  });
-
-  return { data: [], success: true, message: "", statusCode: 200 };
 };
 
 /**

@@ -1,5 +1,5 @@
 from flask import session
-from app.database.supabase_connection import get_supabase_client
+from app.database.supabase_connection import get_supabase_user_client
 from app.data_models import Activation, Settings
 from app.middleware import authenticate
 from app.mapper.mapper import (
@@ -11,7 +11,7 @@ from app.mapper.mapper import (
 @authenticate
 def upsert_activations(new_activations: list[Activation]):
     try:
-        supabase = get_supabase_client()
+        supabase = get_supabase_user_client()
         supabase_activations = [
             {
                 **python_activation_to_supabase_dict(activation),
@@ -29,7 +29,7 @@ def upsert_activations(new_activations: list[Activation]):
 
 
 def save_settings(settings: Settings):
-    supabase = get_supabase_client()
+    supabase = get_supabase_user_client()
 
     settings_dict = python_settings_to_supabase_dict(settings)
     settings_dict["id"] = session["supabase_user_id"]

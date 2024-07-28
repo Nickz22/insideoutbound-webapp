@@ -7,8 +7,6 @@ load_dotenv()
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY") or os.urandom(24)
-    SQLALCHEMY_DATABASE_URI = os.environ.get("DATABASE_URL")
-    SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     SUPABASE_PROJECT_ID = os.getenv("SUPABASE_PROJECT_ID")
     SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
@@ -21,10 +19,13 @@ class Config:
     REDIRECT_URI = f"{BASE_SERVER_URL}/oauth/callback"
 
     # Session configuration
-    SESSION_TYPE = "sqlalchemy"
-    SESSION_SQLALCHEMY = None  # This will be set in create_app
-    SESSION_SQLALCHEMY_TABLE = "sessions"
+    SESSION_TYPE = "filesystem"  # You can change this to "redis" if you prefer
+    SESSION_FILE_DIR = os.getenv("SESSION_FILE_DIR", "./flask_session")
+    SESSION_PERMANENT = True
     PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
-    SESSION_COOKIE_SECURE = True  # for HTTPS
+    SESSION_COOKIE_SECURE = (
+        os.getenv("FLASK_ENV") == "production"
+    )  # Only use secure cookies in production
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_DOMAIN = None  # Allow the cookie to be valid for all subdomains

@@ -1,50 +1,34 @@
+from flask import request, g
+import json
 from functools import wraps
-from flask import session
-from datetime import datetime
+from datetime import datetime, timezone
 from app.data_models import AuthenticationError
-from app.database.supabase_connection import get_supabase_client
+from app.database.supabase_connection import (
+    set_supabase_user_client_with_token,
+    set_session_state,
+)
+from app.database.session_selector import fetch_supabase_session
 
 
 def authenticate(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        # Salesforce authentication check
-        if "access_token" not in session:
-            raise AuthenticationError("Session expired")
-            # return (
-            #     jsonify({"error": "session expired", "type": "AuthenticationError"}),
-            #     401,
-            # )
+        session_token = request.headers.get("X-Session-Token")
+        if not session_token:
+            raise Exception("missing session token, are you logged in?")
 
-        if "token_expires_at" not in session or datetime.now() > datetime.fromisoformat(
-            session["token_expires_at"]
-        ):
-            raise AuthenticationError("Session expired")
-            # return (
-            #     jsonify(
-            #         {
-            #             "error": "session expired",
-            #             "code": "TOKEN_EXPIRED",
-            #             "type": "AuthenticationError",
-            #         }
-            #     ),
-            #     401,
-            # )
+        session = fetch_supabase_session(session_token)
+        session_state = json.loads(session["state"])
+        set_session_state(session_state)
 
-        if "salesforce_id" not in session:
-            raise AuthenticationError("Session expired")
-            # return (
-            #     jsonify(
-            #         {
-            #             "error": "session expired",
-            #             "type": "AuthenticationError",
-            #         }
-            #     ),
-            #     404,
-            # )
+        now = datetime.now(timezone.utc).astimezone()
 
-        # Supabase authentication check
-        get_supabase_client()
+        if now > datetime.fromisoformat(session["expiry"]):
+            raise AuthenticationError("Session expired")
+
+        set_supabase_user_client_with_token(
+            session_state["jwt_token"], session_state["refresh_token"]
+        )
 
         return f(*args, **kwargs)
 

@@ -2,7 +2,6 @@ export interface SalesforceUser {
   id: string;
   email: string;
   username: string;
-  firstName: string;
-  lastName: string;
+  name: string;
   photoUrl: string;
 }

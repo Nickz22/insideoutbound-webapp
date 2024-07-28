@@ -3,7 +3,6 @@ import { Button, Box, Container } from "@mui/material";
 import logo from "../assets/images/logo.jpeg";
 import { generatePKCEChallenge } from "../utils/crypto";
 import config from "../config";
-import { storeCodeVerifier } from "../components/Api/Api"; // Import the API function
 
 const Login = () => {
   const handleLogin = async (e, loginUrlBase) => {
@@ -14,29 +13,26 @@ const Login = () => {
     const isSandbox = loginUrlBase.includes("test.salesforce.com");
 
     try {
-      // Store the code verifier in the Flask session
-      const response = await storeCodeVerifier(codeVerifier, isSandbox);
-
-      if (response.statusCode !== 200) {
-        console.error("Failed to start auth session:", response.message);
-        return;
-      }
-
-      // Store the code verifier in the browser's session storage
-      sessionStorage.setItem("code_verifier", codeVerifier);
-
       const clientId = process.env.REACT_APP_CLIENT_ID;
       const redirectUri = `${config.apiBaseUrl}/oauth/callback`;
+
+      // Encode the code verifier and sandbox flag in the state parameter
+      const state = encodeURIComponent(
+        JSON.stringify({
+          codeVerifier,
+          isSandbox,
+        })
+      );
+
       const loginUrl = `${loginUrlBase}/services/oauth2/authorize?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
         redirectUri
-      )}&code_challenge=${codeChallenge}&code_challenge_method=S256`;
+      )}&code_challenge=${codeChallenge}&code_challenge_method=S256&state=${state}`;
 
       window.location.href = loginUrl;
     } catch (error) {
       console.error("Error starting auth session:", error);
     }
   };
-
   return (
     <Container maxWidth="sm" sx={{ textAlign: "center", marginTop: "100px" }}>
       <Box display="flex" flexDirection="column" alignItems="center">

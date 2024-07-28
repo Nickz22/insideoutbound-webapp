@@ -16,6 +16,7 @@ import {
   saveSettings as saveSettingsToSupabase,
   signInOrSignUp,
   upsertUser,
+  setupAuthAndUser,
 } from "../services/SupabaseServices";
 
 /**
@@ -26,6 +27,7 @@ import {
  * @typedef {import('types').ApiResponse} ApiResponse
  * @typedef {import('types').TableData} TableData
  * @typedef {import('types').TableColumn} TableColumn
+ * @typedef {import('types').SalesforceUser} SalesforceUser
  */
 
 import {
@@ -171,59 +173,23 @@ const Onboard = () => {
   }, [gatheringResponses]);
 
   useEffect(() => {
-    const setupAuthAndUser = async () => {
-      try {
-        // 1. Retrieve Salesforce user info
-        const sfResponse = await fetchLoggedInSalesforceUser();
-        if (!sfResponse.success) {
-          console.error(
-            `Error fetching Salesforce User: ${sfResponse.message}`
-          );
-          return;
-        }
-        const { id: salesforceUserId, email, name } = sfResponse.data[0];
-
-        // 2. Attempt to sign in or sign up
-        const signInResult = await signInOrSignUp(
-          email,
-          "generic-password-123",
-          salesforceUserId,
-          name
-        );
-        if (!signInResult.success) {
-          console.error(
-            "Error signing in or signing up user:",
-            signInResult.message
-          );
-          return;
-        }
-
-        console.log("Successfully authenticated with Supabase");
-
-        // 3. Upsert custom User table
-        const upsertResult = await upsertUser(salesforceUserId, email, name);
-        if (!upsertResult.success) {
-          console.error(
-            "Error upserting User to custom table:",
-            upsertResult.message
-          );
-          return;
-        }
-
-        // Update gatheringResponses with Salesforce user ID
-        setGatheringResponses((prev) => ({
-          ...prev,
-          salesforceUserId: { value: salesforceUserId },
-        }));
-
-        // 4. Now you can proceed with loading or saving settings
-        // This is where you'd call your saveSettings function if needed
-      } catch (error) {
-        console.error("Error in setupAuthAndUser:", error);
+    const setupAuth = async () => {
+      const sfResponse = await fetchLoggedInSalesforceUser();
+      if (!sfResponse.success) {
+        console.error(`Error fetching Salesforce User: ${sfResponse.message}`);
+        return;
       }
-    };
+      /** @type {SalesforceUser} */
+      const salesforceUser = sfResponse.data[0];
+      await setupAuthAndUser(salesforceUser);
 
-    setupAuthAndUser();
+      // Update gatheringResponses with Salesforce user ID
+      setGatheringResponses((prev) => ({
+        ...prev,
+        salesforceUserId: { value: salesforceUser.id },
+      }));
+    };
+    setupAuth();
   }, []);
 
   useEffect(() => {

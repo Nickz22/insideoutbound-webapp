@@ -1,13 +1,13 @@
 from typing import List
 from app.data_models import Activation
 from app.data_models import ApiResponse
-from app.database.supabase_connection import get_supabase_client
+from app.database.supabase_connection import get_supabase_user_client
 from app.mapper.mapper import supabase_dict_to_python_activation
 
 
 def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResponse:
     try:
-        supabase_client = get_supabase_client()
+        supabase_client = get_supabase_user_client()
         response = (
             supabase_client.table("Activations")
             .select("*")
