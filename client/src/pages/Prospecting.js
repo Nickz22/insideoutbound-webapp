@@ -23,6 +23,7 @@ import {
   fetchSalesforceUsers,
   fetchProspectingActivities,
   fetchAndUpdateProspectingActivity,
+  generateActivationSummary,
 } from "src/components/Api/Api";
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
@@ -136,7 +137,7 @@ const Prospecting = () => {
         setLoading(true);
         const newSummary = (
           await generateActivationSummary(filteredData.map((item) => item.id))
-        ).data.summary;
+        ).data[0].summary;
         setLoading(false);
         setFilteredSummaryData(newSummary);
       } else {

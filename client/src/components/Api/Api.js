@@ -262,7 +262,6 @@ export const generateActivationSummary = async (activation_ids) => {
     "/get_prospecting_activities_filtered_by_ids",
     {
       params: { activation_ids: activation_ids },
-      validateStatus: () => true,
     }
   );
   return { ...response.data, statusCode: response.status };

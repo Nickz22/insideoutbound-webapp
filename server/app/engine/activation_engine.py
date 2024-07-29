@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.services.activation_service import (
     compute_activated_accounts,
@@ -85,10 +85,8 @@ def update_activation_states():
 
         upsert_activations(new_activations)
 
-        today = datetime.now().date()
-        settings.latest_date_queried = datetime.strptime(
-            today.strftime("%Y-%m-%d"), "%Y-%m-%d"
-        )
+        now_utc = datetime.now(timezone.utc)
+        settings.latest_date_queried = now_utc
         save_settings(settings)
 
         api_response.data = (

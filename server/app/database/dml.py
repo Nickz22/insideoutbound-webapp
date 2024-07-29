@@ -1,24 +1,17 @@
-from flask import session
 from app.database.supabase_connection import (
-    get_supabase_user_client,
     get_supabase_admin_client,
     get_session_state,
 )
 from app.data_models import Activation, Settings
-from app.middleware import authenticate
 from app.mapper.mapper import (
     python_activation_to_supabase_dict,
     python_settings_to_supabase_dict,
 )
-from uuid import uuid4
 from datetime import datetime
-
+from uuid import uuid4
 from os import environ
 
 SUPABASE_ALL_USERS_PASSWORD = environ.get("SUPABASE_ALL_USERS_PASSWORD")
-
-from supabase import create_client
-from uuid import uuid4
 from datetime import datetime
 
 
@@ -67,12 +60,12 @@ def insert_supabase_user(salesforce_id: str, email: str, org_id: str, is_sandbox
 
 def upsert_activations(new_activations: list[Activation]):
     try:
-        supabase = get_supabase_user_client()
+        supabase = get_supabase_admin_client()
         session_state = get_session_state()
         supabase_activations = [
             {
                 **python_activation_to_supabase_dict(activation),
-                "activated_by_id": session_state["supabase_user_id"],
+                "activated_by_id": session_state["salesforce_id"],
             }
             for activation in new_activations
         ]
@@ -86,12 +79,17 @@ def upsert_activations(new_activations: list[Activation]):
 
 
 def save_settings(settings: Settings):
-    supabase = get_supabase_user_client()
+    supabase = get_supabase_admin_client()
 
     settings_dict = python_settings_to_supabase_dict(settings)
     session_state = get_session_state()
+    settings_dict["salesforce_user_id"] = session_state["salesforce_id"]
 
-    settings_dict["id"] = session_state["supabase_user_id"]
-    supabase.table("Settings").upsert(settings_dict).execute()
+    if "id" not in settings_dict:
+        settings_dict["id"] = str(uuid4())
+
+    supabase.table("Settings").upsert(
+        settings_dict, on_conflict=["salesforce_user_id"]
+    ).execute()
 
     return True

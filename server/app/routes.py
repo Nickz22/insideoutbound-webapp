@@ -29,14 +29,10 @@ from server.app.salesforce_api import (
 )
 from config import Config
 from app.database.supabase_connection import (
-    get_supabase_client_with_token,
-    set_supabase_user_client,
     get_supabase_admin_client,
-    get_supabase_user_client,
     set_session_state,
 )
 from app.database.session_selector import fetch_supabase_session
-from app.database.supabase_user_selector import fetch_supabase_user
 
 bp = Blueprint("main", __name__)
 
@@ -103,9 +99,7 @@ def logout():
 
     api_response = ApiResponse(data=[], message="", success=False)
     admin_supabase = get_supabase_admin_client()
-    user_subabase = get_supabase_user_client()
     admin_supabase.auth.sign_out()
-    user_subabase.auth.sign_out()
 
     api_response.success = True
     api_response.message = "Logged out successfully"
@@ -259,10 +253,14 @@ def get_prospecting_activities_filtered_by_ids():
                 for activation in activations
                 if activation.id in activation_ids
             ]
-            response.data = {
-                "summary": generate_summary(filtered_activations),
-                "raw_data": filtered_activations,
-            }
+            response.data = [
+                {
+                    "summary": generate_summary(filtered_activations),
+                    "raw_data": [
+                        activation.to_dict() for activation in filtered_activations
+                    ],
+                }
+            ]
             response.success = True
     except Exception as e:
         response.message = (
@@ -480,46 +478,17 @@ def get_status_code(response):
 def create_session(token_data, is_sandbox):
     session_token = str(uuid4())
     salesforce_id = token_data.get("id").split("/")[-1]
-    # set to enable query of salesforce user
-    set_session_state(
-        {
-            "access_token": token_data["access_token"],
-            "instance_url": token_data["instance_url"],
-        }
-    )
-    salesforce_user = fetch_salesforce_users([salesforce_id]).data[0]
     org_id = token_data.get("org_id")
-    supabase_user = fetch_supabase_user(salesforce_id)
-    if supabase_user is None:
-        insert_supabase_user(
-            salesforce_id=salesforce_id,
-            email=salesforce_user.email,
-            org_id=org_id,
-            is_sandbox=is_sandbox,
-        )
-        supabase_user = fetch_supabase_user(salesforce_id)
-    supabase_user_id = supabase_user.id
-    email = supabase_user.email
     refresh_token = token_data.get("refresh_token")
     session_state = {
         "salesforce_id": salesforce_id,
         "access_token": token_data["access_token"],
         "refresh_token": refresh_token,
         "instance_url": token_data["instance_url"],
-        "email": email,
         "org_id": org_id,
         "is_sandbox": is_sandbox,
-        "supabase_user_id": supabase_user_id,
     }
-
-    response = get_supabase_client_with_token(
-        email=email,
-        refresh_token=refresh_token,
-        supabase_user_id=supabase_user_id,
-    )
-    session_state["jwt_token"] = response["jwt_token"]
-    supabase = response["client"]
-    set_supabase_user_client(supabase)
+    set_session_state(session_state)
     # Store session data in Supabase
     now = datetime.now(timezone.utc).astimezone()
     session_data = {
@@ -527,5 +496,6 @@ def create_session(token_data, is_sandbox):
         "expiry": (now + timedelta(hours=1)).isoformat(),
         "state": json.dumps(session_state),
     }
+    supabase = get_supabase_admin_client()
     supabase.table("Session").insert(session_data).execute()
     return session_token

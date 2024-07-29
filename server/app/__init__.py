@@ -1,17 +1,11 @@
 from flask import Flask
 from flask_cors import CORS
-from flask_session import Session
 from config import Config
-
-server_session = Session()
 
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-
-    # Initialize Flask-Session
-    server_session.init_app(app)
 
     CORS(
         app,
