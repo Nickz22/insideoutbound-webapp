@@ -23,9 +23,7 @@ import {
   fetchSalesforceUsers,
   fetchProspectingActivities,
   fetchAndUpdateProspectingActivity,
-  fetchLoggedInSalesforceUser,
 } from "src/components/Api/Api";
-import { setupAuthAndUser } from "../services/SupabaseServices";
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
 
@@ -108,21 +106,6 @@ const Prospecting = () => {
 
     fetchAndSetActivatedByUsers();
   }, [summaryData, rawData]);
-
-  useEffect(() => {
-    const setupAuth = async () => {
-      const sfResponse = await fetchLoggedInSalesforceUser();
-      if (!sfResponse.success) {
-        console.error(`Error fetching Salesforce User: ${sfResponse.message}`);
-        return;
-      }
-      /** @type {SalesforceUser} */
-      const salesforceUser = sfResponse.data[0];
-      await setupAuthAndUser(salesforceUser);
-    };
-
-    setupAuth();
-  });
 
   const handleRefresh = () => {
     fetchData(true);

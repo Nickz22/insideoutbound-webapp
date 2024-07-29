@@ -1,6 +1,11 @@
 import axios from "axios";
 import config from "../../config";
 import { handleAuthError } from "./../../services/AuthServices";
+
+/**
+ * @typedef {import('types').Settings} Settings
+ */
+
 const api = axios.create({
   baseURL: config.apiBaseUrl,
 });
@@ -68,6 +73,14 @@ api.defaults.withCredentials = true;
  * @typedef {import('types').TableColumn} TableColumn
  */
 
+export const logout = async () => {
+  const response = await api.post("/logout");
+  if (response.data.success) {
+    localStorage.removeItem("sessionToken");
+    window.location.href = "/";
+  }
+};
+
 /**
  * @returns {Promise<ApiResponse>}
  */
@@ -83,6 +96,25 @@ export const getRefreshToken = async () => {
  */
 export const fetchProspectingActivities = async () => {
   const response = await api.get("/get_prospecting_activities");
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * Fetches settings
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchSettings = async () => {
+  const response = await api.get("/get_settings");
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * saves settings
+ * @param {Settings} settings
+ * @returns {Promise<ApiResponse>}
+ */
+export const saveSettings = async (settings) => {
+  const response = await api.post("/save_settings", settings);
   return { ...response.data, statusCode: response.status };
 };
 

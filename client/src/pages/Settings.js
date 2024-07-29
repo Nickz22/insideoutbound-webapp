@@ -22,8 +22,9 @@ import {
   fetchEventFilterFields,
   fetchTaskFilterFields,
   fetchSalesforceUsers,
+  fetchSettings,
+  saveSettings,
 } from "../components/Api/Api";
-import { fetchSettings, saveSettings } from "../services/SupabaseServices";
 import { FILTER_OPERATOR_MAPPING } from "../utils/c";
 import FilterContainer from "../components/FilterContainer/FilterContainer";
 import CustomTable from "../components/CustomTable/CustomTable";
@@ -67,6 +68,8 @@ const Settings = () => {
           fetchSettings(),
         ]);
 
+        /** @type {Settings} */
+        const settings = settingsResponse.data[0];
         if (taskFilterFieldsResponse.statusCode === 200) {
           setTaskFilterFields(taskFilterFieldsResponse.data);
         } else if (
@@ -84,18 +87,18 @@ const Settings = () => {
         setEventFilterFields(eventFilterFieldsResponse.data);
 
         // Set the default userRole based on teamMemberIds
-        const teamMemberIds = settingsResponse.data.teamMemberIds || [];
+        const teamMemberIds = settings.teamMemberIds || [];
         const defaultUserRole =
           teamMemberIds.length > 0
             ? "I manage a team"
             : "I am an individual contributor";
 
         setSettings({
-          ...settingsResponse.data,
-          userRole: settingsResponse.data.userRole || defaultUserRole,
+          ...settings,
+          userRole: settings.userRole || defaultUserRole,
         });
 
-        setCriteria(settingsResponse.data.criteria || []);
+        setCriteria(settings.criteria || []);
 
         if (teamMemberIds.length > 0) {
           await fetchTeamMembersData(teamMemberIds);

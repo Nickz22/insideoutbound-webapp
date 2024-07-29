@@ -31,7 +31,7 @@ def set_supabase_user_client(client):
 def set_supabase_user_client_with_token(jwt_token, refresh_token):
     supabase_user_client = create_client(url, admin_key)
     supabase_user_client.auth.set_session(jwt_token, refresh_token)
-    g.supabase_user_client = supabase
+    g.supabase_user_client = supabase_user_client
 
 
 def get_supabase_user_client():
@@ -67,7 +67,7 @@ def get_supabase_client_with_token(
         jwt_token = generate_supabase_jwt(email, supabase_user_id)
         supabase_user_client = create_client(url, admin_key)
         supabase_user_client.auth.set_session(jwt_token, refresh_token)
-        return {"client": supabase, "jwt_token": jwt_token}
+        return {"client": supabase_user_client, "jwt_token": jwt_token}
     except AuthenticationError as e:
         print(str(e))
         raise e

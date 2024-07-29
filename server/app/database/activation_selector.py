@@ -8,6 +8,7 @@ from app.mapper.mapper import supabase_dict_to_python_activation
 def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResponse:
     try:
         supabase_client = get_supabase_user_client()
+
         response = (
             supabase_client.table("Activations")
             .select("*")

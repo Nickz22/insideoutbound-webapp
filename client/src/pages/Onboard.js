@@ -11,13 +11,8 @@ import {
   fetchTaskFields,
   fetchTaskFilterFields,
   generateCriteria,
-} from "../components/Api/Api";
-import {
   saveSettings as saveSettingsToSupabase,
-  signInOrSignUp,
-  upsertUser,
-  setupAuthAndUser,
-} from "../services/SupabaseServices";
+} from "../components/Api/Api";
 
 /**
  * @typedef {import('types').SObject} SObject
@@ -173,7 +168,7 @@ const Onboard = () => {
   }, [gatheringResponses]);
 
   useEffect(() => {
-    const setupAuth = async () => {
+    const setLoggedInSalesforceUser = async () => {
       const sfResponse = await fetchLoggedInSalesforceUser();
       if (!sfResponse.success) {
         console.error(`Error fetching Salesforce User: ${sfResponse.message}`);
@@ -181,7 +176,6 @@ const Onboard = () => {
       }
       /** @type {SalesforceUser} */
       const salesforceUser = sfResponse.data[0];
-      await setupAuthAndUser(salesforceUser);
 
       // Update gatheringResponses with Salesforce user ID
       setGatheringResponses((prev) => ({
@@ -189,7 +183,7 @@ const Onboard = () => {
         salesforceUserId: { value: salesforceUser.id },
       }));
     };
-    setupAuth();
+    setLoggedInSalesforceUser();
   }, []);
 
   useEffect(() => {
@@ -208,13 +202,14 @@ const Onboard = () => {
   const saveSettings = async () => {
     try {
       /** @type {Settings} */
-      const settings = Object.keys(gatheringResponses).reduce((acc, key) => {
+      let settings = getSettingsFromResponses();
+      settings = Object.keys(settings).reduce((acc, key) => {
         acc[key] =
-          gatheringResponses[key].value === "Yes"
+          settings[key] === "Yes"
             ? true
-            : gatheringResponses[key].value === "No"
+            : settings[key] === "No"
             ? false
-            : gatheringResponses[key].value;
+            : settings[key];
         return acc;
       }, {});
       const result = await saveSettingsToSupabase(settings);
@@ -241,7 +236,7 @@ const Onboard = () => {
         10
       ), // Tracking Period
       criteria: filters,
-      meetingObject: gatheringResponses["meetingObject"]?.value,
+      meetingObject: gatheringResponses["meetingObject"]?.value.toLowerCase().includes("task") ? "Task" : "Event",
       meetingsCriteria: gatheringResponses["meetingsCriteria"]?.value,
       activitiesPerContact: parseInt(
         gatheringResponses["activitiesPerContact"]?.value,

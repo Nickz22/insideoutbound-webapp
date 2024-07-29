@@ -1,4 +1,3 @@
-import { supabase } from "./SupabaseServices";
 import { getRefreshToken } from "src/components/Api/Api";
 /**
  * @typedef {import('types').ApiResponse} ApiResponse
@@ -27,11 +26,6 @@ export const refreshAuth = async () => {
       return false;
     }
 
-    // Refresh Supabase session
-    const { data, error } = await supabase.auth.refreshSession();
-    if (error) throw error;
-
-    setAuthenticatedUserId(data.user.id);
     return true;
   } catch (error) {
     console.error("Error refreshing authentication:", error);

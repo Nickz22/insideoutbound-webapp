@@ -1,5 +1,5 @@
 import requests, json
-from flask import Blueprint, jsonify, redirect, request, session
+from flask import Blueprint, jsonify, redirect, request
 from urllib.parse import unquote
 from uuid import uuid4
 from app.middleware import authenticate
@@ -8,10 +8,13 @@ from server.app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
 from server.app.database.settings_selector import load_settings
-from server.app.database.dml import save_settings
+from server.app.database.dml import save_settings, insert_supabase_user
 from datetime import datetime, timedelta, timezone
 from app.constants import SESSION_EXPIRED
-from app.mapper.mapper import convert_settings_model_to_settings
+from app.mapper.mapper import (
+    convert_settings_model_to_settings,
+    convert_settings_to_settings_model,
+)
 from app.helpers.activation_helper import generate_summary
 from app.services.setting_service import define_criteria_from_events_or_tasks
 from app.engine.activation_engine import update_activation_states
@@ -28,6 +31,9 @@ from config import Config
 from app.database.supabase_connection import (
     get_supabase_client_with_token,
     set_supabase_user_client,
+    get_supabase_admin_client,
+    get_supabase_user_client,
+    set_session_state,
 )
 from app.database.session_selector import fetch_supabase_session
 from app.database.supabase_user_selector import fetch_supabase_user
@@ -66,7 +72,7 @@ def oauth_callback():
         response = requests.post(token_url, data=payload)
         if response.status_code == 200:
             token_data = response.json()
-            session_token = create_user_session(token_data, is_sandbox)
+            session_token = create_session(token_data, is_sandbox)
 
             settings = load_settings()
             if not settings:
@@ -90,10 +96,20 @@ def oauth_callback():
         return jsonify({"error": f"Failed to retrieve access token: {error_msg}"}), 500
 
 
-@bp.route("/logout")
+@bp.route("/logout", methods=["POST"])
+@authenticate
 def logout():
-    session.clear()
-    return jsonify({"message": "Logged out successfully"}), 200
+    from app.data_models import ApiResponse
+
+    api_response = ApiResponse(data=[], message="", success=False)
+    admin_supabase = get_supabase_admin_client()
+    user_subabase = get_supabase_user_client()
+    admin_supabase.auth.sign_out()
+    user_subabase.auth.sign_out()
+
+    api_response.success = True
+    api_response.message = "Logged out successfully"
+    return jsonify(api_response.to_dict()), 200
 
 
 @bp.route("/refresh_token", methods=["POST"])
@@ -125,7 +141,7 @@ def refresh_token():
         token_data = response_sf.json()
         token_data["refresh_token"] = session_state["refresh_token"]
 
-        session_token = create_user_session(token_data, session_state["is_sandbox"])
+        session_token = create_session(token_data, session_state["is_sandbox"])
         response.data = [{"session_token": session_token}]
         response.success = True
         response.message = "Token refreshed successfully"
@@ -293,29 +309,41 @@ def fetch_prospecting_activity():
 @bp.route("/save_settings", methods=["POST"])
 @authenticate
 def commit_settings():
-    from app.data_models import ApiResponse, SettingsModel
+    from app.data_models import SettingsModel, ApiResponse
 
+    api_response = ApiResponse(data=[], message="", success=False)
     try:
         data = request.json
         settings = convert_settings_model_to_settings(SettingsModel(**data))
         save_settings(settings)
-        return jsonify({"message": "Settings saved successfully"}), 200
+        api_response.success = True
+        api_response.message = "Settings saved successfully"
     except Exception as e:
-        print(f"Failed to save settings: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        error_msg = format_error_message(e)
+        print(error_msg)
+        api_response.message = f"Failed to save settings: {error_msg}"
+
+    return jsonify(api_response.to_dict()), 200 if api_response.success else 400
 
 
 @bp.route("/get_settings", methods=["GET"])
 @authenticate
 def get_settings():
-    from app.data_models import SettingsModel
+    from app.data_models import SettingsModel, ApiResponse
+
+    api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        settings_model = SettingsModel(settings=load_settings())
-        return jsonify(settings_model.to_dict()), 200
+        settings = load_settings()
+        settings_model: SettingsModel = convert_settings_to_settings_model(settings)
+        api_response.data = [settings_model.to_dict()]
+        api_response.success = True
+        return jsonify(api_response.to_dict()), 200
     except Exception as e:
         print(f"Failed to retrieve settings: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        api_response.message = f"Failed to retrieve settings: {str(e)}"
+
+    return api_response
 
 
 @bp.route("/get_salesforce_users", methods=["GET"])
@@ -449,10 +477,27 @@ def get_status_code(response):
     )
 
 
-def create_user_session(token_data, is_sandbox):
+def create_session(token_data, is_sandbox):
     session_token = str(uuid4())
     salesforce_id = token_data.get("id").split("/")[-1]
+    # set to enable query of salesforce user
+    set_session_state(
+        {
+            "access_token": token_data["access_token"],
+            "instance_url": token_data["instance_url"],
+        }
+    )
+    salesforce_user = fetch_salesforce_users([salesforce_id]).data[0]
+    org_id = token_data.get("org_id")
     supabase_user = fetch_supabase_user(salesforce_id)
+    if supabase_user is None:
+        insert_supabase_user(
+            salesforce_id=salesforce_id,
+            email=salesforce_user.email,
+            org_id=org_id,
+            is_sandbox=is_sandbox,
+        )
+        supabase_user = fetch_supabase_user(salesforce_id)
     supabase_user_id = supabase_user.id
     email = supabase_user.email
     refresh_token = token_data.get("refresh_token")
@@ -462,7 +507,7 @@ def create_user_session(token_data, is_sandbox):
         "refresh_token": refresh_token,
         "instance_url": token_data["instance_url"],
         "email": email,
-        "org_id": token_data.get("org_id"),
+        "org_id": org_id,
         "is_sandbox": is_sandbox,
         "supabase_user_id": supabase_user_id,
     }

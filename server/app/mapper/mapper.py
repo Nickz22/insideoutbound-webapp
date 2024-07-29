@@ -19,7 +19,7 @@ from app.utils import (
 )
 
 
-def convert_filter(f: Dict) -> Filter:
+def convert_dict_to_filter(f: Dict) -> Filter:
     # Convert camelCase to snake_case for data_type
     f["data_type"] = f.pop("data_type")
     # Convert options to string if it exists
@@ -32,7 +32,7 @@ def convert_dict_to_filter_container(fc: Dict) -> FilterContainer:
     # Convert camelCase to snake_case for filter_logic
     fc["filter_logic"] = fc.pop("filter_logic")
     # Convert each filter in the filters list
-    fc["filters"] = [convert_filter(f) for f in fc["filters"]]
+    fc["filters"] = [convert_dict_to_filter(f) for f in fc["filters"]]
     return FilterContainer(**fc)
 
 
@@ -259,7 +259,7 @@ def convert_filter_container_model_to_filter_container(
 
     return FilterContainer(
         name=fcm.name,
-        filters=[convert_filter_model_to_filter(FilterModel(**f)) for f in fcm.filters],
+        filters=[convert_filter_model_to_filter(f) for f in fcm.filters],
         filter_logic=surround_numbers_with_underscores(fcm.filterLogic),
     )
 
@@ -279,19 +279,15 @@ def convert_settings_model_to_settings(sm: SettingsModel) -> Settings:
         inactivity_threshold=sm.inactivityThreshold,
         criteria=(
             [
-                convert_filter_container_model_to_filter_container(
-                    FilterContainerModel(**fc)
-                )
-                for fc in sm.criteria
+                convert_filter_container_model_to_filter_container(criteria)
+                for criteria in sm.criteria
             ]
             if len(sm.criteria) > 0
             else [FilterContainer(name="", filters=[], filter_logic="")]
         ),
         meeting_object=sm.meetingObject,
         meetings_criteria=(
-            convert_filter_container_model_to_filter_container(
-                FilterContainerModel(**sm.meetingsCriteria)
-            )
+            convert_filter_container_model_to_filter_container(sm.meetingsCriteria)
             if sm.meetingsCriteria is not None
             else FilterContainer(name="", filters=[], filter_logic="")
         ),
@@ -302,4 +298,26 @@ def convert_settings_model_to_settings(sm: SettingsModel) -> Settings:
         activate_by_opportunity=sm.activateByOpportunity,
         team_member_ids=sm.teamMemberIds,
         salesforce_user_id=sm.salesforceUserId,
+    )
+
+
+def convert_settings_to_settings_model(s: Settings) -> SettingsModel:
+    return SettingsModel(
+        inactivityThreshold=s.inactivity_threshold,
+        criteria=[
+            convert_filter_container_to_filter_container_model(fc) for fc in s.criteria
+        ],
+        meetingObject=s.meeting_object,
+        meetingsCriteria=(
+            convert_filter_container_to_filter_container_model(s.meetings_criteria)
+            if s.meetings_criteria is not None
+            else FilterContainerModel(name="", filters=[], filterLogic="")
+        ),
+        activitiesPerContact=s.activities_per_contact,
+        contactsPerAccount=s.contacts_per_account,
+        trackingPeriod=s.tracking_period,
+        activateByMeeting=s.activate_by_meeting,
+        activateByOpportunity=s.activate_by_opportunity,
+        teamMemberIds=s.team_member_ids,
+        salesforceUserId=s.salesforce_user_id,
     )

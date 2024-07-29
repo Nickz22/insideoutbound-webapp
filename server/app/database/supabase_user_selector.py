@@ -8,17 +8,15 @@ def fetch_supabase_user(salesforce_id: str):
 
         # Fetch all users
         response = service_supabase.auth.admin.list_users()
-
+        supabase_user = None
         # Find the user with matching salesforce_id in user metadata
         for user in response:
             if (
                 user.user_metadata
                 and user.user_metadata.get("salesforce_id") == salesforce_id
             ):
-                return user
+                supabase_user = user
 
-        raise AuthenticationError(
-            f"Could not find Supabase user with Salesforce ID: {salesforce_id}"
-        )
+        return supabase_user
     except Exception as e:
         raise AuthenticationError(f"Failed to fetch Supabase user ID: {str(e)}")

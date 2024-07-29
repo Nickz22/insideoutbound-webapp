@@ -143,7 +143,7 @@ def fetch_criteria_tasks_by_account_ids_from_date(
     return api_response
 
 
-def fetch_salesforce_users():
+def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
     """
     Fetches Salesforce users from Salesforce.
 
@@ -157,6 +157,9 @@ def fetch_salesforce_users():
 
     try:
         soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User"
+
+        if ids:
+            soql_query += f" WHERE Id IN ('{','.join(ids)}')"
 
         response = _fetch_sobjects(soql_query, get_credentials())
         for entry in response.data:

@@ -1,12 +1,14 @@
 import React from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import {
   Drawer,
   List,
   ListItemButton,
   ListItemText,
   Divider,
+  Box,
 } from "@mui/material";
+import { logout } from "../Api/Api";
 import "./Sidebar.css";
 
 const CustomNavLink = ({ to, label }) => {
@@ -31,13 +33,29 @@ const CustomNavLink = ({ to, label }) => {
 };
 
 const Sidebar = () => {
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    }
+  };
+
   return (
     <Drawer
       variant="permanent"
       sx={{
         width: 240,
         flexShrink: 0,
-        [`& .MuiDrawer-paper`]: { width: 240, boxSizing: "border-box" },
+        [`& .MuiDrawer-paper`]: {
+          width: 240,
+          boxSizing: "border-box",
+          display: "flex",
+          flexDirection: "column",
+        },
       }}
     >
       <List>
@@ -47,6 +65,11 @@ const Sidebar = () => {
         <Divider />
         <CustomNavLink to="/app/account" label="Account" />
       </List>
+      <Box sx={{ marginTop: "auto", marginBottom: 2, marginLeft: 2 }}>
+        <ListItemButton onClick={handleLogout}>
+          <ListItemText primary="Logout" />
+        </ListItemButton>
+      </Box>
     </Drawer>
   );
 };
