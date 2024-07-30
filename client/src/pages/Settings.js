@@ -19,6 +19,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CloseIcon from "@mui/icons-material/Close";
 import { useNavigate } from "react-router-dom";
 import {
+  deleteAllActivations,
   fetchEventFilterFields,
   fetchTaskFilterFields,
   fetchSalesforceUsers,
@@ -43,6 +44,7 @@ const Settings = () => {
     activateByOpportunity: false,
     userRole: "",
     teamMemberIds: [],
+    latestDateQueried: null,
   });
 
   const [saving, setSaving] = useState(false);
@@ -183,6 +185,8 @@ const Settings = () => {
               };
             }
             break;
+          case "latestDateQueried":
+            deleteAllActivations();
         }
 
         debouncedSaveSettings(updatedSettings);
@@ -261,6 +265,23 @@ const Settings = () => {
     [debouncedSaveSettings]
   );
 
+  const formatDateForInput = (date) => {
+    if (!date) return "";
+
+    // Parse the input date string and get the date in UTC
+    const d = new Date(date);
+
+    // Format the date components with leading zeros if necessary
+    const pad = (num) => (num < 10 ? "0" : "") + num;
+    const year = d.getUTCFullYear();
+    const month = pad(d.getUTCMonth() + 1);
+    const day = pad(d.getUTCDate());
+    const hours = pad(d.getUTCHours());
+    const minutes = pad(d.getUTCMinutes());
+
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   const handleColumnsChange = useCallback((newColumns) => {
     setTableData((prev) => ({
       ...prev,
@@ -335,6 +356,20 @@ const Settings = () => {
                 }
               />
             </Grid>
+            <Grid item xs={12} sm={6} md={4}>
+              <TextField
+                fullWidth
+                label="Query activities created after"
+                type="datetime-local"
+                value={formatDateForInput(settings.latestDateQueried)}
+                onChange={(e) =>
+                  handleChange("latestDateQueried", e.target.value)
+                }
+                InputLabelProps={{
+                  shrink: true,
+                }}
+              />
+            </Grid>
           </Grid>
           <Grid container spacing={2} marginTop={2}>
             <Grid item xs={12} sm={6} md={4}>
@@ -406,47 +441,43 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      {settings.activateByMeeting && (
-        <Card>
-          <CardContent sx={{ p: 2 }}>
-            <Typography variant="h6" gutterBottom>
-              Meeting Criteria
-            </Typography>
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                <Select
-                  fullWidth
-                  value={settings.meetingObject}
-                  onChange={(e) =>
-                    handleChange("meetingObject", e.target.value)
-                  }
-                  label="Meeting Object"
-                >
-                  <MenuItem value="Task">Task</MenuItem>
-                  <MenuItem value="Event">Event</MenuItem>
-                </Select>
-              </Grid>
+      <Card>
+        <CardContent sx={{ p: 2 }}>
+          <Typography variant="h6" gutterBottom>
+            Meeting Criteria
+          </Typography>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <Select
+                fullWidth
+                value={settings.meetingObject}
+                onChange={(e) => handleChange("meetingObject", e.target.value)}
+                label="Meeting Object"
+              >
+                <MenuItem value="Task">Task</MenuItem>
+                <MenuItem value="Event">Event</MenuItem>
+              </Select>
             </Grid>
-            <Box sx={{ mt: 2 }}>
-              <FilterContainer
-                initialFilterContainer={settings.meetingsCriteria}
-                onLogicChange={(newContainer) =>
-                  handleChange("meetingsCriteria", newContainer)
-                }
-                onValueChange={(newContainer) =>
-                  handleChange("meetingsCriteria", newContainer)
-                }
-                filterFields={
-                  settings.meetingObject === "Event"
-                    ? eventFilterFields
-                    : taskFilterFields
-                }
-                filterOperatorMapping={FILTER_OPERATOR_MAPPING}
-              />
-            </Box>
-          </CardContent>
-        </Card>
-      )}
+          </Grid>
+          <Box sx={{ mt: 2 }}>
+            <FilterContainer
+              initialFilterContainer={settings.meetingsCriteria}
+              onLogicChange={(newContainer) =>
+                handleChange("meetingsCriteria", newContainer)
+              }
+              onValueChange={(newContainer) =>
+                handleChange("meetingsCriteria", newContainer)
+              }
+              filterFields={
+                settings.meetingObject === "Event"
+                  ? eventFilterFields
+                  : taskFilterFields
+              }
+              filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+            />
+          </Box>
+        </CardContent>
+      </Card>
 
       <Card sx={{ mb: 2 }}>
         <CardContent sx={{ p: 2 }}>

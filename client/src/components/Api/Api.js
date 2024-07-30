@@ -266,3 +266,12 @@ export const generateActivationSummary = async (activation_ids) => {
   );
   return { ...response.data, statusCode: response.status };
 };
+
+/**
+ * Deletes all of the logged in user's activations
+ * @returns {Promise<ApiResponse>}
+ */
+export const deleteAllActivations = async () => {
+  const response = await api.post("/delete_all_prospecting_activity");
+  return { ...response.data, statusCode: response.status };
+};

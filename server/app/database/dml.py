@@ -10,6 +10,8 @@ from app.mapper.mapper import (
 from datetime import datetime
 from uuid import uuid4
 from os import environ
+from app.utils import get_salesforce_team_ids
+from app.database.settings_selector import load_settings
 
 SUPABASE_ALL_USERS_PASSWORD = environ.get("SUPABASE_ALL_USERS_PASSWORD")
 from datetime import datetime
@@ -72,6 +74,19 @@ def upsert_activations(new_activations: list[Activation]):
 
         supabase.table("Activations").upsert(supabase_activations).execute()
 
+        return True
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return False
+
+
+def delete_all_activations():
+    try:
+        team_member_ids = get_salesforce_team_ids(load_settings())
+        supabase = get_supabase_admin_client()
+        supabase.table("Activations").delete().in_(
+            "activated_by_id", team_member_ids
+        ).execute()
         return True
     except Exception as e:
         print(f"An error occurred: {e}")

@@ -207,7 +207,7 @@ export const ONBOARD_WIZARD_STEPS = [
       {
         setting: "activateByMeeting",
         inputLabel:
-          "Does a new meeting indicate an approached?",
+          "Does a new meeting indicate an approach?",
         inputType: "picklist",
         options: ["Yes", "No"],
       },
@@ -220,7 +220,7 @@ export const ONBOARD_WIZARD_STEPS = [
           "We use the event object for that",
         ],
         renderEval: (priorInputValues) => {
-          return priorInputValues["activateByMeeting"] === "Yes";
+          return priorInputValues["activateByMeeting"];
         },
       },
       {

@@ -23,6 +23,7 @@ from app.utils import (
     pluck,
     format_error_message,
     get_team_member_salesforce_ids,
+    get_utc_now_for_supabase,
 )
 
 
@@ -83,10 +84,10 @@ def update_activation_states():
             tasks_by_filter_name, contacts, settings
         ).data
 
-        upsert_activations(new_activations)
+        if len(new_activations) > 0:
+            upsert_activations(new_activations)
 
-        now_utc = datetime.now(timezone.utc)
-        settings.latest_date_queried = now_utc
+        settings.latest_date_queried = get_utc_now_for_supabase()
         save_settings(settings)
 
         api_response.data = (

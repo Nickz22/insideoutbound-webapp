@@ -4,6 +4,14 @@ from typing import Any, Set
 from datetime import timedelta, datetime, date, timezone
 from functools import reduce
 import re
+from app.data_models import Settings
+
+
+def get_salesforce_team_ids(settings: Settings):
+    team_member_ids = [settings.salesforce_user_id]
+    if settings.team_member_ids:
+        team_member_ids.extend(settings.team_member_ids)
+    return team_member_ids
 
 
 # filter utils
@@ -110,6 +118,20 @@ def convert_datetime_to_utc_z_format(dt: datetime) -> str:
 
 def datetime_to_iso_string_z(dt):
     return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def get_utc_now_for_supabase():
+    # Get the current time in UTC
+    now_utc = datetime.now(timezone.utc)
+
+    # Format the datetime string as required while keeping it as a datetime instance
+    formatted_now_utc = now_utc.isoformat(timespec="seconds").replace("T", " ")
+
+    # Add the colon in the timezone offset
+    formatted_now_utc = (
+        formatted_now_utc[:-6] + formatted_now_utc[-6:-4] + ":" + formatted_now_utc[-4:]
+    )
+    return formatted_now_utc
 
 
 def parse_date_from_string(salesforce_datetime_str: str) -> date:

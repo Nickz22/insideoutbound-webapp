@@ -298,6 +298,7 @@ def convert_settings_model_to_settings(sm: SettingsModel) -> Settings:
         activate_by_opportunity=sm.activateByOpportunity,
         team_member_ids=sm.teamMemberIds,
         salesforce_user_id=sm.salesforceUserId,
+        latest_date_queried=sm.latestDateQueried,
     )
 
 
@@ -320,4 +321,5 @@ def convert_settings_to_settings_model(s: Settings) -> SettingsModel:
         activateByOpportunity=s.activate_by_opportunity,
         teamMemberIds=s.team_member_ids,
         salesforceUserId=s.salesforce_user_id,
+        latestDateQueried=s.latest_date_queried,
     )

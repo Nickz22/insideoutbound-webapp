@@ -7,6 +7,7 @@ from app.database.supabase_connection import (
     set_session_state,
 )
 from app.database.session_selector import fetch_supabase_session
+from dateutil import parser
 
 
 def authenticate(f):
@@ -22,7 +23,7 @@ def authenticate(f):
 
         now = datetime.now(timezone.utc).astimezone()
 
-        if now > datetime.fromisoformat(session["expiry"]):
+        if now > parser.isoparse(session["expiry"]):
             raise AuthenticationError("Session expired")
 
         return f(*args, **kwargs)

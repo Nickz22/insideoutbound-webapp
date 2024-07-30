@@ -8,7 +8,7 @@ from server.app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
 from server.app.database.settings_selector import load_settings
-from server.app.database.dml import save_settings, insert_supabase_user
+from server.app.database.dml import save_settings, delete_all_activations
 from datetime import datetime, timedelta, timezone
 from app.constants import SESSION_EXPIRED
 from app.mapper.mapper import (
@@ -304,6 +304,23 @@ def fetch_prospecting_activity():
     return jsonify(api_response.to_dict()), status_code
 
 
+@bp.route("/delete_all_prospecting_activity", methods=["POST"])
+@authenticate
+def delete_all_prospecting_activity():
+    from app.data_models import ApiResponse
+
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        delete_all_activations()
+        response.success = True
+    except Exception as e:
+        response.message = (
+            f"Failed to delete prospecting activity: {format_error_message(e)}"
+        )
+
+    return jsonify(response.to_dict()), get_status_code(response)
+
+
 @bp.route("/save_settings", methods=["POST"])
 @authenticate
 def commit_settings():
@@ -321,7 +338,7 @@ def commit_settings():
         print(error_msg)
         api_response.message = f"Failed to save settings: {error_msg}"
 
-    return jsonify(api_response.to_dict()), 200 if api_response.success else 400
+    return jsonify(api_response.to_dict()), 200
 
 
 @bp.route("/get_settings", methods=["GET"])

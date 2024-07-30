@@ -33,19 +33,20 @@ class ApiResponse:
         self.status_code: Optional[int] = 200
 
     def to_dict(self):
-        return {
+        d = {
             "data": (
                 [
                     entry.to_dict() if hasattr(entry, "to_dict") else entry
                     for entry in self.data
                 ]
                 if self.data
-                else None
+                else []
             ),
             "message": self.message,
             "success": self.success,
             "status_code": self.status_code,
         }
+        return d
 
 
 class CriteriaField(SerializableModel):
@@ -167,14 +168,14 @@ class FilterContainer(SerializableModel):
 
 class Settings(SerializableModel):
     inactivity_threshold: int
-    criteria: List[FilterContainer]
-    meetings_criteria: FilterContainer
     meeting_object: str
     activities_per_contact: int
     contacts_per_account: int
     tracking_period: int
     activate_by_meeting: bool
     activate_by_opportunity: bool
+    criteria: Optional[List[FilterContainer]] = None
+    meetings_criteria: Optional[FilterContainer] = None
     salesforce_user_id: Optional[str]
     team_member_ids: Optional[List[str]] = None
     latest_date_queried: Optional[datetime] = None
@@ -201,11 +202,12 @@ class SettingsModel(SerializableModel):
     activateByOpportunity: bool
     activitiesPerContact: int
     contactsPerAccount: int
-    criteria: List[FilterContainerModel]
     inactivityThreshold: int
     meetingObject: str
-    meetingsCriteria: FilterContainerModel
     trackingPeriod: int
+    latestDateQueried: datetime
+    meetingsCriteria: Optional[FilterContainerModel] = None
+    criteria: Optional[List[FilterContainerModel]] = None
     teamMemberIds: Optional[List[str]] = None
     salesforceUserId: Optional[str] = None
     skipAccountCriteria: Optional[FilterContainerModel] = None
