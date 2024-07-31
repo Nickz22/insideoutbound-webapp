@@ -81,7 +81,7 @@ def fetch_accounts_not_in_ids(account_ids):
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        soql_query = "SELECT Id FROM Account"
+        soql_query = "SELECT Id,Name FROM Account"
 
         response = _fetch_sobjects(soql_query, get_credentials())
         accounts = [
@@ -156,10 +156,10 @@ def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User"
+        soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User WHERE IsActive = true"
 
         if ids:
-            soql_query += f" WHERE Id IN ('{','.join(ids)}')"
+            soql_query += f" AND Id IN ('{','.join(ids)}')"
 
         response = _fetch_sobjects(soql_query, get_credentials())
         for entry in response.data:

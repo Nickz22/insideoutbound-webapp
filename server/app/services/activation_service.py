@@ -361,32 +361,41 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 
                     # Can add Prospecting Metadata by
                     # finding Task Ids within task_ids_by_criteria_name
-                    activations.append(
-                        Activation(
-                            id=generate_unique_id(),
-                            account=Account(
-                                name=contact_by_id[active_contact_ids[0]].account.name,
-                                id=account_id,
-                            ),
-                            activated_date=account_first_prospecting_activity,
-                            activated_by_id=last_valid_task_creator_id,
-                            active_contact_ids=active_contact_ids,
-                            last_prospecting_activity=datetime.strptime(
-                                task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
-                            ),
-                            first_prospecting_activity=account_first_prospecting_activity,
-                            task_ids=task_ids,
-                            opportunity=qualifying_opportunity,
-                            event_ids=(
-                                [qualifying_event["Id"]] if qualifying_event else None
-                            ),
-                            status=(
-                                "Opportunity Created"
-                                if qualifying_opportunity
-                                else "Meeting Set" if qualifying_event else "Activated"
-                            ),
-                        )
+                    last_prospecting_activity = datetime.strptime(
+                        task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
                     )
+                    activation = Activation(
+                        id=generate_unique_id(),
+                        account=Account(
+                            name=contact_by_id[active_contact_ids[0]].account.name,
+                            id=account_id,
+                        ),
+                        activated_date=account_first_prospecting_activity,
+                        activated_by_id=last_valid_task_creator_id,
+                        active_contact_ids=active_contact_ids,
+                        last_prospecting_activity=last_prospecting_activity.date(),
+                        first_prospecting_activity=account_first_prospecting_activity,
+                        task_ids=task_ids,
+                        opportunity=qualifying_opportunity,
+                        event_ids=(
+                            [qualifying_event["Id"]] if qualifying_event else None
+                        ),
+                        status=(
+                            "Opportunity Created"
+                            if qualifying_opportunity
+                            else "Meeting Set" if qualifying_event else "Activated"
+                        ),
+                    )
+                    is_last_prospecting_activity_outside_of_inactivity_threshold = (
+                        add_days(
+                            last_prospecting_activity.date(),
+                            settings.inactivity_threshold,
+                        )
+                        < datetime.now().date()
+                    )
+                    if is_last_prospecting_activity_outside_of_inactivity_threshold:
+                        activation.status = "Unresponsive"
+                    activations.append(activation)
 
             # this account's tasks have ended, check for activation
             active_contact_ids = get_active_contact_ids(
@@ -402,32 +411,40 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 continue
 
             # Can add Prospecting Metadata by
-            activations.append(
-                Activation(
-                    id=generate_unique_id(),
-                    account=Account(
-                        id=account_id,
-                        name=contact_by_id[active_contact_ids[0]].account.name,
-                    ),
-                    activated_date=account_first_prospecting_activity.date(),
-                    active_contact_ids=active_contact_ids,
-                    activated_by_id=last_valid_task_creator_id,
-                    first_prospecting_activity=account_first_prospecting_activity.date(),
-                    last_prospecting_activity=datetime.strptime(
-                        task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
-                    ).date(),
-                    opportunity=qualifying_opportunity,
-                    event_ids=[qualifying_event["Id"]] if qualifying_event else None,
-                    task_ids=task_ids,
-                    status=(
-                        "Opportunity Created"
-                        if qualifying_opportunity
-                        else "Meeting Set" if qualifying_event else "Activated"
-                    ),
-                )
+            last_prospecting_activity = datetime.strptime(
+                task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
             )
-
+            activation = Activation(
+                id=generate_unique_id(),
+                account=Account(
+                    id=account_id,
+                    name=contact_by_id[active_contact_ids[0]].account.name,
+                ),
+                activated_date=account_first_prospecting_activity.date(),
+                active_contact_ids=active_contact_ids,
+                activated_by_id=last_valid_task_creator_id,
+                first_prospecting_activity=account_first_prospecting_activity.date(),
+                last_prospecting_activity=last_prospecting_activity.date(),
+                opportunity=qualifying_opportunity,
+                event_ids=[qualifying_event["Id"]] if qualifying_event else None,
+                task_ids=task_ids,
+                status=(
+                    "Opportunity Created"
+                    if qualifying_opportunity
+                    else "Meeting Set" if qualifying_event else "Activated"
+                ),
+            )
+            is_last_prospecting_activity_outside_of_inactivity_threshold = (
+                add_days(
+                    last_prospecting_activity.date(), settings.inactivity_threshold
+                )
+                < datetime.now().date()
+            )
+            if is_last_prospecting_activity_outside_of_inactivity_threshold:
+                activation.status = "Unresponsive"
+            activations.append(activation)
             response.data.extend(activations)
+
     except Exception as e:
         raise Exception(format_error_message(e))
 

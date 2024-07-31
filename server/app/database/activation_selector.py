@@ -15,7 +15,7 @@ def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResp
         response = (
             supabase_client.table("Activations")
             .select("*")
-            .neq("status", "Inactive")
+            .neq("status", "Unresponsive")
             .in_("activated_by_id", team_member_ids)
             .order("first_prospecting_activity", desc=False)
             .execute()

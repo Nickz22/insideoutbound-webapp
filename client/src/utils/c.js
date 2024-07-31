@@ -177,7 +177,7 @@ export const ONBOARD_WIZARD_STEPS = [
       Next up, we\'re going to decide when a prospecting "approach" has ended due to inactivity.
       Help us fill in the blank below:
       <br><br>
-      An account should be removed from my prospecting funnel after _ days of inactivity.
+      An account should be removed from my prospecting funnel after _ days without a new Task, Event or Opportunity.
       `,
     inputs: [
       {
@@ -201,13 +201,13 @@ export const ONBOARD_WIZARD_STEPS = [
         setting: "activateByOpportunity",
         inputType: "picklist",
         inputLabel:
-          "Does a new opportunity indicate an approach?",
+          "Is a new Opportunity created after a prospecting activity considered an approach?",
         options: ["Yes", "No"],
       },
       {
         setting: "activateByMeeting",
         inputLabel:
-          "Does a new meeting indicate an approach?",
+          "Is a new Meeting created after a prospecting activity considered an approach?",
         inputType: "picklist",
         options: ["Yes", "No"],
       },
