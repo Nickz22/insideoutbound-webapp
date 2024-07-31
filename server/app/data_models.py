@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Set, Any
 from datetime import date, datetime
 from uuid import UUID
@@ -124,6 +124,15 @@ class Contact(SerializableModel):
     account: Account
 
 
+class StatusEnum(str, Enum):
+    activated = "Activated"
+    unresponsive = "Unresponsive"
+    engaged = "Engaged"
+    meeting_set = "Meeting Set"
+    meeting_held = "Meeting Held"
+    opportunity_created = "Opportunity Created"
+
+
 class Activation(SerializableModel):
     id: str
     account: Account
@@ -140,7 +149,7 @@ class Activation(SerializableModel):
     engaged_date: Optional[date] = None
     last_outbound_engagement: Optional[datetime] = None
     opportunity: Optional[Dict] = None
-    status: str = "Activated"
+    status: StatusEnum = Field(default=StatusEnum.activated)
 
 
 class ProspectingEffort(SerializableModel):
@@ -164,6 +173,7 @@ class FilterContainer(SerializableModel):
     name: str
     filters: List[Filter]
     filter_logic: str
+    direction: Optional[str] = None
 
 
 class Settings(SerializableModel):
@@ -195,6 +205,7 @@ class FilterContainerModel(SerializableModel):
     name: str
     filters: List[FilterModel]
     filterLogic: str
+    direction: Optional[str] = None
 
 
 class SettingsModel(SerializableModel):

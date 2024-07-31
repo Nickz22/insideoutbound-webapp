@@ -285,6 +285,7 @@ const InfoGatheringStep = ({
                   filterFields={criteriaData.filterFields}
                   filterOperatorMapping={criteriaData.filterOperatorMapping}
                   hasNameField={criteriaData.hasNameField}
+                  hasDirectionField={criteriaData.hasDirectionField}
                   onLogicChange={handleCriteriaChange}
                   onValueChange={handleCriteriaChange}
                 />

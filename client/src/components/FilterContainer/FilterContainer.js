@@ -9,6 +9,7 @@ import {
   MenuItem,
   IconButton,
   Grid,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -22,7 +23,7 @@ import { useFilterLogic } from "./useFilterLogic";
  */
 
 /**
- * @param {{initialFilterContainer: FilterContainer, filterFields: CriteriaField[], filterOperatorMapping: { [key: string]: {[key:string]: string} }, hasNameField: boolean, onLogicChange: Function, onValueChange: Function}} props
+ * @param {{initialFilterContainer: FilterContainer, filterFields: CriteriaField[], filterOperatorMapping: { [key: string]: {[key:string]: string} }, hasNameField: boolean, hasDirectionField: boolean, onLogicChange: Function, onValueChange: Function}} props
  * @returns
  */
 const FilterContainer = ({
@@ -30,6 +31,7 @@ const FilterContainer = ({
   filterFields,
   filterOperatorMapping,
   hasNameField,
+  hasDirectionField,
   onLogicChange,
   onValueChange,
 }) => {
@@ -45,6 +47,11 @@ const FilterContainer = ({
     handleNameChange,
   } = useFilterLogic(initialFilterContainer, filterFields);
 
+  const handleDirectionChange = (e) => {
+    const newDirection = e.target.value;
+    handleValueChange("direction", newDirection, onValueChange);
+  };
+
   return (
     <Box
       sx={{
@@ -58,13 +65,30 @@ const FilterContainer = ({
     >
       {hasNameField && (
         <TextField
-          label="Filter Container Name"
+          label="Name"
           value={filterContainer.name}
           onChange={(e) => handleNameChange(e.target.value)}
           variant="outlined"
           fullWidth
           margin="normal"
         />
+      )}
+      {hasDirectionField && (
+        <Tooltip title="Inbound engagements are interactions initiated by the prospect, while outbound engagements are initiated by your team.">
+          <Box mt={2} mb={1}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Direction</InputLabel>
+              <Select
+                value={filterContainer.direction || ""}
+                label="Direction"
+                onChange={handleDirectionChange}
+              >
+                <MenuItem value="inbound">Inbound</MenuItem>
+                <MenuItem value="outbound">Outbound</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </Tooltip>
       )}
       <Typography variant="h6" gutterBottom>
         Filters

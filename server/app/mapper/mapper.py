@@ -261,6 +261,7 @@ def convert_filter_container_model_to_filter_container(
         name=fcm.name,
         filters=[convert_filter_model_to_filter(f) for f in fcm.filters],
         filter_logic=surround_numbers_with_underscores(fcm.filterLogic),
+        direction=fcm.direction,
     )
 
 
@@ -271,6 +272,7 @@ def convert_filter_container_to_filter_container_model(
         name=fc.name,
         filters=[convert_filter_to_filter_model(f) for f in fc.filters],
         filterLogic=remove_underscores_from_numbers(fc.filter_logic),
+        direction=fc.direction,
     )
 
 

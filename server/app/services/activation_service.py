@@ -1,5 +1,5 @@
 import os, sys
-from app.data_models import Settings, Activation, Account, ApiResponse
+from app.data_models import Settings, Activation, Account, ApiResponse, StatusEnum
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from server.app.salesforce_api import (
@@ -242,6 +242,16 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
     return response
 
 
+def has_any_inbound_task(
+    task_ids, task_ids_by_criteria_name, criteria_name_by_direction
+):
+    for criteria_name, task_id_set in task_ids_by_criteria_name.items():
+        if any(task_id in task_id_set for task_id in task_ids):
+            if criteria_name_by_direction.get(criteria_name).lower() == "inbound":
+                return True
+    return False
+
+
 def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     """
     This function, `compute_activated_accounts`, is designed to process a collection of tasks, contacts, and settings to identify and construct activations for accounts.
@@ -278,6 +288,9 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             salesforce_user_ids,
         )
 
+        criteria_name_by_direction = {
+            criteria.name: criteria.direction for criteria in settings.criteria
+        }
         task_ids_by_criteria_name = get_task_ids_by_criteria_name(tasks_by_account_id)
         contact_by_id = {contact.id: contact for contact in contacts}
         for account_id, tasks_by_criteria_by_who_id in tasks_by_account_id.items():
@@ -364,37 +377,20 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     last_prospecting_activity = datetime.strptime(
                         task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
                     )
-                    activation = Activation(
-                        id=generate_unique_id(),
-                        account=Account(
-                            name=contact_by_id[active_contact_ids[0]].account.name,
-                            id=account_id,
-                        ),
-                        activated_date=account_first_prospecting_activity,
-                        activated_by_id=last_valid_task_creator_id,
-                        active_contact_ids=active_contact_ids,
-                        last_prospecting_activity=last_prospecting_activity.date(),
-                        first_prospecting_activity=account_first_prospecting_activity,
-                        task_ids=task_ids,
-                        opportunity=qualifying_opportunity,
-                        event_ids=(
-                            [qualifying_event["Id"]] if qualifying_event else None
-                        ),
-                        status=(
-                            "Opportunity Created"
-                            if qualifying_opportunity
-                            else "Meeting Set" if qualifying_event else "Activated"
-                        ),
+                    activation = create_activation(
+                        account_id,
+                        contact_by_id,
+                        account_first_prospecting_activity,
+                        active_contact_ids,
+                        last_valid_task_creator_id,
+                        last_prospecting_activity,
+                        task_ids,
+                        qualifying_opportunity,
+                        qualifying_event,
+                        task_ids_by_criteria_name,
+                        criteria_name_by_direction,
+                        settings,
                     )
-                    is_last_prospecting_activity_outside_of_inactivity_threshold = (
-                        add_days(
-                            last_prospecting_activity.date(),
-                            settings.inactivity_threshold,
-                        )
-                        < datetime.now().date()
-                    )
-                    if is_last_prospecting_activity_outside_of_inactivity_threshold:
-                        activation.status = "Unresponsive"
                     activations.append(activation)
 
             # this account's tasks have ended, check for activation
@@ -414,34 +410,20 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             last_prospecting_activity = datetime.strptime(
                 task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
             )
-            activation = Activation(
-                id=generate_unique_id(),
-                account=Account(
-                    id=account_id,
-                    name=contact_by_id[active_contact_ids[0]].account.name,
-                ),
-                activated_date=account_first_prospecting_activity.date(),
-                active_contact_ids=active_contact_ids,
-                activated_by_id=last_valid_task_creator_id,
-                first_prospecting_activity=account_first_prospecting_activity.date(),
-                last_prospecting_activity=last_prospecting_activity.date(),
-                opportunity=qualifying_opportunity,
-                event_ids=[qualifying_event["Id"]] if qualifying_event else None,
-                task_ids=task_ids,
-                status=(
-                    "Opportunity Created"
-                    if qualifying_opportunity
-                    else "Meeting Set" if qualifying_event else "Activated"
-                ),
+            activation = create_activation(
+                account_id,
+                contact_by_id,
+                account_first_prospecting_activity,
+                active_contact_ids,
+                last_valid_task_creator_id,
+                last_prospecting_activity,
+                task_ids,
+                qualifying_opportunity,
+                qualifying_event,
+                task_ids_by_criteria_name,
+                criteria_name_by_direction,
+                settings,
             )
-            is_last_prospecting_activity_outside_of_inactivity_threshold = (
-                add_days(
-                    last_prospecting_activity.date(), settings.inactivity_threshold
-                )
-                < datetime.now().date()
-            )
-            if is_last_prospecting_activity_outside_of_inactivity_threshold:
-                activation.status = "Unresponsive"
             activations.append(activation)
             response.data.extend(activations)
 
@@ -449,6 +431,61 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
         raise Exception(format_error_message(e))
 
     return response
+
+
+def create_activation(
+    account_id,
+    contact_by_id,
+    account_first_prospecting_activity,
+    active_contact_ids,
+    last_valid_task_creator_id,
+    last_prospecting_activity,
+    task_ids,
+    qualifying_opportunity,
+    qualifying_event,
+    task_ids_by_criteria_name,
+    criteria_name_by_direction,
+    settings,
+):
+    activation = Activation(
+        id=generate_unique_id(),
+        account=Account(
+            id=account_id,
+            name=contact_by_id[active_contact_ids[0]].account.name,
+        ),
+        activated_date=account_first_prospecting_activity.date(),
+        active_contact_ids=active_contact_ids,
+        activated_by_id=last_valid_task_creator_id,
+        first_prospecting_activity=account_first_prospecting_activity.date(),
+        last_prospecting_activity=last_prospecting_activity.date(),
+        opportunity=qualifying_opportunity,
+        event_ids=[qualifying_event["Id"]] if qualifying_event else None,
+        task_ids=task_ids,
+        status=(
+            StatusEnum.opportunity_created
+            if qualifying_opportunity
+            else (
+                StatusEnum.meeting_set
+                if qualifying_event
+                else (
+                    StatusEnum.engaged
+                    if has_any_inbound_task(
+                        task_ids, task_ids_by_criteria_name, criteria_name_by_direction
+                    )
+                    else StatusEnum.activated
+                )
+            )
+        ),
+    )
+
+    is_last_prospecting_activity_outside_of_inactivity_threshold = (
+        add_days(last_prospecting_activity.date(), settings.inactivity_threshold)
+        < datetime.now().date()
+    )
+    if is_last_prospecting_activity_outside_of_inactivity_threshold:
+        activation.status = StatusEnum.unresponsive
+
+    return activation
 
 
 # helpers with side effects

@@ -18,6 +18,7 @@ export const useFilterLogic = (initialFilterContainer, filterFields) => {
       filterLogic: "",
       filters: [],
       name: "",
+      direction: "",
     }
   );
   /** @type {[{[key: number]: any}, Function]} */
@@ -65,18 +66,33 @@ export const useFilterLogic = (initialFilterContainer, filterFields) => {
   const handleValueChange = useCallback(
     /**
      *
-     * @param {number} filterIndex
+     * @param {number|string} filterIndexOrField
      * @param {any} value
      * @param {Function} onValueChange
      */
-    (filterIndex, value, onValueChange) => {
+    (filterIndexOrField, value, onValueChange) => {
       setFilterContainer((prevContainer) => {
-        const newFilters = [...prevContainer.filters];
-        newFilters[filterIndex] = { ...newFilters[filterIndex], value: value };
-        if (onValueChange) {
-          onValueChange({ ...prevContainer, filters: newFilters });
+        if (typeof filterIndexOrField === "string") {
+          const newContainer = {
+            ...prevContainer,
+            [filterIndexOrField]: value,
+          };
+          if (onValueChange) {
+            onValueChange(newContainer);
+          }
+          return newContainer;
+        } else {
+          const newFilters = [...prevContainer.filters];
+          newFilters[filterIndexOrField] = {
+            ...newFilters[filterIndexOrField],
+            value: value,
+          };
+          const newContainer = { ...prevContainer, filters: newFilters };
+          if (onValueChange) {
+            onValueChange(newContainer);
+          }
+          return newContainer;
         }
-        return { ...prevContainer, filters: newFilters };
       });
     },
     []
@@ -103,7 +119,7 @@ export const useFilterLogic = (initialFilterContainer, filterFields) => {
     setFilterContainer((prevContainer) => ({
       ...(prevContainer
         ? prevContainer
-        : { filters: [], filterLogic: "", name: "" }),
+        : { filters: [], filterLogic: "", name: "", direction: "" }),
       filters: [
         ...prevContainer.filters,
         { field: "", operator: "", value: "", dataType: "string" },

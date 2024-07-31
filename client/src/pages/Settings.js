@@ -444,7 +444,9 @@ const Settings = () => {
                     filterFields={taskFilterFields}
                     filterOperatorMapping={FILTER_OPERATOR_MAPPING}
                     hasNameField={true}
+                    hasDirectionField={true}
                   />
+
                   <IconButton
                     aria-label="delete"
                     onClick={() => handleDeleteFilter(index)}
@@ -495,6 +497,7 @@ const Settings = () => {
                   : taskFilterFields
               }
               filterOperatorMapping={FILTER_OPERATOR_MAPPING}
+              hasDirectionField={false}
             />
           </Box>
         </CardContent>
