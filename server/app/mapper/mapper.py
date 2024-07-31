@@ -33,6 +33,7 @@ def convert_dict_to_filter_container(fc: Dict) -> FilterContainer:
     fc["filter_logic"] = fc.pop("filter_logic")
     # Convert each filter in the filters list
     fc["filters"] = [convert_dict_to_filter(f) for f in fc["filters"]]
+    fc["direction"] = fc.get("direction", None)
     return FilterContainer(**fc)
 
 

@@ -216,7 +216,7 @@ class SettingsModel(SerializableModel):
     inactivityThreshold: int
     meetingObject: str
     trackingPeriod: int
-    latestDateQueried: datetime
+    latestDateQueried: Optional[datetime] = None
     meetingsCriteria: Optional[FilterContainerModel] = None
     criteria: Optional[List[FilterContainerModel]] = None
     teamMemberIds: Optional[List[str]] = None

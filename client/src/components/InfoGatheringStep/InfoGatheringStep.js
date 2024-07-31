@@ -11,6 +11,7 @@ import {
   InputLabel,
   Paper,
   Grid,
+  Tooltip,
 } from "@mui/material";
 import parse from "html-react-parser";
 import CustomTable from "./../CustomTable/CustomTable";
@@ -213,7 +214,7 @@ const InfoGatheringStep = ({
       case "text":
       case "number":
       case "picklist":
-        return (
+        const inputComponent = (
           <>
             {isLoading && <CircularProgress size={20} />}
             {input.inputType === "picklist" ? (
@@ -250,6 +251,14 @@ const InfoGatheringStep = ({
               />
             )}
           </>
+        );
+
+        return input.tooltip ? (
+          <Tooltip title={input.tooltip} arrow>
+            <div>{inputComponent}</div>
+          </Tooltip>
+        ) : (
+          inputComponent
         );
       case "table":
         return (

@@ -23,7 +23,15 @@ import { useFilterLogic } from "./useFilterLogic";
  */
 
 /**
- * @param {{initialFilterContainer: FilterContainer, filterFields: CriteriaField[], filterOperatorMapping: { [key: string]: {[key:string]: string} }, hasNameField: boolean, hasDirectionField: boolean, onLogicChange: Function, onValueChange: Function}} props
+ * @param {{
+ * initialFilterContainer: FilterContainer,
+ * filterFields: CriteriaField[],
+ * filterOperatorMapping: { [key: string]: {[key:string]: string} },
+ * hasNameField: boolean,
+ * isNameReadOnly: boolean,
+ * hasDirectionField: boolean,
+ * onLogicChange: Function,
+ * onValueChange: Function}} props
  * @returns
  */
 const FilterContainer = ({
@@ -31,6 +39,7 @@ const FilterContainer = ({
   filterFields,
   filterOperatorMapping,
   hasNameField,
+  isNameReadOnly,
   hasDirectionField,
   onLogicChange,
   onValueChange,
@@ -71,6 +80,9 @@ const FilterContainer = ({
           variant="outlined"
           fullWidth
           margin="normal"
+          InputProps={{
+            readOnly: isNameReadOnly,
+          }}
         />
       )}
       {hasDirectionField && (
@@ -79,7 +91,7 @@ const FilterContainer = ({
             <FormControl fullWidth size="small">
               <InputLabel>Direction</InputLabel>
               <Select
-                value={filterContainer.direction || ""}
+                value={filterContainer.direction?.toLowerCase() || ""}
                 label="Direction"
                 onChange={handleDirectionChange}
               >

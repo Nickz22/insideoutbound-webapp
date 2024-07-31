@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Dialog, DialogContent, Box, Typography, Paper } from "@mui/material";
+import {
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  Box,
+  Typography,
+  Paper,
+} from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
 import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
@@ -31,14 +38,13 @@ import {
 } from "../utils/c";
 
 /**
- * @param {{ categoryFormTableData: TableData, setSelectedColumns: Function, onAddCategory: Function, onDone: React.MouseEventHandler, placeholder: string }} props
+ * @param {{ categoryFormTableData: TableData, setSelectedColumns: Function, onAddCategory: Function, onDone: React.MouseEventHandler}} props
  */
 const CategoryFormWithHeader = ({
   categoryFormTableData,
   setSelectedColumns,
   onAddCategory,
   onDone,
-  placeholder,
 }) => {
   return (
     <Box>
@@ -50,7 +56,6 @@ const CategoryFormWithHeader = ({
         setSelectedColumns={setSelectedColumns}
         onAddCategory={onAddCategory}
         onDone={onDone}
-        placeholder={placeholder}
       />
     </Box>
   );
@@ -65,7 +70,6 @@ const Onboard = () => {
   const [filters, setFilters] = useState([]);
   /** @type {[{ [key: string]: any }, function]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
-  const [categoryFormKey, setCategoryFormKey] = useState(0);
   const placeholderIndexRef = useRef(0);
   const [isLargeDialog, setIsLargeDialog] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -80,6 +84,7 @@ const Onboard = () => {
   const [tasks, setTasks] = useState([]);
   const taskSObjectFields = useRef([]);
   const taskFilterFields = useRef([]);
+  const [isProcessingCategories, setIsProcessingCategories] = useState(false);
 
   useEffect(() => {
     const setInitialCategoryFormTableData = async () => {
@@ -193,6 +198,51 @@ const Onboard = () => {
     }
   }, [isTransitioning]);
 
+  useEffect(() => {
+    const processCategories = async () => {
+      if (categories.size === 4 && isProcessingCategories) {
+        try {
+          const selectedColumns = categoryFormTableData.columns;
+          const filterContainersPromises = Array.from(categories.entries()).map(
+            async ([category, tasks]) => {
+              try {
+                const response = await generateCriteria(tasks, selectedColumns);
+                return {
+                  ...response.data[0],
+                  name: category,
+                  direction: category.toLowerCase().includes("inbound")
+                    ? "Inbound"
+                    : "Outbound",
+                };
+              } catch (error) {
+                console.error("Error processing category:", category, error);
+                return {
+                  name: category,
+                  filters: [{ field: "", operator: "", value: "" }],
+                  direction: category.toLowerCase().includes("inbound")
+                    ? "Inbound"
+                    : "Outbound",
+                };
+              }
+            }
+          );
+
+          const filterContainers = await Promise.all(filterContainersPromises);
+          setFilters(filterContainers);
+          setGatheringResponses((prev) => ({
+            ...prev,
+            criteria: { value: filterContainers },
+          }));
+        } finally {
+          setIsProcessingCategories(false);
+          handleNext();
+        }
+      }
+    };
+
+    processCategories();
+  }, [categories, isProcessingCategories]);
+
   const handleStepClick = (clickedStep) => {
     if (clickedStep < step) {
       setStep(clickedStep);
@@ -212,6 +262,7 @@ const Onboard = () => {
             : settings[key];
         return acc;
       }, {});
+
       const result = await saveSettingsToSupabase(settings);
 
       if (!result.success) {
@@ -236,7 +287,11 @@ const Onboard = () => {
         10
       ), // Tracking Period
       criteria: filters,
-      meetingObject: gatheringResponses["meetingObject"]?.value.toLowerCase().includes("task") ? "Task" : "Event",
+      meetingObject: gatheringResponses["meetingObject"]?.value
+        .toLowerCase()
+        .includes("task")
+        ? "Task"
+        : "Event",
       meetingsCriteria: gatheringResponses["meetingsCriteria"]?.value,
       activitiesPerContact: parseInt(
         gatheringResponses["activitiesPerContact"]?.value,
@@ -330,7 +385,61 @@ const Onboard = () => {
     []
   );
 
+  /**
+   *
+   * @param {string} category
+   * @param {Set<string>} selectedTaskIds
+   * @returns
+   */
+  const addCategory = (category, selectedTaskIds) => {
+    return new Promise((resolve) => {
+      const newCategories = new Map(categories);
+      const selectedTasks = tasks.filter((task) =>
+        selectedTaskIds.has(task.id)
+      );
+      newCategories.set(category, selectedTasks);
+
+      const remainingTasks = tasks.filter(
+        (task) => !selectedTaskIds.has(task.id)
+      );
+
+      setCategories(newCategories);
+      setTasks(remainingTasks);
+      setCategoryFormTableData((prev) => {
+        const newData = {
+          ...prev,
+          data: remainingTasks,
+          selectedIds: new Set(),
+        };
+        resolve(newData);
+        return newData;
+      });
+    });
+  };
+
+  const handleProspectingCategoriesComplete = async () => {
+    setIsProcessingCategories(true);
+  };
+
   const renderStep = () => {
+    if (isProcessingCategories) {
+      return (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "100%",
+          }}
+        >
+          <CircularProgress />
+          <Typography variant="h6" sx={{ ml: 2 }}>
+            Processing categories...
+          </Typography>
+        </Box>
+      );
+    }
+
     if (step <= ONBOARD_WIZARD_STEPS.length) {
       return (
         <InfoGatheringStep
@@ -344,12 +453,10 @@ const Onboard = () => {
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
       return (
         <CategoryFormWithHeader
-          key={categoryFormKey}
           categoryFormTableData={categoryFormTableData}
           setSelectedColumns={setSelectedColumns}
           onAddCategory={addCategory}
           onDone={handleProspectingCategoriesComplete}
-          placeholder={`Example: ${getPlaceholder()}`}
         />
       );
     } else if (step === ONBOARD_WIZARD_STEPS.length + 2) {
@@ -374,35 +481,6 @@ const Onboard = () => {
     ];
   };
 
-  /**
-   *
-   * @param {string} category
-   * @param {Set<string>} selectedTaskIds
-   * @returns
-   */
-  const addCategory = (category, selectedTaskIds) => {
-    if (categories.has(category)) {
-      alert("Category already exists!");
-      return;
-    }
-
-    const newCategories = new Map(categories);
-    /** @type {SObject[]} */
-    const selectedTasks = tasks.filter((task) => selectedTaskIds.has(task.id));
-    newCategories.set(category, selectedTasks);
-    setCategories(newCategories);
-
-    // Remove selected tasks from the available tasks list
-    /** @type {SObject[]} */
-    const remainingTasks = tasks.filter(
-      (task) => !selectedTaskIds.has(task.id)
-    );
-    setTasks(remainingTasks);
-
-    // Reset the CategoryForm by updating its key
-    setCategoryFormKey((prevKey) => prevKey + 1);
-  };
-
   const getPlaceholder = () => {
     const placeholder =
       PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS[
@@ -412,39 +490,6 @@ const Onboard = () => {
       (placeholderIndexRef.current + 1) %
       PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS.length;
     return placeholder;
-  };
-
-  const handleProspectingCategoriesComplete = async () => {
-    const selectedColumns = categoryFormTableData.columns;
-    const filterContainersPromises = Array.from(categories.entries()).map(
-      async ([category, tasks]) => {
-        try {
-          const response = await generateCriteria(tasks, selectedColumns);
-          return {
-            ...response.data[0],
-            name: category,
-          };
-        } catch (error) {
-          console.error("Error processing category:", category, error);
-          return {
-            name: category,
-            filters: [{ field: "", operator: "", value: "" }],
-          };
-        }
-      }
-    );
-
-    const filterContainers = await Promise.all(filterContainersPromises);
-    setFilters(filterContainers);
-    setGatheringResponses(
-      /** @param {{ [key: string]: any }} prev */
-      (prev) => {
-        const newResponses = { ...prev };
-        newResponses["criteria"] = { value: filterContainers };
-        return newResponses;
-      }
-    );
-    handleNext();
   };
 
   const isLargeDialogStep = () => {

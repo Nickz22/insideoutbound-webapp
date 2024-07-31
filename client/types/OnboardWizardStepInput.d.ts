@@ -15,6 +15,7 @@ export interface OnboardWizardStepInput {
   setting: string;
   inputType: "text" | "number" | "picklist" | "table" | "criteria";
   inputLabel?: string;
+  tooltip?: string;
   options?: string[];
   renderEval?: RenderEvaluatorFunction;
   dataFetcher?: DataFetcherFunction;

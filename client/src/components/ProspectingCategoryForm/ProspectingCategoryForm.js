@@ -1,92 +1,90 @@
 import React, { useState, useEffect } from "react";
-import { TextField, Button, Typography, Box } from "@mui/material";
-import CustomTable from "../CustomTable/CustomTable"; // Adjust the path as necessary
+import {
+  Button,
+  Typography,
+  Box,
+  Stepper,
+  Step,
+  StepLabel,
+} from "@mui/material";
+import CustomTable from "../CustomTable/CustomTable";
 
-/**
- * @typedef {import('types').Task} Task
- * @typedef {import('types').TableData} TableData
- * @typedef {import('types').SObjectField} SObjectField
- */
+const CATEGORIES = [
+  "Inbound Call",
+  "Outbound Call",
+  "Inbound Email",
+  "Outbound Email",
+];
 
-/**
- * @param {{ initialTableData: TableData, setSelectedColumns: Function,  onAddCategory: Function, onDone: React.MouseEventHandler, placeholder: string }} props
- */
 const ProspectingCategoryForm = ({
   initialTableData,
   setSelectedColumns,
   onAddCategory,
   onDone,
-  placeholder,
 }) => {
-  const [categoryName, setCategoryName] = useState("");
+  const [activeStep, setActiveStep] = useState(0);
   const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
-  const [tableData, setTableData] = useState({ initialTableData });
+  const [tableData, setTableData] = useState(initialTableData);
+  const [completedCategories, setCompletedCategories] = useState(0);
 
   useEffect(() => {
     setTableData(initialTableData);
   }, [initialTableData]);
 
-  /**
-   * @param {Set<string>} newSelectedIds
-   */
   const handleTableSelectionChange = (newSelectedIds) => {
-    setTableData(
-      /** @param {TableData} prev */
-      (prev) => ({ ...prev, selectedIds: newSelectedIds })
-    );
     setSelectedTaskIds(newSelectedIds);
+    setTableData((prev) => ({ ...prev, selectedIds: newSelectedIds }));
   };
 
-  const handleCreateCategory = () => {
-    if (categoryName.trim() === "") {
-      alert("Please enter a category name.");
-      return;
-    }
+  const handleNext = async () => {
     if (selectedTaskIds.size === 0) {
       alert("Please select at least one task.");
       return;
     }
-    onAddCategory(categoryName, selectedTaskIds);
-    setCategoryName("");
-    setSelectedTaskIds(new Set());
+
+    // Always add the category and wait for it to complete
+    await onAddCategory(CATEGORIES[activeStep], selectedTaskIds);
+
+    if (activeStep < CATEGORIES.length - 1) {
+      setActiveStep((prev) => prev + 1);
+      setCompletedCategories((prev) => prev + 1);
+      setSelectedTaskIds(new Set());
+      // The table data will be updated in the useEffect hook
+    } else {
+      // This is the last category
+      setCompletedCategories((prev) => prev + 1);
+      onDone();
+    }
   };
 
   return (
-    tableData.data && (
-      <Box sx={{ p: 1 }}>
-        <Typography gutterBottom>
-          Create a prospecting category and select example tasks. We will use
-          these to set up automatic detection for similar activities.
-        </Typography>
-        <TextField
-          label="Category Name"
-          value={categoryName}
-          onChange={(e) => setCategoryName(e.target.value)}
-          placeholder={placeholder}
-          fullWidth
-          margin="normal"
-        />
-        <CustomTable
-          tableData={tableData}
-          onSelectionChange={handleTableSelectionChange}
-          onColumnsChange={setSelectedColumns}
-          paginate={true}
-        />
-        <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-start" }}>
-          <Button
-            onClick={handleCreateCategory}
-            variant="contained"
-            color="primary"
-            sx={{ mr: 2 }}
-          >
-            Create New
-          </Button>
-          <Button onClick={onDone} variant="outlined" color="primary">
-            Done
-          </Button>
-        </Box>
+    <Box sx={{ p: 1 }}>
+      <Stepper activeStep={activeStep}>
+        {CATEGORIES.map((label, index) => (
+          <Step key={label} completed={index < completedCategories}>
+            <StepLabel>{label}</StepLabel>
+          </Step>
+        ))}
+      </Stepper>
+
+      <Typography gutterBottom sx={{ mt: 2 }}>
+        Select tasks that we should recognize as {CATEGORIES[activeStep]}. We
+        will use these to set up automatic detection for similar activities.
+      </Typography>
+
+      <CustomTable
+        tableData={{ ...tableData, selectedIds: selectedTaskIds }}
+        onSelectionChange={handleTableSelectionChange}
+        onColumnsChange={setSelectedColumns}
+        paginate={true}
+      />
+
+      <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-start" }}>
+        <Button onClick={handleNext} variant="contained" color="primary">
+          {activeStep < CATEGORIES.length - 1 ? "Next" : "Done"}
+        </Button>
       </Box>
-    )
+    </Box>
   );
 };
 

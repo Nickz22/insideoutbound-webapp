@@ -91,6 +91,7 @@ const ProspectingCategoryOverview = ({
                 filterFields={taskFilterFields}
                 filterOperatorMapping={FILTER_OPERATOR_MAPPING}
                 hasNameField={true}
+                isNameReadOnly={true}
                 onLogicChange={onFilterChange}
                 onValueChange={onFilterChange}
               />

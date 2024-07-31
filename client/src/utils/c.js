@@ -200,14 +200,16 @@ export const ONBOARD_WIZARD_STEPS = [
       {
         setting: "activateByOpportunity",
         inputType: "picklist",
-        inputLabel:
-          "Is a new Opportunity created after a prospecting activity considered an approach?",
+        inputLabel: "Activate an Account when an Opportunity is created",
+        tooltip:
+          "Should the creation of an Opportunity following the creation of a prospecting activity be considered an approach?",
         options: ["Yes", "No"],
       },
       {
         setting: "activateByMeeting",
-        inputLabel:
-          "Is a new Meeting created after a prospecting activity considered an approach?",
+        inputLabel: "Activate an Account when a Meeting is booked",
+        tooltip:
+          "Should the creation of a Meeting following the creation of a prospecting activity be considered an approach?",
         inputType: "picklist",
         options: ["Yes", "No"],
       },
@@ -246,14 +248,6 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: "string",
           },
         ],
-        // availableColumns: (await fetchTaskFields()).data.map(
-        //   /** @param {SObjectField} field */
-        //   (field) => ({
-        //     id: field.name,
-        //     label: field.label,
-        //     dataType: field.type,
-        //   })
-        // ),
         setting: "",
         inputLabel:
           "Select Tasks that should set an Account as 'approached'. We'll create filters from your selections - don't worry, you'll have a chance to confirm them later.",
@@ -313,14 +307,6 @@ export const ONBOARD_WIZARD_STEPS = [
             dataType: "string",
           },
         ],
-        // availableColumns: (await fetchEventFields()).data.map(
-        //   /** @param {SObjectField} field */
-        //   (field) => ({
-        //     id: field.name,
-        //     label: field.label,
-        //     dataType: field.type,
-        //   })
-        // ),
         setting: "",
         inputType: "table",
         inputLabel:
