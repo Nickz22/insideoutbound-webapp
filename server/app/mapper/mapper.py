@@ -6,6 +6,7 @@ from app.data_models import (
     FilterContainerModel,
     FilterModel,
     SettingsModel,
+    Opportunity,
     Activation,
     ProspectingMetadata,
 )
@@ -17,6 +18,19 @@ from app.utils import (
     surround_numbers_with_underscores,
     remove_underscores_from_numbers,
 )
+
+
+def convert_dict_to_opportunity(opportunity_dict: Dict) -> Opportunity:
+    id = opportunity_dict.get("Id")
+    name = opportunity_dict.get("Name")
+    amount = float(opportunity_dict.get("Amount", 0.0))
+    close_date_str = opportunity_dict.get("CloseDate")
+    close_date = date.fromisoformat(close_date_str) if close_date_str else None
+    stage = opportunity_dict.get("StageName")
+
+    return Opportunity(
+        id=id, name=name, amount=amount, close_date=close_date, stage=stage
+    )
 
 
 def convert_dict_to_filter(f: Dict) -> Filter:
@@ -129,6 +143,9 @@ def python_settings_to_supabase_dict(settings: Settings) -> Dict:
 
 
 def supabase_dict_to_python_activation(row: Dict) -> Activation:
+
+    row["account"] = Account(**json.loads(row["account"]))
+
     # Convert JSON strings back to Python objects
     if "prospecting_metadata" in row and row["prospecting_metadata"]:
         row["prospecting_metadata"] = [
@@ -136,18 +153,10 @@ def supabase_dict_to_python_activation(row: Dict) -> Activation:
             for item in json.loads(row["prospecting_metadata"])
         ]
 
-    if "opportunity" in row and row["opportunity"]:
-        row["opportunity"] = json.loads(row["opportunity"])
-
     # Convert array fields to sets
     for field in ["active_contact_ids", "task_ids", "event_ids"]:
         if field in row and row[field]:
             row[field] = set(row[field])
-
-    # Create Account object
-    if "account_id" in row:
-        row["account"] = Account(id=row["account_id"])
-        del row["account_id"]
 
     # Convert date strings to date objects
     date_fields = ["activated_date", "engaged_date"]
@@ -171,10 +180,8 @@ def supabase_dict_to_python_activation(row: Dict) -> Activation:
 def python_activation_to_supabase_dict(activation: Activation) -> Dict:
     activation_dict = activation.to_dict()
 
-    # Handle specific fields
-    if "account" in activation_dict:
-        activation_dict["account_id"] = activation_dict["account"]["id"]
-        del activation_dict["account"]
+    activation_dict["account_id"] = activation_dict["account"]["id"]
+    activation_dict["account"] = json.dumps(activation_dict["account"])
 
     if "active_contact_ids" in activation_dict:
         activation_dict["active_contact_ids"] = list(
@@ -198,13 +205,6 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
             else None
         )
 
-    if "opportunity" in activation_dict:
-        activation_dict["opportunity"] = (
-            json.dumps(activation_dict["opportunity"])
-            if activation_dict["opportunity"]
-            else None
-        )
-
     # Convert datetime, date, and UUID objects to strings
     for key, value in activation_dict.items():
         if isinstance(value, (datetime, date)):
@@ -216,6 +216,7 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
     supabase_fields = [
         "id",
         "account_id",
+        "account",
         "activated_by_id",
         "active_contact_ids",
         "task_ids",

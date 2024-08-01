@@ -324,7 +324,7 @@ def fetch_contact_tasks_by_criteria_from_date(
     """
     api_response = ApiResponse(data=[], message="", success=False)
     joined_user_ids = "','".join(salesforce_user_ids)
-    soql_query = f"SELECT Id, WhoId, OwnerId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND CreatedById IN ('{joined_user_ids}') AND "
+    soql_query = f"SELECT Id, WhoId, OwnerId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND OwnerId IN ('{joined_user_ids}') AND "
     if additional_filter:
         soql_query += f"{additional_filter} AND "
     tasks_by_filter_name = {}
@@ -465,7 +465,7 @@ def fetch_opportunities_by_account_ids_from_date(
             batch_ids = account_ids[i : i + batch_size]
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
             joined_user_ids = "','".join(salesforce_user_ids)
-            soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids}) AND CreatedById IN ('{joined_user_ids}') ORDER BY CreatedDate ASC"
+            soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName, Name, CloseDate FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids}) AND CreatedById IN ('{joined_user_ids}') ORDER BY CreatedDate ASC"
 
             response = _fetch_sobjects(soql_query, get_credentials())
             for opportunity in response.data:

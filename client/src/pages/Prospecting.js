@@ -17,6 +17,7 @@ import {
   CircularProgress,
   IconButton,
   Tooltip,
+  Link,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import {
@@ -24,13 +25,10 @@ import {
   fetchProspectingActivities,
   fetchAndUpdateProspectingActivity,
   generateActivationSummary,
+  getInstanceUrl,
 } from "src/components/Api/Api";
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
-
-/**
- * @typedef {import('types').SalesforceUser} SalesforceUser
- */
 
 const Prospecting = () => {
   const [period, setPeriod] = useState("");
@@ -42,6 +40,7 @@ const Prospecting = () => {
   const [activatedByUsers, setActivatedByUsers] = useState([]);
   const [filteredSummaryData, setFilteredSummaryData] = useState(null);
   const [selectedActivatedBy, setSelectedActivatedBy] = useState("");
+  const [instanceUrl, setInstanceUrl] = useState("");
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
 
@@ -84,7 +83,21 @@ const Prospecting = () => {
   );
 
   useEffect(() => {
-    fetchData();
+    const fetchInitialData = async () => {
+      await fetchData();
+      try {
+        const response = await getInstanceUrl();
+        if (response.success) {
+          setInstanceUrl(response.data[0]);
+        } else {
+          console.error("Failed to fetch instance URL:", response.message);
+        }
+      } catch (error) {
+        console.error("Error fetching instance URL:", error);
+      }
+    };
+
+    fetchInitialData();
   }, [fetchData]);
 
   useEffect(() => {
@@ -152,7 +165,12 @@ const Prospecting = () => {
 
   const tableColumns = [
     { id: "id", label: "ID", dataType: "text" },
-    { id: "account.name", label: "Account Name", dataType: "text" },
+    { id: "account.name", label: "Account Name", dataType: "component" },
+    {
+      id: "opportunity.name",
+      label: "Opportunity Name",
+      dataType: "component",
+    },
     { id: "activated_date", label: "Activated Date", dataType: "date" },
     { id: "status", label: "Status", dataType: "text" },
     { id: "days_activated", label: "Days Activated", dataType: "number" },
@@ -242,7 +260,26 @@ const Prospecting = () => {
         columns: tableColumns,
         data: filteredData.map((item) => ({
           ...item,
-          "account.name": item.account?.name || "N/A",
+          "account.name": (
+            <Link
+              href={`${instanceUrl}/${item.account?.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {item.account?.name || "N/A"}
+            </Link>
+          ),
+          "opportunity.name": item.opportunity ? (
+            <Link
+              href={`${instanceUrl}/${item.opportunity.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {item.opportunity.name || "N/A"}
+            </Link>
+          ) : (
+            "N/A"
+          ),
         })),
         selectedIds: new Set(),
         availableColumns: tableColumns,

@@ -19,6 +19,7 @@ from app.utils import (
     get_team_member_salesforce_ids,
 )
 from datetime import datetime, timezone
+from app.mapper.mapper import convert_dict_to_opportunity
 
 
 def find_unresponsive_activations(
@@ -458,7 +459,11 @@ def create_activation(
         activated_by_id=last_valid_task_creator_id,
         first_prospecting_activity=account_first_prospecting_activity.date(),
         last_prospecting_activity=last_prospecting_activity.date(),
-        opportunity=qualifying_opportunity,
+        opportunity=(
+            convert_dict_to_opportunity(qualifying_opportunity)
+            if qualifying_opportunity
+            else None
+        ),
         event_ids=[qualifying_event["Id"]] if qualifying_event else None,
         task_ids=task_ids,
         status=(

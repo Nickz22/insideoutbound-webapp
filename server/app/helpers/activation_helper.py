@@ -31,7 +31,7 @@ def generate_summary(activations: list[Activation]) -> dict:
 
         if activation.opportunity:
             summary["total_deals"] += 1
-            summary["total_pipeline_value"] += activation.opportunity.get("Amount", 0)
+            summary["total_pipeline_value"] += activation.opportunity.amount
 
     summary["total_contacts"] = sum(
         len(contacts) for contacts in account_contacts.values()

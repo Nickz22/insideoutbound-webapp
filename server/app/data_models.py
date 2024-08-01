@@ -1,20 +1,23 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Set, Any
+from typing import List, Optional, Set, Any
 from datetime import date, datetime
 from uuid import UUID
 from enum import Enum
 
 
 def serialize_complex_types(obj: Any) -> Any:
-    if isinstance(obj, (set, frozenset)):
-        return list(obj)
     if isinstance(obj, (date, datetime)):
         return obj.isoformat()
-    if isinstance(obj, UUID):
-        return str(obj)
-    if isinstance(obj, BaseModel):
-        return obj.model_dump()
-    return obj
+    elif isinstance(obj, set):
+        return list(obj)
+    elif isinstance(obj, SerializableModel):
+        return obj.to_dict()
+    elif isinstance(obj, list):
+        return [serialize_complex_types(item) for item in obj]
+    elif isinstance(obj, dict):
+        return {key: serialize_complex_types(value) for key, value in obj.items()}
+    else:
+        return obj
 
 
 class SerializableModel(BaseModel):
@@ -133,6 +136,14 @@ class StatusEnum(str, Enum):
     opportunity_created = "Opportunity Created"
 
 
+class Opportunity(SerializableModel):
+    id: str
+    name: str
+    amount: float
+    close_date: date
+    stage: str
+
+
 class Activation(SerializableModel):
     id: str
     account: Account
@@ -148,7 +159,7 @@ class Activation(SerializableModel):
     days_engaged: Optional[int] = None
     engaged_date: Optional[date] = None
     last_outbound_engagement: Optional[datetime] = None
-    opportunity: Optional[Dict] = None
+    opportunity: Optional[Opportunity] = None
     status: StatusEnum = Field(default=StatusEnum.activated)
 
 

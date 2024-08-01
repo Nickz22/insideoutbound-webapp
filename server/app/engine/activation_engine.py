@@ -46,7 +46,9 @@ def update_activation_states():
             ).data
 
         if unresponsive_activations and len(unresponsive_activations) > 0:
-            upsert_activations(unresponsive_activations)
+            result: ApiResponse = upsert_activations(unresponsive_activations)
+            if not result.success:
+                raise Exception(result.message)
 
         active_activations = [
             a for a in active_activations if a.id not in unresponsive_activations

@@ -81,6 +81,15 @@ export const logout = async () => {
   }
 };
 
+// getInstanceUrl
+/**
+ * @returns {Promise<ApiResponse>}
+ */
+export const getInstanceUrl = async () => {
+  const response = await api.get("/get_instance_url");
+  return { ...response.data, statusCode: response.status };
+};
+
 /**
  * @returns {Promise<ApiResponse>}
  */

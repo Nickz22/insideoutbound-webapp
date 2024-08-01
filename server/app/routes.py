@@ -31,6 +31,7 @@ from config import Config
 from app.database.supabase_connection import (
     get_supabase_admin_client,
     set_session_state,
+    get_session_state,
 )
 from app.database.session_selector import fetch_supabase_session
 
@@ -208,6 +209,22 @@ def generate_filters():
     return final_response
 
 
+# get_instance_url
+@bp.route("/get_instance_url", methods=["GET"])
+@authenticate
+def get_instance_url():
+    from app.data_models import ApiResponse
+
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        response.data = [get_session_state().get("instance_url")]
+        response.success = True
+    except Exception as e:
+        response.message = f"Failed to retrieve instance URL: {format_error_message(e)}"
+
+    return jsonify(response.to_dict()), get_status_code(response)
+
+
 @bp.route("/get_prospecting_activities", methods=["GET"])
 @authenticate
 def get_prospecting_activities():
@@ -215,13 +232,17 @@ def get_prospecting_activities():
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        activations = (
-            load_active_activations_order_by_first_prospecting_activity_asc().data
+        query_response = (
+            load_active_activations_order_by_first_prospecting_activity_asc()
         )
+        if not query_response.success:
+            raise Exception(query_response.message)
         response.data = [
             {
-                "summary": generate_summary(activations),
-                "raw_data": [activation.to_dict() for activation in activations],
+                "summary": generate_summary(query_response.data),
+                "raw_data": [
+                    activation.to_dict() for activation in query_response.data
+                ],
             }
         ]
         response.success = True
