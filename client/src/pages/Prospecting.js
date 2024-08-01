@@ -24,21 +24,21 @@ import {
   fetchSalesforceUsers,
   fetchProspectingActivities,
   fetchAndUpdateProspectingActivity,
-  generateActivationSummary,
   getInstanceUrl,
+  generateActivationSummary,
 } from "src/components/Api/Api";
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
 
 const Prospecting = () => {
-  const [period, setPeriod] = useState("");
+  const [period, setPeriod] = useState("All");
   const [view, setView] = useState("Summary");
   const [loading, setLoading] = useState(true);
+  const [summaryLoading, setSummaryLoading] = useState(false);
   const [error, setError] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [rawData, setRawData] = useState([]);
   const [activatedByUsers, setActivatedByUsers] = useState([]);
-  const [filteredSummaryData, setFilteredSummaryData] = useState(null);
   const [selectedActivatedBy, setSelectedActivatedBy] = useState("");
   const [instanceUrl, setInstanceUrl] = useState("");
   const inFlightRef = useRef(false);
@@ -57,7 +57,6 @@ const Prospecting = () => {
         switch (response.statusCode) {
           case 200:
             setSummaryData(response.data[0].summary);
-            setFilteredSummaryData(response.data[0].summary);
             setRawData(response.data[0].raw_data || []);
             break;
           case 400:
@@ -137,31 +136,74 @@ const Prospecting = () => {
     setSelectedActivatedBy(event.target.value);
   };
 
+  const filterDataByPeriod = useCallback((data, selectedPeriod) => {
+    if (selectedPeriod === "All") return data;
+
+    const now = new Date();
+    const periodInHours = {
+      "24h": 24,
+      "48h": 48,
+      "7d": 24 * 7,
+      "30d": 24 * 30,
+      "90d": 24 * 90,
+    }[selectedPeriod];
+
+    return data.filter((item) => {
+      const lastProspectingActivity = new Date(item.last_prospecting_activity);
+      const hoursDifference =
+        (now - lastProspectingActivity) / (1000 * 60 * 60);
+      return hoursDifference < periodInHours; // Changed <= to
+    });
+  }, []);
+
+  // Update the dependency array of filteredData useMemo
   const filteredData = useMemo(() => {
-    if (!selectedActivatedBy) return rawData;
-    return rawData.filter(
-      (item) => item.activated_by_id === selectedActivatedBy
-    );
-  }, [selectedActivatedBy, rawData]);
+    let filtered = rawData;
+    if (selectedActivatedBy) {
+      filtered = filtered.filter(
+        (item) => item.activated_by_id === selectedActivatedBy
+      );
+    }
+    return filterDataByPeriod(filtered, period);
+  }, [selectedActivatedBy, rawData, period, filterDataByPeriod]); // Added filterDataByPeriod
 
   useEffect(() => {
-    const fetchFilteredSummaryData = async () => {
-      if (selectedActivatedBy) {
-        setLoading(true);
-        const newSummary = (
-          await generateActivationSummary(filteredData.map((item) => item.id))
-        ).data[0].summary;
-        setLoading(false);
-        setFilteredSummaryData(newSummary);
-      } else {
-        setFilteredSummaryData(summaryData);
+    const fetchFilteredSummary = async () => {
+      setSummaryLoading(true);
+      try {
+        const filteredIds = filteredData.map((item) => item.id);
+        const response = await generateActivationSummary(filteredIds);
+        if (response.success) {
+          setSummaryData(response.data[0].summary);
+        } else {
+          setError(
+            `Failed to generate activation summary. ${response.message}`
+          );
+        }
+      } catch (err) {
+        setError(`An error occurred while generating the summary. ${err}`);
+      } finally {
+        setSummaryLoading(false);
       }
     };
 
-    if (summaryData && rawData.length > 0) {
-      fetchFilteredSummaryData();
+    if (filteredData.length > 0) {
+      fetchFilteredSummary();
+    } else {
+      setSummaryData({
+        total_activations: 0,
+        activations_today: 0,
+        avg_tasks_per_contact: 0,
+        avg_contacts_per_account: 0,
+        total_tasks: 0,
+        total_events: 0,
+        total_contacts: 0,
+        total_accounts: 0,
+        total_deals: 0,
+        total_pipeline_value: 0,
+      });
     }
-  }, [selectedActivatedBy, filteredData, summaryData]);
+  }, [filteredData]);
 
   const tableColumns = [
     { id: "id", label: "ID", dataType: "text" },
@@ -195,62 +237,77 @@ const Prospecting = () => {
 
   const renderSummaryView = () => (
     <Grid container spacing={2}>
-      <Grid item xs={12} sm={6} md={4} lg={4}>
-        <MetricCard
-          title="Total Activations"
-          value={filteredSummaryData.total_activations.toString()}
-          subText=""
-        />
-      </Grid>
-      <Grid item xs={12} sm={6} md={4} lg={4}>
-        <MetricCard
-          title="Activations Today"
-          value={filteredSummaryData.activations_today.toString()}
-          subText=""
-        />
-      </Grid>
-      <Grid item xs={12} sm={6} md={4} lg={4}>
-        <MetricCard
-          title="Total Tasks"
-          value={filteredSummaryData.total_tasks.toString()}
-          subText=""
-        />
-      </Grid>
-      <Grid item xs={12} sm={6} md={4} lg={4}>
-        <MetricCard
-          title="Total Events"
-          value={filteredSummaryData.total_events.toString()}
-          subText=""
-        />
-      </Grid>
-      <Grid item xs={12} sm={6} md={4} lg={4}>
-        <MetricCard
-          title="Avg Tasks Per Contact"
-          value={filteredSummaryData.avg_tasks_per_contact.toFixed(2)}
-          subText=""
-        />
-      </Grid>
-      <Grid item xs={12} sm={6} md={4} lg={4}>
-        <MetricCard
-          title="Avg Contacts Per Account"
-          value={filteredSummaryData.avg_contacts_per_account.toFixed(2)}
-          subText=""
-        />
-      </Grid>
-      <Grid item xs={12} sm={6} md={4} lg={4}>
-        <MetricCard
-          title="Total Deals"
-          value={filteredSummaryData.total_deals.toString()}
-          subText=""
-        />
-      </Grid>
-      <Grid item xs={12} sm={6} md={4} lg={4}>
-        <MetricCard
-          title="Total Pipeline Value"
-          value={`$${filteredSummaryData.total_pipeline_value.toLocaleString()}`}
-          subText=""
-        />
-      </Grid>
+      {summaryLoading ? (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            width: "100%",
+            mt: 4,
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      ) : (
+        <>
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+            <MetricCard
+              title="Total Activations"
+              value={summaryData.total_activations.toString()}
+              subText=""
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+            <MetricCard
+              title="Activations Today"
+              value={summaryData.activations_today.toString()}
+              subText=""
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+            <MetricCard
+              title="Total Tasks"
+              value={summaryData.total_tasks.toString()}
+              subText=""
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+            <MetricCard
+              title="Total Events"
+              value={summaryData.total_events.toString()}
+              subText=""
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+            <MetricCard
+              title="Avg Tasks Per Contact"
+              value={summaryData.avg_tasks_per_contact.toFixed(2)}
+              subText=""
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+            <MetricCard
+              title="Avg Contacts Per Account"
+              value={summaryData.avg_contacts_per_account.toFixed(2)}
+              subText=""
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+            <MetricCard
+              title="Total Deals"
+              value={summaryData.total_deals.toString()}
+              subText=""
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={4} lg={4}>
+            <MetricCard
+              title="Total Pipeline Value"
+              value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+              subText=""
+            />
+          </Grid>
+        </>
+      )}
     </Grid>
   );
 
@@ -330,13 +387,12 @@ const Prospecting = () => {
               onChange={handlePeriodChange}
               label="Period"
             >
-              <MenuItem value="">
-                <em>None</em>
-              </MenuItem>
-              <MenuItem value="Q1">Q1</MenuItem>
-              <MenuItem value="Q2">Q2</MenuItem>
-              <MenuItem value="Q3">Q3</MenuItem>
-              <MenuItem value="Q4">Q4</MenuItem>
+              <MenuItem value="All">All</MenuItem>
+              <MenuItem value="24h">24h</MenuItem>
+              <MenuItem value="48h">48h</MenuItem>
+              <MenuItem value="7d">7d</MenuItem>
+              <MenuItem value="30d">30d</MenuItem>
+              <MenuItem value="90d">90d</MenuItem>
             </Select>
           </FormControl>
           <FormControl

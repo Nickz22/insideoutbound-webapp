@@ -264,7 +264,17 @@ def get_prospecting_activities_filtered_by_ids():
     try:
         activation_ids = request.args.getlist("activation_ids[]")
         if not activation_ids:
-            response.message = "No activation IDs provided"
+            response.data = {
+                "total_activations": len(activations),
+                "activations_today": 0,
+                "total_tasks": 0,
+                "total_events": 0,
+                "total_contacts": 0,
+                "total_accounts": 0,
+                "total_deals": 0,
+                "total_pipeline_value": 0,
+            }
+            response.success = True
         else:
             activations = (
                 load_active_activations_order_by_first_prospecting_activity_asc().data
@@ -284,9 +294,8 @@ def get_prospecting_activities_filtered_by_ids():
             ]
             response.success = True
     except Exception as e:
-        response.message = (
-            f"Failed to retrieve prospecting activities: {format_error_message(e)}"
-        )
+        error_msg = format_error_message(e)
+        response.message = f"Failed to retrieve prospecting activities: {error_msg}"
 
     return jsonify(response.to_dict()), get_status_code(response)
 
