@@ -8,7 +8,11 @@ from server.app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
 from server.app.database.settings_selector import load_settings
-from server.app.database.dml import save_settings, delete_all_activations
+from server.app.database.dml import (
+    save_settings,
+    delete_all_activations,
+    upsert_supabase_user,
+)
 from datetime import datetime, timedelta, timezone
 from app.constants import SESSION_EXPIRED
 from app.mapper.mapper import (
@@ -42,6 +46,8 @@ bp = Blueprint("main", __name__)
 
 @bp.route("/oauth/callback", methods=["GET"])
 def oauth_callback():
+    from app.data_models import UserModel
+
     try:
         code = request.args.get("code")
         state = request.args.get("state")
@@ -72,9 +78,12 @@ def oauth_callback():
         if response.status_code == 200:
             token_data = response.json()
             session_token = create_session(token_data, is_sandbox)
-
+            user: UserModel = fetch_logged_in_salesforce_user().data
             settings = load_settings()
             if not settings:
+                upsert_supabase_user(
+                    user=user, org_id=token_data["id"], is_sandbox=is_sandbox
+                )
                 return redirect(
                     f"{Config.REACT_APP_URL}/onboard?session_token={session_token}"
                 )
@@ -511,7 +520,9 @@ def task_query_count():
     api_response = ApiResponse(data=[], message="", success=False)
     try:
         data = request.json
-        criteria = convert_filter_container_model_to_filter_container(FilterContainerModel(**data.get("criteria")))
+        criteria = convert_filter_container_model_to_filter_container(
+            FilterContainerModel(**data.get("criteria"))
+        )
         salesforce_user_ids = data.get("salesforce_user_ids", [])
 
         api_response = get_task_query_count(criteria, salesforce_user_ids)

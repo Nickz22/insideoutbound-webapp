@@ -2,7 +2,7 @@ from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
 )
-from app.data_models import Activation, ApiResponse, Settings
+from app.data_models import Activation, ApiResponse, Settings, UserModel
 from app.mapper.mapper import (
     python_activation_to_supabase_dict,
     python_settings_to_supabase_dict,
@@ -17,47 +17,43 @@ SUPABASE_ALL_USERS_PASSWORD = environ.get("SUPABASE_ALL_USERS_PASSWORD")
 from datetime import datetime
 
 
-def insert_supabase_user(salesforce_id: str, email: str, org_id: str, is_sandbox: bool):
-    # Initialize Supabase client with admin rights
-    supabase = get_supabase_admin_client()
+def upsert_supabase_user(user: UserModel, org_id: str, is_sandbox: bool):
 
     try:
-        # First, create the user in Supabase Auth
-        user_response = supabase.auth.admin.create_user(
-            {
-                "email": email,
-                "password": SUPABASE_ALL_USERS_PASSWORD,
-                "email_confirm": True,  # This automatically confirms the email
-                "user_metadata": {
-                    "salesforce_id": salesforce_id,
-                    "org_id": org_id,
-                    "is_sandbox": is_sandbox,
-                },
-            }
+        salesforce_id = user.id
+        email = user.email
+        supabase = get_supabase_admin_client()
+        user_id = str(uuid4())
+        current_time = datetime.now().isoformat()
+
+        # Query the User table to check if the row exists
+        existing_user = (
+            supabase.table("User")
+            .select("id")
+            .eq("salesforce_id", salesforce_id)
+            .execute()
         )
 
-        user = user_response.user
-        # If user creation is successful, add additional info to your custom Users table
-        if user and user.id:
+        if not existing_user.data:
+            # If the row does not exist, insert the new record
             supabase.table("User").insert(
                 {
-                    "id": user.id,  # Use the Supabase Auth user id
+                    "id": user_id,
                     "salesforce_id": salesforce_id,
                     "email": email,
+                    "photo_url": user.photoUrl,
                     "org_id": org_id,
                     "is_sandbox": is_sandbox,
-                    "created_at": datetime.now().isoformat(),
+                    "created_at": current_time,
                 }
             ).execute()
-
-            print(f"User created successfully with id: {user.id}")
-            return user.id
         else:
-            raise Exception("User creation failed")
+            user_id = existing_user.data[0]["id"]
+
+        return user_id
 
     except Exception as e:
-        print(f"Error creating user: {str(e)}")
-        return None
+        raise Exception(f"An error occurred upserting user: {e}")
 
 
 def upsert_activations(new_activations: list[Activation]):

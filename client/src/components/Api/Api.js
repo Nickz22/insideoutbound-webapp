@@ -90,6 +90,11 @@ export const getInstanceUrl = async () => {
   return { ...response.data, statusCode: response.status };
 };
 
+export const getLoggedInUser = async () => {
+  const response = await api.get("/get_salesforce_user");
+  return { ...response.data, statusCode: response.status };
+}
+
 /**
  * @returns {Promise<ApiResponse>}
  */

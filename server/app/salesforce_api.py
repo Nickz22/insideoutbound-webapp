@@ -635,7 +635,7 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
     return api_response
 
 
-def fetch_logged_in_salesforce_user():
+def fetch_logged_in_salesforce_user() -> ApiResponse:
     api_response = ApiResponse(data=[], message="", success=False)
 
     access_token, instance_url = get_credentials()
@@ -658,6 +658,7 @@ def fetch_logged_in_salesforce_user():
         api_response.data = UserModel(
             id=user_data["user_id"],
             email=user_data["email"],
+            orgId=user_data["organization_id"],
             username=user_data["preferred_username"],
             lastName=user_data["family_name"],
             firstName=user_data["given_name"],

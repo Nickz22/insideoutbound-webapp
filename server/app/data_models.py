@@ -277,6 +277,7 @@ class UserModel(SerializableModel):
     username: str
     lastName: str
     photoUrl: str
+    orgId: Optional[str] = None
     firstName: Optional[str] = None
     role: Optional[str] = None
 
