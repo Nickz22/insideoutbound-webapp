@@ -12,6 +12,7 @@ from server.app.database.dml import save_settings, delete_all_activations
 from datetime import datetime, timedelta, timezone
 from app.constants import SESSION_EXPIRED
 from app.mapper.mapper import (
+    convert_filter_container_model_to_filter_container,
     convert_settings_model_to_settings,
     convert_settings_to_settings_model,
 )
@@ -26,6 +27,7 @@ from server.app.salesforce_api import (
     fetch_tasks_by_user_ids,
     fetch_events_by_user_ids,
     fetch_logged_in_salesforce_user,
+    get_task_query_count,
 )
 from config import Config
 from app.database.supabase_connection import (
@@ -499,6 +501,29 @@ def get_event_fields():
         response.message = f"Failed to retrieve event fields: {format_error_message(e)}"
 
     return jsonify(response.__dict__), get_status_code(response)
+
+
+@bp.route("/get_task_query_count", methods=["POST"])
+@authenticate
+def task_query_count():
+    from app.data_models import ApiResponse, FilterContainerModel
+
+    api_response = ApiResponse(data=[], message="", success=False)
+    try:
+        data = request.json
+        criteria = convert_filter_container_model_to_filter_container(FilterContainerModel(**data.get("criteria")))
+        salesforce_user_ids = data.get("salesforce_user_ids", [])
+
+        api_response = get_task_query_count(criteria, salesforce_user_ids)
+        api_response.success = True
+
+    except Exception as e:
+        print(f"Error in task_query_count: {e}")
+        api_response.message = (
+            f"Failed to retrieve task query count: {format_error_message(e)}"
+        )
+
+    return jsonify(api_response.to_dict()), get_status_code(api_response)
 
 
 @bp.app_errorhandler(Exception)

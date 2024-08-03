@@ -64,6 +64,10 @@ const Sidebar = () => {
         <CustomNavLink to="/app/settings" label="Settings" />
         <Divider />
         <CustomNavLink to="/app/account" label="Account" />
+        <CustomNavLink
+          to="/app/task-query-counter"
+          label="Task Query Counter"
+        />
       </List>
       <Box sx={{ marginTop: "auto", marginBottom: 2, marginLeft: 2 }}>
         <ListItemButton onClick={handleLogout}>

@@ -450,10 +450,7 @@ def create_activation(
 ):
     activation = Activation(
         id=generate_unique_id(),
-        account=Account(
-            id=account_id,
-            name=contact_by_id[active_contact_ids[0]].account.name,
-        ),
+        account=contact_by_id[active_contact_ids[0]].account,
         activated_date=account_first_prospecting_activity.date(),
         active_contact_ids=active_contact_ids,
         activated_by_id=last_valid_task_creator_id,

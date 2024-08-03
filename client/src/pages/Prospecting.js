@@ -18,8 +18,10 @@ import {
   IconButton,
   Tooltip,
   Link,
+  Paper,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
+import DataFilter from "./../components/DataFilter/DataFilter";
 import {
   fetchSalesforceUsers,
   fetchProspectingActivities,
@@ -43,6 +45,20 @@ const Prospecting = () => {
   const [instanceUrl, setInstanceUrl] = useState("");
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
+
+  const [dataFilter, setDataFilter] = useState(null);
+
+  const accountFields = useMemo(() => {
+    if (rawData.length === 0) return [];
+    const firstAccount = rawData[0].account;
+    return Object.keys(firstAccount).filter(
+      (key) => typeof firstAccount[key] !== "object"
+    );
+  }, [rawData]);
+
+  const handleDataFilter = useCallback((filter) => {
+    setDataFilter(filter);
+  }, []);
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
@@ -156,7 +172,6 @@ const Prospecting = () => {
     });
   }, []);
 
-  // Update the dependency array of filteredData useMemo
   const filteredData = useMemo(() => {
     let filtered = rawData;
     if (selectedActivatedBy) {
@@ -164,8 +179,49 @@ const Prospecting = () => {
         (item) => item.activated_by_id === selectedActivatedBy
       );
     }
+    if (dataFilter) {
+      filtered = filtered.filter((item) => {
+        const accountValue = item.account[dataFilter.field];
+        if (dataFilter.operator === "equals") {
+          return accountValue === dataFilter.value;
+        } else if (dataFilter.operator === "notEquals") {
+          return accountValue !== dataFilter.value;
+        }
+        return true;
+      });
+    }
     return filterDataByPeriod(filtered, period);
-  }, [selectedActivatedBy, rawData, period, filterDataByPeriod]); // Added filterDataByPeriod
+  }, [rawData, selectedActivatedBy, dataFilter, filterDataByPeriod, period]);
+
+  const tableColumns = [
+    { id: "id", label: "ID", dataType: "text" },
+    { id: "account.name", label: "Account Name", dataType: "component" },
+    {
+      id: "opportunity.name",
+      label: "Opportunity Name",
+      dataType: "component",
+    },
+    { id: "activated_date", label: "Activated Date", dataType: "date" },
+    { id: "status", label: "Status", dataType: "text" },
+    { id: "days_activated", label: "Days Activated", dataType: "number" },
+    { id: "days_engaged", label: "Days Engaged", dataType: "number" },
+    { id: "engaged_date", label: "Engaged Date", dataType: "date" },
+    {
+      id: "first_prospecting_activity",
+      label: "First Prospecting Activity",
+      dataType: "date",
+    },
+    {
+      id: "last_prospecting_activity",
+      label: "Last Prospecting Activity",
+      dataType: "date",
+    },
+    {
+      id: "last_outbound_engagement",
+      label: "Last Outbound Engagement",
+      dataType: "date",
+    },
+  ];
 
   useEffect(() => {
     const fetchFilteredSummary = async () => {
@@ -204,36 +260,6 @@ const Prospecting = () => {
       });
     }
   }, [filteredData]);
-
-  const tableColumns = [
-    { id: "id", label: "ID", dataType: "text" },
-    { id: "account.name", label: "Account Name", dataType: "component" },
-    {
-      id: "opportunity.name",
-      label: "Opportunity Name",
-      dataType: "component",
-    },
-    { id: "activated_date", label: "Activated Date", dataType: "date" },
-    { id: "status", label: "Status", dataType: "text" },
-    { id: "days_activated", label: "Days Activated", dataType: "number" },
-    { id: "days_engaged", label: "Days Engaged", dataType: "number" },
-    { id: "engaged_date", label: "Engaged Date", dataType: "date" },
-    {
-      id: "first_prospecting_activity",
-      label: "First Prospecting Activity",
-      dataType: "date",
-    },
-    {
-      id: "last_prospecting_activity",
-      label: "Last Prospecting Activity",
-      dataType: "date",
-    },
-    {
-      id: "last_outbound_engagement",
-      label: "Last Outbound Engagement",
-      dataType: "date",
-    },
-  ];
 
   const renderSummaryView = () => (
     <Grid container spacing={2}>
@@ -365,20 +391,18 @@ const Prospecting = () => {
   }
 
   return (
-    summaryData &&
-    rawData && (
-      <Box sx={{ padding: "24px" }}>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginBottom: "16px",
-          }}
-        >
-          <FormControl
-            variant="outlined"
-            sx={{ minWidth: 120, marginRight: "16px" }}
-          >
+    <Box sx={{ padding: "24px" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+        }}
+      >
+        <DataFilter fields={accountFields} onFilter={handleDataFilter} />
+        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+          <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
             <InputLabel id="period-label">Period</InputLabel>
             <Select
               labelId="period-label"
@@ -395,10 +419,7 @@ const Prospecting = () => {
               <MenuItem value="90d">90d</MenuItem>
             </Select>
           </FormControl>
-          <FormControl
-            variant="outlined"
-            sx={{ minWidth: 120, marginRight: "16px" }}
-          >
+          <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
             <InputLabel id="view-label">View</InputLabel>
             <Select
               labelId="view-label"
@@ -412,10 +433,7 @@ const Prospecting = () => {
             </Select>
           </FormControl>
           {activatedByUsers.length > 0 && (
-            <FormControl
-              variant="outlined"
-              sx={{ minWidth: 120, marginRight: "16px" }}
-            >
+            <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
               <InputLabel id="activated-by-label">User</InputLabel>
               <Select
                 labelId="activated-by-label"
@@ -436,14 +454,138 @@ const Prospecting = () => {
             </FormControl>
           )}
           <Tooltip title="Refresh data from org">
-            <IconButton onClick={handleRefresh} color="primary">
+            <IconButton onClick={handleRefresh} color="primary" size="small">
               <RefreshIcon />
             </IconButton>
           </Tooltip>
         </Box>
-        {view === "Summary" ? renderSummaryView() : renderDetailedView()}
       </Box>
-    )
+
+      {loading ? (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            height: "50vh",
+          }}
+        >
+          <CircularProgress />
+        </Box>
+      ) : error ? (
+        <Alert severity="error">{error}</Alert>
+      ) : (
+        <>
+          {view === "Summary" ? (
+            <Grid container spacing={2}>
+              {summaryLoading ? (
+                <Box
+                  sx={{
+                    display: "flex",
+                    justifyContent: "center",
+                    width: "100%",
+                    mt: 4,
+                  }}
+                >
+                  <CircularProgress />
+                </Box>
+              ) : (
+                <>
+                  <Grid item xs={12} sm={6} md={4} lg={4}>
+                    <MetricCard
+                      title="Total Activations"
+                      value={summaryData.total_activations.toString()}
+                      subText=""
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4} lg={4}>
+                    <MetricCard
+                      title="Activations Today"
+                      value={summaryData.activations_today.toString()}
+                      subText=""
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4} lg={4}>
+                    <MetricCard
+                      title="Total Tasks"
+                      value={summaryData.total_tasks.toString()}
+                      subText=""
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4} lg={4}>
+                    <MetricCard
+                      title="Total Events"
+                      value={summaryData.total_events.toString()}
+                      subText=""
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4} lg={4}>
+                    <MetricCard
+                      title="Avg Tasks Per Contact"
+                      value={summaryData.avg_tasks_per_contact.toFixed(2)}
+                      subText=""
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4} lg={4}>
+                    <MetricCard
+                      title="Avg Contacts Per Account"
+                      value={summaryData.avg_contacts_per_account.toFixed(2)}
+                      subText=""
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4} lg={4}>
+                    <MetricCard
+                      title="Total Deals"
+                      value={summaryData.total_deals.toString()}
+                      subText=""
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6} md={4} lg={4}>
+                    <MetricCard
+                      title="Total Pipeline Value"
+                      value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+                      subText=""
+                    />
+                  </Grid>
+                </>
+              )}
+            </Grid>
+          ) : (
+            <CustomTable
+              tableData={{
+                columns: tableColumns,
+                data: filteredData.map((item) => ({
+                  ...item,
+                  "account.name": (
+                    <Link
+                      href={`${instanceUrl}/${item.account?.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.account?.name || "N/A"}
+                    </Link>
+                  ),
+                  "opportunity.name": item.opportunity ? (
+                    <Link
+                      href={`${instanceUrl}/${item.opportunity.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.opportunity.name || "N/A"}
+                    </Link>
+                  ) : (
+                    "N/A"
+                  ),
+                })),
+                selectedIds: new Set(),
+                availableColumns: tableColumns,
+              }}
+              paginate={true}
+            />
+          )}
+        </>
+      )}
+    </Box>
   );
 };
 

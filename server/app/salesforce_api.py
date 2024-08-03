@@ -1,21 +1,18 @@
 import requests
 from typing import List, Dict
-from app.utils import pluck, format_error_message, parse_date_with_timezone
+from app.utils import pluck, format_error_message
 from app.data_models import (
     ApiResponse,
     Contact,
     Account,
-    Task,
     CriteriaField,
     FilterContainer,
-    Settings,
     SObjectFieldModel,
     UserModel,
     UserSObject,
 )
 from app.database.supabase_connection import get_session_state
 from app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
-from flask import session
 
 
 def get_credentials():
@@ -354,6 +351,31 @@ def fetch_contact_tasks_by_criteria_from_date(
     return api_response
 
 
+def get_task_query_count(filter_container, salesforce_user_ids):
+    api_response = ApiResponse(data=[], message="", success=False)
+    try:
+        soql_query = "SELECT COUNT() FROM Task WHERE "
+        combined_conditions = _construct_where_clause_from_filter(filter_container)
+
+        if salesforce_user_ids:
+            joined_user_ids = "','".join(salesforce_user_ids)
+            soql_query += f"OwnerId IN ('{joined_user_ids}') AND "
+
+        soql_query += combined_conditions
+
+        response = _fetch_sobjects_count(soql_query, get_credentials())
+
+        count = response.data
+
+        api_response.data = [{"count": count}]
+        api_response.success = True
+        api_response.message = "Task count retrieved successfully"
+    except Exception as e:
+        raise Exception(format_error_message(e))
+
+    return api_response
+
+
 def fetch_events_by_user_ids(user_ids):
     """
     Fetches events from Salesforce based on a list of user IDs.
@@ -550,11 +572,39 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
     contact_models = []
 
     try:
+        account_fields = _fetch_object_fields("Account", get_credentials()).data
+
+        blacklist = {
+            "isdeleted",
+            "masterrecordid",
+            "parentid",
+            "billinglatitude",
+            "billinglongitude",
+            "billingcodegeoaccuracy",
+            "shippinglatitude",
+            "shippinglongitude",
+            "photourl",
+            "dandbcompanyid",
+        }
+
+        # Filter out fields whose 'type' contains 'date' or 'reference' and those in the blacklist
+        filtered_account_fields = [
+            field["name"]
+            for field in account_fields
+            if "date" not in field["type"].lower()
+            and "reference" not in field["type"].lower()
+            and field["name"].lower() not in blacklist
+        ]
+
+        account_fields_str = ", ".join(
+            [f"Account.{field}" for field in filtered_account_fields]
+        )
         # Process the contact IDs in batches of 150
         for i in range(0, len(contact_ids), batch_size):
             batch_ids = contact_ids[i : i + batch_size]
             joined_ids = ",".join([f"'{id}'" for id in batch_ids])
-            soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
+
+            soql_query = f"SELECT Id, FirstName, LastName, AccountId, {account_fields_str} FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
 
             for contact in _fetch_sobjects(soql_query, get_credentials()).data:
                 contact_models.append(
@@ -570,6 +620,8 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
                         account=Account(
                             id=contact.get("AccountId"),
                             name=contact.get("Account").get("Name"),
+                            owner_id=contact.get("Account").get("OwnerId"),
+                            **contact.get("Account"),
                         ),
                     )
                 )
@@ -718,6 +770,32 @@ def _fetch_object_fields(object_name, credentials):
     except Exception as e:
         raise Exception(format_error_message(e))
     return api_response
+
+
+def _fetch_sobjects_count(soql_query, credentials):
+    try:
+        access_token, instance_url = credentials
+        if not access_token or not instance_url:
+            raise Exception(SESSION_EXPIRED)
+        headers = {"Authorization": f"Bearer {access_token}"}
+        response = requests.get(
+            f"{instance_url}/services/data/v55.0/query",
+            headers=headers,
+            params={"q": soql_query},
+        )
+        if response.status_code == 200:
+            return ApiResponse(
+                success=True,
+                data=response.json()["totalSize"],
+                message=None,
+                status_code=200,
+            )
+        else:
+            raise Exception(
+                f"Failed to fetch sobjects count ({response.status_code}): {get_http_error_message(response)}"
+            )
+    except Exception as e:
+        raise Exception(format_error_message(e))
 
 
 def _fetch_sobjects(soql_query, credentials):

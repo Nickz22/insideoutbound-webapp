@@ -178,6 +178,35 @@ export const fetchSalesforceUsers = async () => {
 };
 
 /**
+ * Fetches task query count from the Salesforce API
+ * @param {Object} criteria - The criteria for the query
+ * @param {String[]} salesforceUserIds - The Salesforce user IDs
+ * @returns {Promise<ApiResponse>}
+ */
+export const getTaskQueryCount = async (criteria, salesforceUserIds) => {
+  try {
+    const response = await api.post(
+      "/get_task_query_count",
+      {
+        criteria,
+        salesforce_user_ids: salesforceUserIds,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": localStorage.getItem("sessionToken"),
+        },
+        validateStatus: () => true,
+      }
+    );
+    return { ...response.data, statusCode: response.status };
+  } catch (error) {
+    console.error("Error in getTaskQueryCount:", error);
+    throw error;
+  }
+};
+
+/**
  * Retrieves the JWT from the server
  * @returns {Promise<ApiResponse>}
  */

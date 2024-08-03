@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Set, Any
+from typing import List, Optional, Set, Any, Dict
 from datetime import date, datetime
 from uuid import UUID
 from enum import Enum
@@ -69,6 +69,10 @@ class Account(SerializableModel):
     id: str
     name: Optional[str] = None
     owner_id: Optional[str] = None
+    additional_properties: Dict[str, Any] = {}
+
+    class Config:
+        extra = "allow"
 
 
 class Task(SerializableModel):
