@@ -331,6 +331,7 @@ def fetch_contact_tasks_by_criteria_from_date(
             combined_conditions = _construct_where_clause_from_filter(filter_container)
 
             contact_task_models = []
+            print("fetching tasks for filter", filter_container.name)
             for task in _fetch_sobjects(
                 f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC",
                 get_credentials(),

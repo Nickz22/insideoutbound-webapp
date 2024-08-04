@@ -127,7 +127,9 @@ def load_inactive_activations() -> ApiResponse:
                             else None
                         ),
                         last_outbound_engagement=(
-                            datetime.fromisoformat(entry["last_outbound_engagement"])
+                            datetime.fromisoformat(
+                                entry["last_outbound_engagement"]
+                            )
                             if entry.get("last_outbound_engagement")
                             else None
                         ),

@@ -155,14 +155,14 @@ class Activation(SerializableModel):
     active_contact_ids: Set[str]
     task_ids: Set[str]
     activated_date: Optional[date] = None
-    first_prospecting_activity: Optional[datetime] = None
-    last_prospecting_activity: Optional[datetime] = None
+    first_prospecting_activity: Optional[date] = None
+    last_prospecting_activity: Optional[date] = None
     event_ids: Optional[Set[str]] = None
     prospecting_metadata: Optional[List[ProspectingMetadata]] = None
     days_activated: Optional[int] = None
     days_engaged: Optional[int] = None
     engaged_date: Optional[date] = None
-    last_outbound_engagement: Optional[datetime] = None
+    last_outbound_engagement: Optional[date] = None
     opportunity: Optional[Opportunity] = None
     status: StatusEnum = Field(default=StatusEnum.activated)
 

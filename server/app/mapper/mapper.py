@@ -159,20 +159,16 @@ def supabase_dict_to_python_activation(row: Dict) -> Activation:
             row[field] = set(row[field])
 
     # Convert date strings to date objects
-    date_fields = ["activated_date", "engaged_date"]
-    for field in date_fields:
-        if field in row and row[field]:
-            row[field] = datetime.fromisoformat(row[field]).date()
-
-    # convert datetime strings to datetime objects
-    datetime_fields = [
+    date_fields = [
+        "activated_date",
+        "engaged_date",
         "first_prospecting_activity",
         "last_prospecting_activity",
         "last_outbound_engagement",
     ]
-    for field in datetime_fields:
+    for field in date_fields:
         if field in row and row[field]:
-            row[field] = datetime.fromisoformat(row[field]).replace(tzinfo=None)
+            row[field] = datetime.fromisoformat(row[field]).date()
 
     return Activation(**row)
 
@@ -182,6 +178,7 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
 
     activation_dict["account_id"] = activation_dict["account"]["id"]
     activation_dict["account"] = json.dumps(activation_dict["account"])
+    activation_dict["created_at"] = datetime.now().isoformat()
 
     if "active_contact_ids" in activation_dict:
         activation_dict["active_contact_ids"] = list(
@@ -213,6 +210,7 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
     # Ensure only Supabase schema fields are included
     supabase_fields = [
         "id",
+        "created_at",
         "account_id",
         "account",
         "activated_by_id",

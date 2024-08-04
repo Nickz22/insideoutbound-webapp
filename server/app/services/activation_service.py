@@ -22,12 +22,11 @@ from app.utils import (
     group_by,
     pluck,
     format_error_message,
-    convert_datetime_to_utc_z_format,
-    datetime_to_iso_string_z,
+    convert_date_to_salesforce_datetime_format,
     get_team_member_salesforce_ids,
     parse_datetime_string_with_timezone,
 )
-from datetime import datetime, timezone
+from datetime import datetime, date
 from app.mapper.mapper import convert_dict_to_opportunity
 
 
@@ -55,7 +54,9 @@ def find_unresponsive_activations(
     response = ApiResponse(data=[], message="", success=False)
 
     try:
-        first_prospecting_activity = activations[0].first_prospecting_activity
+        first_prospecting_activity = convert_date_to_salesforce_datetime_format(
+            activations[0].first_prospecting_activity
+        )
         activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
 
         today = datetime.now().date()
@@ -63,7 +64,7 @@ def find_unresponsive_activations(
             activation
             for activation in activations
             if add_days(
-                activation.last_prospecting_activity.date(),
+                activation.last_prospecting_activity,
                 settings.inactivity_threshold,
             )
             < today
@@ -83,7 +84,7 @@ def find_unresponsive_activations(
         criteria_group_tasks_by_account_id = (
             fetch_tasks_by_account_ids_from_date_not_in_ids(
                 list(account_ids),
-                convert_datetime_to_utc_z_format(first_prospecting_activity),
+                first_prospecting_activity,
                 settings.criteria,
                 already_counted_task_ids,
                 get_team_member_salesforce_ids(settings),
@@ -129,21 +130,12 @@ def find_unresponsive_activations(
 
 
 def increment_existing_activations(activations: List[Activation], settings: Settings):
-    """
-    Processes a list of activation objects and updates their counters based on criteria specified in the settings.
-
-    Parameters:
-    - `activations` (list): A list of activation objects to be processed, ASSUMED TO BE ORDERED BY first_prospecting_activity ASC.
-    - `settings` (dict): A dictionary containing various criteria used to determine how the activation objects should be updated.
-
-    Returns:
-    - ApiResponse: `data` param is a collection of updated activation objects.
-    """
     response = ApiResponse(data=[], message="", success=False)
     try:
+        today = date.today()
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
 
-        first_prospecting_activity = convert_datetime_to_utc_z_format(
+        first_prospecting_activity = convert_date_to_salesforce_datetime_format(
             activations[0].first_prospecting_activity
         )
         activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
@@ -186,7 +178,6 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     criteria_name_by_task_id[task.get("Id")] = criteria
                     all_tasks.append(task)
 
-            # opportunity for merge sort implementation...sorting by ascending order
             all_tasks = sorted(all_tasks, key=lambda x: x.get("CreatedDate"))
             for task in all_tasks:
                 is_task_within_inactivity_threshold = is_model_date_field_within_window(
@@ -194,7 +185,6 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     activation.last_prospecting_activity,
                     settings.inactivity_threshold,
                 )
-                ## any further tasks will only be further away from last activity, so we break
                 if not is_task_within_inactivity_threshold:
                     break
                 activation.task_ids.add(task.get("Id"))
@@ -204,8 +194,17 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                 activation.last_prospecting_activity = task_created_date
                 activation.active_contact_ids.add(task.get("WhoId"))
 
-                # Update ProspectingMetadata
+                # Update engaged_date if this is an inbound task and we don't have an engaged_date yet
                 criteria_name = criteria_name_by_task_id[task.get("Id")]
+                if (
+                    not activation.engaged_date
+                    and criteria_name_by_direction.get(criteria_name).lower()
+                    == "inbound"
+                ):
+                    activation.engaged_date = task_created_date.date()
+                    activation.days_engaged = (today - activation.engaged_date).days
+
+                # Update ProspectingMetadata
                 metadata = next(
                     (
                         m
@@ -229,7 +228,12 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                         )
                     )
 
-                activations_by_account_id[account_id] = activation
+            # Update days_activated and days_engaged
+            activation.days_activated = (today - activation.activated_date).days
+            if activation.engaged_date:
+                activation.days_engaged = (today - activation.engaged_date).days
+
+            activations_by_account_id[account_id] = activation
 
         opportunities_by_account_id = group_by(opportunities, "AccountId")
 
@@ -375,8 +379,10 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 if is_task_in_tracking_period:
                     if task.get("WhoId") not in valid_task_ids_by_who_id:
                         valid_task_ids_by_who_id[task.get("WhoId")] = []
-                        account_first_prospecting_activity = datetime.strptime(
-                            task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
+                        account_first_prospecting_activity = (
+                            parse_datetime_string_with_timezone(
+                                task.get("CreatedDate")
+                            ).date()
                         )
                     valid_task_ids_by_who_id[task.get("WhoId")].append(task.get("Id"))
                     last_valid_task_creator_id = task.get("OwnerId")
@@ -406,18 +412,18 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                             valid_task_ids_by_who_id[task.get("WhoId")] = [
                                 task.get("Id")
                             ]
-                            account_first_prospecting_activity = datetime.strptime(
-                                task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
+                            account_first_prospecting_activity = (
+                                parse_datetime_string_with_timezone(
+                                    task.get("CreatedDate")
+                                ).date()
                             )
                             task_ids = [task.get("Id")]
                             last_valid_task_creator_id = task.get("OwnerId")
                         continue
 
-                    # Can add Prospecting Metadata by
-                    # finding Task Ids within task_ids_by_criteria_name
-                    last_prospecting_activity = datetime.strptime(
-                        task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
-                    )
+                    last_prospecting_activity = parse_datetime_string_with_timezone(
+                        task.get("CreatedDate")
+                    ).date()
                     activation = create_activation(
                         contact_by_id,
                         account_first_prospecting_activity,
@@ -447,10 +453,9 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             if not is_account_active_for_tracking_period:
                 continue
 
-            # Can add Prospecting Metadata by
-            last_prospecting_activity = datetime.strptime(
-                task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
-            )
+            last_prospecting_activity = parse_datetime_string_with_timezone(
+                task.get("CreatedDate")
+            ).date()
             activation = create_activation(
                 contact_by_id,
                 account_first_prospecting_activity,
@@ -488,14 +493,75 @@ def create_activation(
     settings,
     all_tasks_under_account,
 ):
+    today = date.today()
+
+    # Find the first inbound task
+    first_inbound_task = next(
+        (
+            task
+            for task in all_tasks_under_account
+            if task["Id"] in task_ids
+            and any(
+                task["Id"] in task_set
+                for criteria_name, task_set in task_ids_by_criteria_name.items()
+                if criteria_name_by_direction.get(criteria_name, "").lower()
+                == "inbound"
+            )
+        ),
+        None,
+    )
+
+    engaged_date = (
+        parse_datetime_string_with_timezone(first_inbound_task["CreatedDate"]).date()
+        if first_inbound_task
+        else None
+    )
+
+    # Determine the activated_date based on the activation condition
+    if qualifying_opportunity:
+        activated_date = parse_datetime_string_with_timezone(
+            qualifying_opportunity["CreatedDate"]
+        ).date()
+    elif qualifying_event:
+        activated_date = parse_datetime_string_with_timezone(
+            qualifying_event["CreatedDate"]
+        ).date()
+    else:
+        # Find the task that caused the account to meet the activation criteria
+        activating_task = next(
+            (
+                task
+                for task in reversed(all_tasks_under_account)
+                if task["Id"] in task_ids
+                and len(
+                    [
+                        t
+                        for t in all_tasks_under_account
+                        if t["CreatedDate"] <= task["CreatedDate"]
+                        and t["Id"] in task_ids
+                    ]
+                )
+                >= settings.activities_per_contact * settings.contacts_per_account
+            ),
+            None,
+        )
+        activated_date = (
+            parse_datetime_string_with_timezone(activating_task["CreatedDate"]).date()
+            if activating_task
+            else account_first_prospecting_activity
+        )
+
     activation = Activation(
         id=generate_unique_id(),
         account=contact_by_id[active_contact_ids[0]].account,
-        activated_date=account_first_prospecting_activity.date(),
+        activated_date=activated_date,
+        days_activated=(today - activated_date).days,
+        engaged_date=engaged_date,
+        days_engaged=(today - engaged_date).days if engaged_date else None,
         active_contact_ids=active_contact_ids,
         activated_by_id=last_valid_task_creator_id,
-        first_prospecting_activity=account_first_prospecting_activity.date(),
-        last_prospecting_activity=last_prospecting_activity.date(),
+        first_prospecting_activity=account_first_prospecting_activity,
+        last_prospecting_activity=last_prospecting_activity,
         opportunity=(
             convert_dict_to_opportunity(qualifying_opportunity)
             if qualifying_opportunity
@@ -524,8 +590,7 @@ def create_activation(
     )
 
     is_last_prospecting_activity_outside_of_inactivity_threshold = (
-        add_days(last_prospecting_activity.date(), settings.inactivity_threshold)
-        < datetime.now().date()
+        add_days(last_prospecting_activity, settings.inactivity_threshold) < today
     )
     if is_last_prospecting_activity_outside_of_inactivity_threshold:
         activation.status = StatusEnum.unresponsive
@@ -632,10 +697,8 @@ def get_first_prospecting_activity_date(tasks_by_criteria):
     first_prospecting_activity = None
     for criteria_key, tasks in tasks_by_criteria.items():
         for task in tasks:
-            task_created_date = (
-                datetime.strptime(task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z")
-                .astimezone(timezone.utc)
-                .replace(tzinfo=None)
+            task_created_date = parse_datetime_string_with_timezone(
+                task.get("CreatedDate")
             )
             first_prospecting_activity = (
                 task_created_date
@@ -644,7 +707,7 @@ def get_first_prospecting_activity_date(tasks_by_criteria):
             )
     if not first_prospecting_activity:
         first_prospecting_activity = datetime.now()
-    return datetime_to_iso_string_z(first_prospecting_activity)
+    return convert_date_to_salesforce_datetime_format(first_prospecting_activity.date())
 
 
 def get_tasks_by_account_id(tasks_by_criteria, contacts):

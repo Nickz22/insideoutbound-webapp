@@ -73,7 +73,7 @@ def generate_unique_id():
 
 
 # date utils
-def add_days(date, days):
+def add_days(date: date, days: int) -> date:
     return date + timedelta(days=days)
 
 
@@ -99,24 +99,18 @@ def is_model_date_field_within_window(
     return start_date <= model_date_value <= end_date
 
 
-def convert_datetime_to_utc_z_format(dt: datetime) -> str:
+def convert_date_to_salesforce_datetime_format(d: date) -> str:
     """
-    Convert a timezone-naive datetime object to a UTC datetime string in Z format.
+    Convert a date object to a UTC datetime string in Z format.
 
     Args:
-        dt (datetime): A timezone-naive datetime object.
+        d (date): A date object.
 
     Returns:
-        str: The datetime string in UTC Z format (e.g., "2023-10-05T14:48:00Z").
+        str: The datetime string in UTC Z format (e.g., "2023-10-05T00:00:00Z").
     """
-    # Assume the datetime object is in the local timezone and make it timezone-aware
-    local_dt = dt.replace(tzinfo=timezone.utc)
-
-    # Convert to UTC and remove timezone information
-    dt_utc = local_dt.astimezone(tz=timezone.utc).replace(tzinfo=None)
-
-    # Format the datetime object to the desired string format
-    return dt_utc.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
+    # Format the date object to the desired string format
+    return d.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
 
 
 def datetime_to_iso_string_z(dt):
