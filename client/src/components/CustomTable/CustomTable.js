@@ -39,7 +39,8 @@ import ClearIcon from "@mui/icons-material/Clear";
  *   tableData: TableData,
  *   onSelectionChange: (selectedIds: Set<string>) => void,
  *   onColumnsChange: (columns: TableColumn[]) => void,
- *   paginate?: boolean
+ *   paginate?: boolean,
+ *   onRowClick: (item: Record<string, any>) => void
  * }} props
  */
 const CustomTable = ({
@@ -47,6 +48,7 @@ const CustomTable = ({
   onSelectionChange,
   onColumnsChange,
   paginate = false,
+  onRowClick,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(0);
@@ -218,7 +220,11 @@ const CustomTable = ({
           </TableHead>
           <TableBody>
             {paginatedData.map((item) => (
-              <TableRow key={item.id}>
+              <TableRow
+                key={item.id}
+                onClick={() => (onRowClick ? onRowClick(item) : null)}
+                style={{ cursor: onRowClick ? "pointer" : "default" }}
+              >
                 {tableData.columns.map((column) => (
                   <TableCell key={`${item.id}-${column.id}`}>
                     {renderCell(column, item)}

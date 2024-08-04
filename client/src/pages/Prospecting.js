@@ -13,12 +13,15 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Card,
+  CardContent,
   MenuItem,
   CircularProgress,
   IconButton,
   Tooltip,
+  Modal,
   Link,
-  Paper,
+  Typography,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "./../components/DataFilter/DataFilter";
@@ -43,6 +46,8 @@ const Prospecting = () => {
   const [activatedByUsers, setActivatedByUsers] = useState([]);
   const [selectedActivatedBy, setSelectedActivatedBy] = useState("");
   const [instanceUrl, setInstanceUrl] = useState("");
+  const [selectedRow, setSelectedRow] = useState(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
 
@@ -172,6 +177,31 @@ const Prospecting = () => {
     });
   }, []);
 
+  const handleRowClick = useCallback((rowData) => {
+    setSelectedRow(rowData);
+    setModalOpen(true);
+  }, []);
+
+  const handleCloseModal = useCallback(() => {
+    setModalOpen(false);
+    setSelectedRow(null);
+  }, []);
+
+  const renderProspectingMetadataCards = useMemo(() => {
+    if (!selectedRow || !selectedRow.prospecting_metadata) return null;
+
+    return selectedRow.prospecting_metadata.map((metadata, index) => (
+      <Card key={index} sx={{ mb: 2 }}>
+        <CardContent>
+          <Typography variant="h6">{metadata.name}</Typography>
+          <Typography>First Occurrence: {metadata.first_occurrence}</Typography>
+          <Typography>Last Occurrence: {metadata.last_occurrence}</Typography>
+          <Typography>Total: {metadata.total}</Typography>
+        </CardContent>
+      </Card>
+    ));
+  }, [selectedRow]);
+
   const filteredData = useMemo(() => {
     let filtered = rawData;
     if (selectedActivatedBy) {
@@ -260,116 +290,6 @@ const Prospecting = () => {
       });
     }
   }, [filteredData]);
-
-  const renderSummaryView = () => (
-    <Grid container spacing={2}>
-      {summaryLoading ? (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            width: "100%",
-            mt: 4,
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      ) : (
-        <>
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <MetricCard
-              title="Total Activations"
-              value={summaryData.total_activations.toString()}
-              subText=""
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <MetricCard
-              title="Activations Today"
-              value={summaryData.activations_today.toString()}
-              subText=""
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <MetricCard
-              title="Total Tasks"
-              value={summaryData.total_tasks.toString()}
-              subText=""
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <MetricCard
-              title="Total Events"
-              value={summaryData.total_events.toString()}
-              subText=""
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <MetricCard
-              title="Avg Tasks Per Contact"
-              value={summaryData.avg_tasks_per_contact.toFixed(2)}
-              subText=""
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <MetricCard
-              title="Avg Contacts Per Account"
-              value={summaryData.avg_contacts_per_account.toFixed(2)}
-              subText=""
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <MetricCard
-              title="Total Deals"
-              value={summaryData.total_deals.toString()}
-              subText=""
-            />
-          </Grid>
-          <Grid item xs={12} sm={6} md={4} lg={4}>
-            <MetricCard
-              title="Total Pipeline Value"
-              value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
-              subText=""
-            />
-          </Grid>
-        </>
-      )}
-    </Grid>
-  );
-
-  const renderDetailedView = () => (
-    <CustomTable
-      tableData={{
-        columns: tableColumns,
-        data: filteredData.map((item) => ({
-          ...item,
-          "account.name": (
-            <Link
-              href={`${instanceUrl}/${item.account?.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {item.account?.name || "N/A"}
-            </Link>
-          ),
-          "opportunity.name": item.opportunity ? (
-            <Link
-              href={`${instanceUrl}/${item.opportunity.id}`}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {item.opportunity.name || "N/A"}
-            </Link>
-          ) : (
-            "N/A"
-          ),
-        })),
-        selectedIds: new Set(),
-        availableColumns: tableColumns,
-      }}
-      paginate={true}
-    />
-  );
 
   if (loading) {
     return (
@@ -581,10 +501,37 @@ const Prospecting = () => {
                 availableColumns: tableColumns,
               }}
               paginate={true}
+              onRowClick={handleRowClick}
             />
           )}
         </>
       )}
+
+      <Modal
+        open={modalOpen}
+        onClose={handleCloseModal}
+        aria-labelledby="prospecting-metadata-modal"
+      >
+        <Box
+          sx={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            width: 400,
+            bgcolor: "background.paper",
+            boxShadow: 24,
+            p: 4,
+            maxHeight: "80vh",
+            overflow: "auto",
+          }}
+        >
+          <Typography variant="h5" component="h2" gutterBottom>
+            Prospecting Metadata
+          </Typography>
+          {renderProspectingMetadataCards}
+        </Box>
+      </Modal>
     </Box>
   );
 };
