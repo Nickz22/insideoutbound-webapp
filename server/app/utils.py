@@ -78,7 +78,7 @@ def add_days(date, days):
 
 
 def is_model_date_field_within_window(
-    sobject_model, start_date, period_days, date_field="CreatedDate"
+    sobject_model, start_date: datetime, period_days: int, date_field="CreatedDate"
 ):
     """
     Check if the date field of a model is within a window of days from a start date.
@@ -89,28 +89,31 @@ def is_model_date_field_within_window(
     :param date_field: The date field to check
     """
     ## offset-naive start time
-    start_time = (
-        datetime.strptime(start_date, "%Y-%m-%dT%H:%M:%S.%f%z")
-        .astimezone(timezone.utc)
-        .replace(tzinfo=None)
-    )
-    end_date = start_time + timedelta(days=period_days)
+    end_date = start_date + timedelta(days=period_days)
     if isinstance(sobject_model, dict):
         model_date_value = datetime.strptime(
             sobject_model[date_field], "%Y-%m-%dT%H:%M:%S.%f%z"
         ).replace(tzinfo=None)
     else:
         model_date_value = getattr(sobject_model, date_field)
-    return start_time <= model_date_value <= end_date
+    return start_date <= model_date_value <= end_date
 
 
 def convert_datetime_to_utc_z_format(dt: datetime) -> str:
-    # Ensure the datetime object is timezone-aware
-    if dt.tzinfo is None:
-        raise ValueError("The datetime instance must be timezone-aware.")
+    """
+    Convert a timezone-naive datetime object to a UTC datetime string in Z format.
+
+    Args:
+        dt (datetime): A timezone-naive datetime object.
+
+    Returns:
+        str: The datetime string in UTC Z format (e.g., "2023-10-05T14:48:00Z").
+    """
+    # Assume the datetime object is in the local timezone and make it timezone-aware
+    local_dt = dt.replace(tzinfo=timezone.utc)
 
     # Convert to UTC and remove timezone information
-    dt_utc = dt.astimezone(tz=timezone.utc).replace(tzinfo=None)
+    dt_utc = local_dt.astimezone(tz=timezone.utc).replace(tzinfo=None)
 
     # Format the datetime object to the desired string format
     return dt_utc.strftime("%Y-%m-%dT%H:%M:%S") + "Z"
@@ -141,7 +144,7 @@ def parse_date_from_string(salesforce_datetime_str: str) -> date:
     return datetime.strptime(salesforce_datetime_str, "%Y-%m-%dT%H:%M:%S").date()
 
 
-def parse_date_with_timezone(date_str) -> datetime:
+def parse_datetime_string_with_timezone(date_str) -> datetime:
     """
     Takes a datetime string formatted as 'YYYY-MM-DDTHH:MM:SS.mmm+ZZZZ' and converts it to a timezone-naive datetime object.
     """

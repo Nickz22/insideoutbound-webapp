@@ -172,7 +172,7 @@ def supabase_dict_to_python_activation(row: Dict) -> Activation:
     ]
     for field in datetime_fields:
         if field in row and row[field]:
-            row[field] = datetime.fromisoformat(row[field])
+            row[field] = datetime.fromisoformat(row[field]).replace(tzinfo=None)
 
     return Activation(**row)
 
@@ -198,9 +198,7 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
 
     if "prospecting_metadata" in activation_dict:
         activation_dict["prospecting_metadata"] = (
-            json.dumps(
-                [item.dict() for item in activation_dict["prospecting_metadata"]]
-            )
+            json.dumps(activation_dict["prospecting_metadata"])
             if activation_dict["prospecting_metadata"]
             else None
         )

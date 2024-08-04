@@ -1,5 +1,13 @@
 import os, sys
-from app.data_models import Settings, Activation, Account, ApiResponse, StatusEnum
+from app.data_models import (
+    Settings,
+    Activation,
+    ProspectingMetadata,
+    ApiResponse,
+    StatusEnum,
+)
+from typing import List, Dict
+
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from server.app.salesforce_api import (
@@ -17,6 +25,7 @@ from app.utils import (
     convert_datetime_to_utc_z_format,
     datetime_to_iso_string_z,
     get_team_member_salesforce_ids,
+    parse_datetime_string_with_timezone,
 )
 from datetime import datetime, timezone
 from app.mapper.mapper import convert_dict_to_opportunity
@@ -119,7 +128,7 @@ def find_unresponsive_activations(
     return response
 
 
-def increment_existing_activations(activations: list[Activation], settings: Settings):
+def increment_existing_activations(activations: List[Activation], settings: Settings):
     """
     Processes a list of activation objects and updates their counters based on criteria specified in the settings.
 
@@ -177,7 +186,7 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                     criteria_name_by_task_id[task.get("Id")] = criteria
                     all_tasks.append(task)
 
-            # opportunity for merge sort implementation
+            # opportunity for merge sort implementation...sorting by ascending order
             all_tasks = sorted(all_tasks, key=lambda x: x.get("CreatedDate"))
             for task in all_tasks:
                 is_task_within_inactivity_threshold = is_model_date_field_within_window(
@@ -185,15 +194,42 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
                     activation.last_prospecting_activity,
                     settings.inactivity_threshold,
                 )
+                ## any further tasks will only be further away from last activity, so we break
                 if not is_task_within_inactivity_threshold:
                     break
-                activation.task_ids.append(task.get("Id"))
-                activation.last_prospecting_activity = datetime.strptime(
-                    task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
+                activation.task_ids.add(task.get("Id"))
+                task_created_date = parse_datetime_string_with_timezone(
+                    task.get("CreatedDate")
                 )
-                activation.active_contact_ids.append(task.get("WhoId"))
+                activation.last_prospecting_activity = task_created_date
+                activation.active_contact_ids.add(task.get("WhoId"))
+
+                # Update ProspectingMetadata
+                criteria_name = criteria_name_by_task_id[task.get("Id")]
+                metadata = next(
+                    (
+                        m
+                        for m in activation.prospecting_metadata
+                        if m.name == criteria_name
+                    ),
+                    None,
+                )
+                if metadata:
+                    metadata.last_occurrence = max(
+                        metadata.last_occurrence, task_created_date.date()
+                    )
+                    metadata.total += 1
+                else:
+                    activation.prospecting_metadata.append(
+                        ProspectingMetadata(
+                            name=criteria_name,
+                            first_occurrence=task_created_date.date(),
+                            last_occurrence=task_created_date.date(),
+                            total=1,
+                        )
+                    )
+
                 activations_by_account_id[account_id] = activation
-                # rollup prospecting metadata via criteria_name_by_task_id
 
         opportunities_by_account_id = group_by(opportunities, "AccountId")
 
@@ -235,7 +271,7 @@ def increment_existing_activations(activations: list[Activation], settings: Sett
 
             activations_by_account_id[account_id] = activation
 
-        response.data = activations_by_account_id.values()
+        response.data = list(activations_by_account_id.values())
         response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))
@@ -310,7 +346,9 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 all_tasks_under_account, key=lambda x: x.get("CreatedDate")
             )
 
-            start_tracking_period = all_tasks_under_account[0].get("CreatedDate")
+            start_tracking_period = parse_datetime_string_with_timezone(
+                all_tasks_under_account[0].get("CreatedDate")
+            )
 
             qualifying_event = get_qualifying_meeting(
                 meetings_by_account_id.get(account_id, []),
@@ -330,7 +368,9 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 
             for task in all_tasks_under_account:
                 is_task_in_tracking_period = is_model_date_field_within_window(
-                    task, start_tracking_period, settings.tracking_period
+                    sobject_model=task,
+                    start_date=start_tracking_period,
+                    period_days=settings.tracking_period,
                 )
                 if is_task_in_tracking_period:
                     if task.get("WhoId") not in valid_task_ids_by_who_id:
@@ -379,7 +419,6 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
                     )
                     activation = create_activation(
-                        account_id,
                         contact_by_id,
                         account_first_prospecting_activity,
                         active_contact_ids,
@@ -391,6 +430,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         task_ids_by_criteria_name,
                         criteria_name_by_direction,
                         settings,
+                        all_tasks_under_account,
                     )
                     activations.append(activation)
 
@@ -412,7 +452,6 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 task.get("CreatedDate"), "%Y-%m-%dT%H:%M:%S.%f%z"
             )
             activation = create_activation(
-                account_id,
                 contact_by_id,
                 account_first_prospecting_activity,
                 active_contact_ids,
@@ -424,6 +463,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 task_ids_by_criteria_name,
                 criteria_name_by_direction,
                 settings,
+                all_tasks_under_account,
             )
             activations.append(activation)
             response.data.extend(activations)
@@ -435,7 +475,6 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 
 
 def create_activation(
-    account_id,
     contact_by_id,
     account_first_prospecting_activity,
     active_contact_ids,
@@ -447,6 +486,7 @@ def create_activation(
     task_ids_by_criteria_name,
     criteria_name_by_direction,
     settings,
+    all_tasks_under_account,
 ):
     activation = Activation(
         id=generate_unique_id(),
@@ -478,6 +518,9 @@ def create_activation(
                 )
             )
         ),
+        prospecting_metadata=create_prospecting_metadata(
+            task_ids, task_ids_by_criteria_name, all_tasks_under_account
+        ),
     )
 
     is_last_prospecting_activity_outside_of_inactivity_threshold = (
@@ -488,6 +531,39 @@ def create_activation(
         activation.status = StatusEnum.unresponsive
 
     return activation
+
+
+def create_prospecting_metadata(
+    task_ids: List[str],
+    task_ids_by_criteria_name: Dict[str, List[str]],
+    all_tasks_under_account: List[Dict],
+) -> List[ProspectingMetadata]:
+    metadata_list = []
+    for criteria_name, criteria_task_ids in task_ids_by_criteria_name.items():
+        matching_task_ids = set(task_ids) & set(criteria_task_ids)
+        if matching_task_ids:
+            matching_tasks = [
+                task
+                for task in all_tasks_under_account
+                if task["Id"] in matching_task_ids
+            ]
+            first_occurrence = min(
+                datetime.strptime(task["CreatedDate"], "%Y-%m-%dT%H:%M:%S.%f%z").date()
+                for task in matching_tasks
+            )
+            last_occurrence = max(
+                datetime.strptime(task["CreatedDate"], "%Y-%m-%dT%H:%M:%S.%f%z").date()
+                for task in matching_tasks
+            )
+            metadata_list.append(
+                ProspectingMetadata(
+                    name=criteria_name,
+                    first_occurrence=first_occurrence,
+                    last_occurrence=last_occurrence,
+                    total=len(matching_task_ids),
+                )
+            )
+    return metadata_list
 
 
 # helpers with side effects
@@ -544,7 +620,7 @@ def get_task_ids_by_criteria_name(tasks_by_account_id):
     return task_ids_by_criteria_name
 
 
-def get_all_tasks_under_account(tasks_by_criteria_by_who_id):
+def get_all_tasks_under_account(tasks_by_criteria_by_who_id) -> List[Dict]:
     all_tasks_under_account = []
     for contact_id, tasks_by_criteria in tasks_by_criteria_by_who_id.items():
         for criteria, tasks in tasks_by_criteria.items():
