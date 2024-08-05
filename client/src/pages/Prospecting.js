@@ -13,16 +13,26 @@ import {
   FormControl,
   InputLabel,
   Select,
+  MenuItem,
   Card,
   CardContent,
-  MenuItem,
   CircularProgress,
   IconButton,
   Tooltip,
-  Modal,
   Link,
+  List,
+  ListItem,
+  ListItemText,
   Typography,
 } from "@mui/material";
+import {
+  Timeline,
+  TimelineItem,
+  TimelineSeparator,
+  TimelineConnector,
+  TimelineContent,
+  TimelineDot,
+} from "@mui/lab";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "./../components/DataFilter/DataFilter";
 import {
@@ -46,8 +56,6 @@ const Prospecting = () => {
   const [activatedByUsers, setActivatedByUsers] = useState([]);
   const [selectedActivatedBy, setSelectedActivatedBy] = useState("");
   const [instanceUrl, setInstanceUrl] = useState("");
-  const [selectedRow, setSelectedRow] = useState(null);
-  const [modalOpen, setModalOpen] = useState(false);
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
 
@@ -177,30 +185,87 @@ const Prospecting = () => {
     });
   }, []);
 
-  const handleRowClick = useCallback((rowData) => {
-    setSelectedRow(rowData);
-    setModalOpen(true);
-  }, []);
+  const [selectedActivation, setSelectedActivation] = useState(null);
 
-  const handleCloseModal = useCallback(() => {
-    setModalOpen(false);
-    setSelectedRow(null);
-  }, []);
+  const handleRowClick = (activation) => {
+    setSelectedActivation(activation);
+  };
 
-  const renderProspectingMetadataCards = useMemo(() => {
-    if (!selectedRow || !selectedRow.prospecting_metadata) return null;
+  const ProspectingMetadataOverview = ({ metadata }) => (
+    <Grid container spacing={2}>
+      {metadata.map((item, index) => (
+        <Grid item xs={12} key={index}>
+          <Card variant="outlined">
+            <CardContent>
+              <Typography variant="h6" component="div" gutterBottom>
+                {item.name}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Total: {item.total}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                First: {new Date(item.first_occurrence).toLocaleDateString()}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Last: {new Date(item.last_occurrence).toLocaleDateString()}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      ))}
+    </Grid>
+  );
 
-    return selectedRow.prospecting_metadata.map((metadata, index) => (
-      <Card key={index} sx={{ mb: 2 }}>
-        <CardContent>
-          <Typography variant="h6">{metadata.name}</Typography>
-          <Typography>First Occurrence: {metadata.first_occurrence}</Typography>
-          <Typography>Last Occurrence: {metadata.last_occurrence}</Typography>
-          <Typography>Total: {metadata.total}</Typography>
-        </CardContent>
-      </Card>
-    ));
-  }, [selectedRow]);
+  const ProspectingEffortTimeline = ({ efforts }) => (
+    <Timeline sx={{ padding: 0, margin: 0 }}>
+      {efforts.map((effort, index) => (
+        <TimelineItem key={index}>
+          <TimelineSeparator>
+            <TimelineDot color={getStatusColor(effort.status)} />
+            {index < efforts.length - 1 && <TimelineConnector />}
+          </TimelineSeparator>
+          <TimelineContent>
+            <Typography variant="h6" component="span">
+              {effort.status}
+            </Typography>
+            <Typography>
+              {new Date(effort.date_entered).toLocaleDateString()}
+            </Typography>
+            <Typography>Tasks: {effort.task_ids.length}</Typography>
+            {effort.prospecting_metadata.length > 0 && (
+              <List dense>
+                {effort.prospecting_metadata.map((item, metaIndex) => (
+                  <ListItem key={metaIndex}>
+                    <ListItemText
+                      primary={`${item.name}: ${item.total}`}
+                      secondary={`${new Date(
+                        item.first_occurrence
+                      ).toLocaleDateString()} - ${new Date(
+                        item.last_occurrence
+                      ).toLocaleDateString()}`}
+                    />
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </TimelineContent>
+        </TimelineItem>
+      ))}
+    </Timeline>
+  );
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case "Activated":
+        return "primary";
+      case "Meeting Set":
+        return "secondary";
+      case "Opportunity Created":
+        return "success";
+      default:
+        return "grey";
+    }
+  };
 
   const filteredData = useMemo(() => {
     let filtered = rawData;
@@ -394,144 +459,148 @@ const Prospecting = () => {
         </Box>
       ) : error ? (
         <Alert severity="error">{error}</Alert>
+      ) : view === "Summary" ? (
+        <Grid container spacing={2}>
+          {summaryLoading ? (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                width: "100%",
+                mt: 4,
+              }}
+            >
+              <CircularProgress />
+            </Box>
+          ) : (
+            <>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Activations"
+                  value={summaryData.total_activations.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Activations Today"
+                  value={summaryData.activations_today.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Tasks"
+                  value={summaryData.total_tasks.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Events"
+                  value={summaryData.total_events.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Avg Tasks Per Contact"
+                  value={summaryData.avg_tasks_per_contact.toFixed(2)}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Avg Contacts Per Account"
+                  value={summaryData.avg_contacts_per_account.toFixed(2)}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Deals"
+                  value={summaryData.total_deals.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Pipeline Value"
+                  value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+                  subText=""
+                />
+              </Grid>
+            </>
+          )}
+        </Grid>
       ) : (
         <>
-          {view === "Summary" ? (
-            <Grid container spacing={2}>
-              {summaryLoading ? (
-                <Box
-                  sx={{
-                    display: "flex",
-                    justifyContent: "center",
-                    width: "100%",
-                    mt: 4,
-                  }}
-                >
-                  <CircularProgress />
-                </Box>
-              ) : (
-                <>
-                  <Grid item xs={12} sm={6} md={4} lg={4}>
-                    <MetricCard
-                      title="Total Activations"
-                      value={summaryData.total_activations.toString()}
-                      subText=""
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4} lg={4}>
-                    <MetricCard
-                      title="Activations Today"
-                      value={summaryData.activations_today.toString()}
-                      subText=""
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4} lg={4}>
-                    <MetricCard
-                      title="Total Tasks"
-                      value={summaryData.total_tasks.toString()}
-                      subText=""
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4} lg={4}>
-                    <MetricCard
-                      title="Total Events"
-                      value={summaryData.total_events.toString()}
-                      subText=""
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4} lg={4}>
-                    <MetricCard
-                      title="Avg Tasks Per Contact"
-                      value={summaryData.avg_tasks_per_contact.toFixed(2)}
-                      subText=""
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4} lg={4}>
-                    <MetricCard
-                      title="Avg Contacts Per Account"
-                      value={summaryData.avg_contacts_per_account.toFixed(2)}
-                      subText=""
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4} lg={4}>
-                    <MetricCard
-                      title="Total Deals"
-                      value={summaryData.total_deals.toString()}
-                      subText=""
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={6} md={4} lg={4}>
-                    <MetricCard
-                      title="Total Pipeline Value"
-                      value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
-                      subText=""
-                    />
-                  </Grid>
-                </>
-              )}
-            </Grid>
-          ) : (
-            <CustomTable
-              tableData={{
-                columns: tableColumns,
-                data: filteredData.map((item) => ({
-                  ...item,
-                  "account.name": (
-                    <Link
-                      href={`${instanceUrl}/${item.account?.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.account?.name || "N/A"}
-                    </Link>
-                  ),
-                  "opportunity.name": item.opportunity ? (
-                    <Link
-                      href={`${instanceUrl}/${item.opportunity.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.opportunity.name || "N/A"}
-                    </Link>
-                  ) : (
-                    "N/A"
-                  ),
-                })),
-                selectedIds: new Set(),
-                availableColumns: tableColumns,
+          <CustomTable
+            tableData={{
+              columns: tableColumns,
+              data: filteredData.map((item) => ({
+                ...item,
+                "account.name": (
+                  <Link
+                    href={`${instanceUrl}/${item.account?.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {item.account?.name || "N/A"}
+                  </Link>
+                ),
+                "opportunity.name": item.opportunity ? (
+                  <Link
+                    href={`${instanceUrl}/${item.opportunity.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {item.opportunity.name || "N/A"}
+                  </Link>
+                ) : (
+                  "N/A"
+                ),
+              })),
+              selectedIds: new Set(),
+              availableColumns: tableColumns,
+            }}
+            paginate={true}
+            onRowClick={handleRowClick}
+          />
+
+          {selectedActivation && (
+            <Box
+              sx={{
+                marginTop: 4,
+                display: "flex",
+                height: "calc(100vh - 600px)",
+                minHeight: "400px",
               }}
-              paginate={true}
-              onRowClick={handleRowClick}
-            />
+            >
+              <Box sx={{ width: "40%", overflowY: "auto", pr: 2 }}>
+                <Typography variant="h6" gutterBottom>
+                  Prospecting Metadata for {selectedActivation.account.name}
+                </Typography>
+                <ProspectingMetadataOverview
+                  metadata={selectedActivation.prospecting_metadata}
+                />
+              </Box>
+              <Box
+                sx={{
+                  width: "60%",
+                  overflowY: "auto",
+                  pl: 2,
+                  borderLeft: "1px solid #e0e0e0",
+                }}
+              >
+                <ProspectingEffortTimeline
+                  efforts={selectedActivation.prospecting_effort}
+                />
+              </Box>
+            </Box>
           )}
         </>
       )}
-
-      <Modal
-        open={modalOpen}
-        onClose={handleCloseModal}
-        aria-labelledby="prospecting-metadata-modal"
-      >
-        <Box
-          sx={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            width: 400,
-            bgcolor: "background.paper",
-            boxShadow: 24,
-            p: 4,
-            maxHeight: "80vh",
-            overflow: "auto",
-          }}
-        >
-          <Typography variant="h5" component="h2" gutterBottom>
-            Prospecting Metadata
-          </Typography>
-          {renderProspectingMetadataCards}
-        </Box>
-      </Modal>
     </Box>
   );
 };
