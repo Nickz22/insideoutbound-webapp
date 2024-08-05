@@ -1,22 +1,7 @@
-os
-json
 requests
 flask
-urllib
-uuid
 flask_cors
 pydantic
-typing
-enum
-functools
-dateutil
-re
-datetime
-dataclasses
-traceback
-dotenv
-random
-unittest
-sys
-collections
-supabase
+python-dotenv
+supabase-py
+python-dateutil  # If you need it
