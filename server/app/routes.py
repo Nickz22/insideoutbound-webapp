@@ -2,6 +2,7 @@ import requests, json
 from flask import Blueprint, jsonify, redirect, request
 from urllib.parse import unquote
 from uuid import uuid4
+from datetime import datetime, timedelta, timezone
 from app.middleware import authenticate
 from app.utils import format_error_message
 from server.app.database.activation_selector import (
@@ -13,7 +14,6 @@ from server.app.database.dml import (
     delete_all_activations,
     upsert_supabase_user,
 )
-from datetime import datetime, timedelta, timezone
 from app.constants import SESSION_EXPIRED
 from app.mapper.mapper import (
     convert_filter_container_model_to_filter_container,

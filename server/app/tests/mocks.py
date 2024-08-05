@@ -5,7 +5,7 @@ from server.app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,  # 3
     mock_tasks_for_criteria_with_unique_values_content,  # 3
 )
-from server.app.models import TaskSObject
+from server.app.data_models import TaskSObject
 from typing import List, Dict
 from datetime import datetime
 

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 
 from app.services.activation_service import (
     compute_activated_accounts,

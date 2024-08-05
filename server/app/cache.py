@@ -1,5 +1,4 @@
 import os, json
-from app.constants import SESSION_EXPIRED
 from datetime import datetime, date
 
 APP_ENV = "production"
