@@ -2,11 +2,14 @@ import os, sys
 from app.data_models import (
     Settings,
     Activation,
+    FilterContainer,
     ProspectingMetadata,
+    ProspectingEffort,
     ApiResponse,
     StatusEnum,
 )
 from typing import List, Dict
+from datetime import timedelta
 
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
@@ -136,13 +139,14 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
 
         first_prospecting_activity = convert_date_to_salesforce_datetime_format(
-            activations[0].first_prospecting_activity
+            min(activation.first_prospecting_activity for activation in activations)
         )
         activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
-        account_ids = list(pluck(activations, "account.id"))
-        already_counted_task_ids = [
+        account_ids = list(set(activation.account.id for activation in activations))
+        already_counted_task_ids = set(
             task_id for activation in activations for task_id in activation.task_ids
-        ]
+        )
+
         criteria_group_tasks_by_account_id = (
             fetch_tasks_by_account_ids_from_date_not_in_ids(
                 account_ids,
@@ -153,59 +157,90 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
             ).data
         )
 
-        opportunities = fetch_opportunities_by_account_ids_from_date(
-            account_ids, first_prospecting_activity, salesforce_user_ids
-        ).data
+        opportunities_by_account_id: List[Dict] = group_by(
+            fetch_opportunities_by_account_ids_from_date(
+                account_ids, first_prospecting_activity, salesforce_user_ids
+            ).data,
+            "AccountId",
+        )
 
-        meetings_by_account_id = get_meetings_by_account_id(
+        meetings_by_account_id: Dict[str, List[Dict]] = get_meetings_by_account_id(
             settings,
             account_ids,
             first_prospecting_activity,
             salesforce_user_ids,
         )
 
-        activations_by_account_id = {
+        activations_by_account_id: Dict[str, List[Activation]] = {
             activation.account.id: activation for activation in activations
         }
 
-        for account_id in criteria_group_tasks_by_account_id:
+        for account_id, tasks_by_criteria in criteria_group_tasks_by_account_id.items():
             activation = activations_by_account_id.get(account_id)
-            criteria_name_by_task_id = {}
+            if not activation:
+                continue
+
             all_tasks = []
+            for criteria_name, tasks in tasks_by_criteria.items():
+                all_tasks.extend((task, criteria_name) for task in tasks)
+            all_tasks.sort(key=lambda x: x[0]["CreatedDate"])
 
-            for criteria in criteria_group_tasks_by_account_id[account_id]:
-                for task in criteria_group_tasks_by_account_id[account_id][criteria]:
-                    criteria_name_by_task_id[task.get("Id")] = criteria
-                    all_tasks.append(task)
+            opportunities = opportunities_by_account_id.get(account_id, [])
+            meetings = meetings_by_account_id.get(account_id, [])
 
-            all_tasks = sorted(all_tasks, key=lambda x: x.get("CreatedDate"))
-            for task in all_tasks:
-                is_task_within_inactivity_threshold = is_model_date_field_within_window(
-                    task,
-                    activation.last_prospecting_activity,
-                    settings.inactivity_threshold,
+            current_pe = (
+                activation.prospecting_effort[-1]
+                if activation.prospecting_effort
+                else None
+            )
+            # shouldn't happen, but jic
+            if not current_pe:
+                current_pe = ProspectingEffort(
+                    activation_id=activation.id,
+                    prospecting_metadata=[],
+                    status=activation.status,
+                    date_entered=activation.activated_date,
+                    tasks=[],
                 )
-                if not is_task_within_inactivity_threshold:
-                    break
-                activation.task_ids.add(task.get("Id"))
-                task_created_date = parse_datetime_string_with_timezone(
-                    task.get("CreatedDate")
-                )
-                activation.last_prospecting_activity = task_created_date
-                activation.active_contact_ids.add(task.get("WhoId"))
+                activation.prospecting_effort.append(current_pe)
 
-                # Update engaged_date if this is an inbound task and we don't have an engaged_date yet
-                criteria_name = criteria_name_by_task_id[task.get("Id")]
-                if (
-                    not activation.engaged_date
-                    and criteria_name_by_direction.get(criteria_name).lower()
-                    == "inbound"
-                ):
-                    activation.engaged_date = task_created_date.date()
-                    activation.days_engaged = (today - activation.engaged_date).days
+            for task, criteria_name in all_tasks:
+                task_created_datetime = parse_datetime_string_with_timezone(
+                    task["CreatedDate"]
+                )
+
+                if task["Id"] in activation.task_ids:
+                    continue
+
+                # Determine new status
+                new_status = get_new_status(
+                    activation, settings.criteria, task, opportunities, meetings
+                )
+
+                if new_status != current_pe.status:
+                    new_pe = ProspectingEffort(
+                        activation_id=activation.id,
+                        prospecting_metadata=[],
+                        status=new_status,
+                        date_entered=task_created_datetime,
+                        task_ids=[],
+                    )
+                    activation.prospecting_effort.append(new_pe)
+                    current_pe = new_pe
+
+                # Update activation and current PE
+                activation.task_ids.add(task["Id"])
+                activation.last_prospecting_activity = max(
+                    activation.last_prospecting_activity, task_created_datetime.date()
+                )
+                activation.active_contact_ids.add(task["WhoId"])
+                current_pe.task_ids.add(task["Id"])
 
                 # Update ProspectingMetadata
-                metadata = next(
+                update_prospecting_metadata(current_pe, task, criteria_name)
+
+                # Update Activation's metadata
+                activation_metadata = next(
                     (
                         m
                         for m in activation.prospecting_metadata
@@ -213,67 +248,44 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     ),
                     None,
                 )
-                if metadata:
-                    metadata.last_occurrence = max(
-                        metadata.last_occurrence, task_created_date.date()
+                if activation_metadata:
+                    activation_metadata.last_occurrence = max(
+                        activation_metadata.last_occurrence,
+                        task_created_datetime.date(),
                     )
-                    metadata.total += 1
+                    activation_metadata.total += 1
                 else:
                     activation.prospecting_metadata.append(
                         ProspectingMetadata(
                             name=criteria_name,
-                            first_occurrence=task_created_date.date(),
-                            last_occurrence=task_created_date.date(),
+                            first_occurrence=task_created_datetime.date(),
+                            last_occurrence=task_created_datetime.date(),
                             total=1,
                         )
                     )
 
-            # Update days_activated and days_engaged
+                # Update engagement date if necessary
+                if not activation.engaged_date and is_inbound_task(
+                    task, settings.criteria
+                ):
+                    activation.engaged_date = task_created_datetime.date()
+
+            # Update activation status and dates
+            activation.status = current_pe.status
             activation.days_activated = (today - activation.activated_date).days
             if activation.engaged_date:
                 activation.days_engaged = (today - activation.engaged_date).days
 
-            activations_by_account_id[account_id] = activation
+            # Update opportunity if necessary
+            if opportunities and activation.status == StatusEnum.opportunity_created:
+                activation.opportunity = convert_dict_to_opportunity(opportunities[0])
 
-        opportunities_by_account_id = group_by(opportunities, "AccountId")
-
-        for account_id in activations_by_account_id:
-            activation = activations_by_account_id[account_id]
-            opportunities = opportunities_by_account_id.get(account_id, [])
-            events = meetings_by_account_id.get(account_id, [])
-
-            if events:
-                for event in events:
-                    is_event_within_window = is_model_date_field_within_window(
-                        event,
-                        activation.first_prospecting_activity,
-                        settings.inactivity_threshold,
-                        date_field="CreatedDate",
-                    )
-                    if is_event_within_window and activation.status == "Activated":
-                        activation.status = "Meeting Set"
-                    elif is_event_within_window and (
-                        activation.event_ids == None
-                        or event["Id"] not in activation.event_ids
-                    ):
-                        activation.event_ids = (
-                            [] if activation.event_ids is None else activation.event_ids
-                        )
-                        activation.event_ids.append(event["Id"])
-
-            if opportunities:
-                for opportunity in opportunities:
-                    if is_model_date_field_within_window(
-                        opportunity,
-                        activation.first_prospecting_activity,
-                        settings.inactivity_threshold,
-                        date_field="CreatedDate",
-                    ) and activation.status in ["Activated", "Meeting Set"]:
-                        activation.opportunity = opportunities[0]
-                        activation.status = "Opportunity Created"
-                        break
-
-            activations_by_account_id[account_id] = activation
+            # Update meeting/event if necessary
+            if meetings and activation.status in [
+                StatusEnum.meeting_set,
+                StatusEnum.opportunity_created,
+            ]:
+                activation.event_ids = [meeting["Id"] for meeting in meetings]
 
         response.data = list(activations_by_account_id.values())
         response.success = True
@@ -281,6 +293,64 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
         raise Exception(format_error_message(e))
 
     return response
+
+
+def is_inbound_task(task, criteria):
+    for criterion in criteria:
+        if (
+            criterion.name == task["TaskSubtype"]
+            and criterion.direction.lower() == "inbound"
+        ):
+            return True
+    return False
+
+
+def get_new_status(
+    activation: Activation,
+    task: Dict,
+    criteria: List[FilterContainer],
+    opportunities: List[Dict],
+    events: List[Dict],
+):
+
+    if (
+        opportunities
+        and opportunities[0]
+        and activation.status != StatusEnum.opportunity_created
+    ):
+        return StatusEnum.opportunity_created
+    elif (
+        events
+        and events[0]
+        and activation.status != StatusEnum.meeting_set
+        and activation.status != StatusEnum.opportunity_created
+    ):
+        return StatusEnum.meeting_set
+    elif activation.status == StatusEnum.activated and is_inbound_task(task, criteria):
+        return StatusEnum.engaged
+
+    return activation.status
+
+
+def update_prospecting_metadata(prospecting_effort, task, criteria_name):
+    metadata = next(
+        (m for m in prospecting_effort.prospecting_metadata if m.name == criteria_name),
+        None,
+    )
+    task_date = parse_datetime_string_with_timezone(task["CreatedDate"]).date()
+
+    if metadata:
+        metadata.last_occurrence = max(metadata.last_occurrence, task_date)
+        metadata.total += 1
+    else:
+        prospecting_effort.prospecting_metadata.append(
+            ProspectingMetadata(
+                name=criteria_name,
+                first_occurrence=task_date,
+                last_occurrence=task_date,
+                total=1,
+            )
+        )
 
 
 def has_any_inbound_task(
@@ -512,7 +582,7 @@ def create_activation(
     )
 
     engaged_date = (
-        parse_datetime_string_with_timezone(first_inbound_task["CreatedDate"]).date()
+        parse_datetime_string_with_timezone(first_inbound_task["CreatedDate"])
         if first_inbound_task
         else None
     )
@@ -556,8 +626,8 @@ def create_activation(
         account=contact_by_id[active_contact_ids[0]].account,
         activated_date=activated_date,
         days_activated=(today - activated_date).days,
-        engaged_date=engaged_date,
-        days_engaged=(today - engaged_date).days if engaged_date else None,
+        engaged_date=engaged_date.date(),
+        days_engaged=(today - engaged_date.date()).days if engaged_date else None,
         active_contact_ids=active_contact_ids,
         activated_by_id=last_valid_task_creator_id,
         first_prospecting_activity=account_first_prospecting_activity,
@@ -595,7 +665,104 @@ def create_activation(
     if is_last_prospecting_activity_outside_of_inactivity_threshold:
         activation.status = StatusEnum.unresponsive
 
+    # Create ProspectingEfforts
+    prospecting_efforts = []
+    current_status = StatusEnum.activated
+    current_status_date = activated_date
+    current_tasks = []
+
+    for task in all_tasks_under_account:
+        if task["Id"] not in task_ids:
+            continue
+
+        task_date = parse_datetime_string_with_timezone(task["CreatedDate"])
+
+        if qualifying_opportunity and task_date >= parse_datetime_string_with_timezone(
+            qualifying_opportunity["CreatedDate"]
+        ):
+            if current_status != StatusEnum.opportunity_created:
+                prospecting_efforts.append(
+                    create_prospecting_effort(
+                        activation.id,
+                        current_status,
+                        current_status_date,
+                        current_tasks,
+                        task_ids_by_criteria_name,
+                    )
+                )
+                current_status = StatusEnum.opportunity_created
+                current_status_date = parse_datetime_string_with_timezone(
+                    qualifying_opportunity["CreatedDate"]
+                ).date()
+                current_tasks = []
+
+        elif qualifying_event and task_date >= parse_datetime_string_with_timezone(
+            qualifying_event["CreatedDate"]
+        ):
+            if current_status != StatusEnum.meeting_set:
+                prospecting_efforts.append(
+                    create_prospecting_effort(
+                        activation.id,
+                        current_status,
+                        current_status_date,
+                        current_tasks,
+                        task_ids_by_criteria_name,
+                    )
+                )
+                current_status = StatusEnum.meeting_set
+                current_status_date = parse_datetime_string_with_timezone(
+                    qualifying_event["CreatedDate"]
+                ).date()
+                current_tasks = []
+
+        elif (
+            engaged_date
+            and task_date >= engaged_date
+            and current_status == StatusEnum.activated
+        ):
+            prospecting_efforts.append(
+                create_prospecting_effort(
+                    activation.id,
+                    current_status,
+                    current_status_date,
+                    current_tasks,
+                    task_ids_by_criteria_name,
+                )
+            )
+            current_status = StatusEnum.engaged
+            current_status_date = engaged_date
+            current_tasks = []
+
+        current_tasks.append(task)
+
+    # Add the final ProspectingEffort
+    prospecting_efforts.append(
+        create_prospecting_effort(
+            activation.id,
+            current_status,
+            current_status_date,
+            current_tasks,
+            task_ids_by_criteria_name,
+        )
+    )
+
+    activation.prospecting_effort = prospecting_efforts
+
     return activation
+
+
+def create_prospecting_effort(
+    activation_id, status, date_entered, tasks, task_ids_by_criteria_name
+):
+    return ProspectingEffort(
+        activation_id=activation_id,
+        prospecting_metadata=create_prospecting_metadata(
+            [task["Id"] for task in tasks], task_ids_by_criteria_name, tasks
+        ),
+        status=status,
+        date_entered=date_entered,
+        task_ids=[task["Id"] for task in tasks],
+    )
 
 
 def create_prospecting_metadata(

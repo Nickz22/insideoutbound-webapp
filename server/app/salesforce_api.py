@@ -465,7 +465,7 @@ def fetch_events_by_account_ids_from_date(
 
 def fetch_opportunities_by_account_ids_from_date(
     account_ids, start, salesforce_user_ids: List[str]
-):
+) -> List[Dict]:
     """
     Fetches opportunities from Salesforce based on a list of account IDs, querying in batches of 150.
 

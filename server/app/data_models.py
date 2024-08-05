@@ -58,13 +58,6 @@ class CriteriaField(SerializableModel):
     options: List[dict]
 
 
-class ProspectingMetadata(SerializableModel):
-    name: str
-    first_occurrence: date
-    last_occurrence: date
-    total: int
-
-
 class Account(SerializableModel):
     id: str
     name: Optional[str] = None
@@ -148,6 +141,21 @@ class Opportunity(SerializableModel):
     stage: str
 
 
+class ProspectingMetadata(SerializableModel):
+    name: str
+    first_occurrence: date
+    last_occurrence: date
+    total: int
+
+
+class ProspectingEffort(SerializableModel):
+    activation_id: str
+    prospecting_metadata: List[ProspectingMetadata]
+    status: str
+    date_entered: date
+    task_ids: Set[str]
+
+
 class Activation(SerializableModel):
     id: str
     account: Account
@@ -159,21 +167,13 @@ class Activation(SerializableModel):
     last_prospecting_activity: Optional[date] = None
     event_ids: Optional[Set[str]] = None
     prospecting_metadata: Optional[List[ProspectingMetadata]] = None
+    prospecting_effort: Optional[List[ProspectingEffort]] = None
     days_activated: Optional[int] = None
     days_engaged: Optional[int] = None
     engaged_date: Optional[date] = None
     last_outbound_engagement: Optional[date] = None
     opportunity: Optional[Opportunity] = None
     status: StatusEnum = Field(default=StatusEnum.activated)
-
-
-class ProspectingEffort(SerializableModel):
-    id: str
-    activation_id: str
-    prospecting_metadata: List[ProspectingMetadata]
-    status: str
-    date_entered: date
-    tasks: List[Task]
 
 
 class Filter(SerializableModel):

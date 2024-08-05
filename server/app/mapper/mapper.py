@@ -9,6 +9,7 @@ from app.data_models import (
     Opportunity,
     Activation,
     ProspectingMetadata,
+    ProspectingEffort,
 )
 from typing import Dict
 from datetime import datetime, date
@@ -153,6 +154,11 @@ def supabase_dict_to_python_activation(row: Dict) -> Activation:
             for item in json.loads(row["prospecting_metadata"])
         ]
 
+    if "prospecting_effort" in row and row["prospecting_effort"]:
+        row["prospecting_effort"] = [
+            ProspectingEffort(**item) for item in json.loads(row["prospecting_effort"])
+        ]
+
     # Convert array fields to sets
     for field in ["active_contact_ids", "task_ids", "event_ids"]:
         if field in row and row[field]:
@@ -200,6 +206,13 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
             else None
         )
 
+    if "prospecting_effort" in activation_dict:
+        activation_dict["prospecting_effort"] = (
+            json.dumps(activation_dict["prospecting_effort"])
+            if activation_dict["prospecting_effort"]
+            else None
+        )
+
     # Convert datetime, date, and UUID objects to strings
     for key, value in activation_dict.items():
         if isinstance(value, (datetime, date)):
@@ -221,6 +234,7 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
         "last_prospecting_activity",
         "event_ids",
         "prospecting_metadata",
+        "prospecting_effort",
         "days_activated",
         "days_engaged",
         "engaged_date",
