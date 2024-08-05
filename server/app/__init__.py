@@ -2,6 +2,11 @@ from flask import Flask
 from flask_cors import CORS
 from config import Config
 
+import os
+
+SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8000")
+REACT_APP_URL = os.getenv("REACT_APP_URL", "http://localhost:3000")
+
 
 def create_app():
     app = Flask(__name__)
@@ -10,13 +15,7 @@ def create_app():
     CORS(
         app,
         resources={
-            r"/*": {
-                "origins": [
-                    app.config["BASE_SERVER_URL"],
-                    app.config["REACT_APP_URL"],
-                    "https://gleeful-cascaron-9766fa.netlify.app",
-                ]
-            }
+            r"/*": {"origins": [app.config["SERVER_URL"], app.config["REACT_APP_URL"]]}
         },
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization", "x-session-token"],
@@ -31,9 +30,9 @@ def create_app():
     @app.after_request
     def add_header(response):
         response.headers["Content-Security-Policy"] = (
-            "default-src 'self' https://*.ngrok-free.app; "
-            "script-src 'self' 'unsafe-inline' https://*.ngrok-free.app; "
-            "style-src 'self' 'unsafe-inline' https://*.ngrok-free.app"
+            f"default-src 'self' {SERVER_URL} {REACT_APP_URL}; "
+            f"script-src 'self' 'unsafe-inline' {SERVER_URL} {REACT_APP_URL}; "
+            f"style-src 'self' 'unsafe-inline' {SERVER_URL} {REACT_APP_URL}"
         )
         return response
 

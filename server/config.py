@@ -11,7 +11,7 @@ class Config:
     SUPABASE_PROJECT_ID = os.getenv("SUPABASE_PROJECT_ID")
     SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 
-    BASE_SERVER_URL = os.getenv("FLASK_NGROK_URL", "http://localhost:8000")
+    BASE_SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8000")
     REACT_APP_URL = os.getenv("REACT_APP_URL", "http://localhost:3000")
 
     CLIENT_ID = os.getenv("CLIENT_ID")

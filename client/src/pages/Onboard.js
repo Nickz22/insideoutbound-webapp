@@ -32,10 +32,7 @@ import {
  * @typedef {import('types').SalesforceUser} SalesforceUser
  */
 
-import {
-  PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS,
-  ONBOARD_WIZARD_STEPS,
-} from "../utils/c";
+import { ONBOARD_WIZARD_STEPS } from "../utils/c";
 
 /**
  * @param {{ categoryFormTableData: TableData, setSelectedColumns: Function, onAddCategory: Function, onDone: React.MouseEventHandler}} props
@@ -70,7 +67,6 @@ const Onboard = () => {
   const [filters, setFilters] = useState([]);
   /** @type {[{ [key: string]: any }, function]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
-  const placeholderIndexRef = useRef(0);
   const [isLargeDialog, setIsLargeDialog] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   /** @type {[TableData, Function]} */
@@ -479,17 +475,6 @@ const Onboard = () => {
       { title: "Prospecting Categories" },
       { title: "Review" },
     ];
-  };
-
-  const getPlaceholder = () => {
-    const placeholder =
-      PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS[
-        placeholderIndexRef.current
-      ];
-    placeholderIndexRef.current =
-      (placeholderIndexRef.current + 1) %
-      PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS.length;
-    return placeholder;
   };
 
   const isLargeDialogStep = () => {

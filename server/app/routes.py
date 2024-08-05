@@ -551,6 +551,16 @@ def handle_exception(e):
     )
 
 
+@bp.app_errorhandler(404)
+def not_found_error(error):
+    return jsonify({"error": f"Not Found {error}"}), 404
+
+
+@bp.app_errorhandler(500)
+def internal_error(error):
+    return jsonify({"error": f"Internal Server Error {error}"}), 500
+
+
 # helpers
 def get_status_code(response):
     return (
