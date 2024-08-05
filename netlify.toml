@@ -1,0 +1,9 @@
+[build]
+  base = "client"
+  publish = "build"
+  command = "npm install --legacy-peer-deps && CI=false npm run build"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

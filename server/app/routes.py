@@ -5,11 +5,11 @@ from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from app.middleware import authenticate
 from app.utils import format_error_message
-from server.app.database.activation_selector import (
+from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
-from server.app.database.settings_selector import load_settings
-from server.app.database.dml import (
+from app.database.settings_selector import load_settings
+from app.database.dml import (
     save_settings,
     delete_all_activations,
     upsert_supabase_user,
@@ -23,7 +23,7 @@ from app.mapper.mapper import (
 from app.helpers.activation_helper import generate_summary
 from app.services.setting_service import define_criteria_from_events_or_tasks
 from app.engine.activation_engine import update_activation_states
-from server.app.salesforce_api import (
+from app.salesforce_api import (
     fetch_criteria_fields,
     fetch_task_fields,
     fetch_event_fields,

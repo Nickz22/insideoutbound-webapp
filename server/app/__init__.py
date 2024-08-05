@@ -11,7 +11,11 @@ def create_app():
         app,
         resources={
             r"/*": {
-                "origins": [app.config["BASE_SERVER_URL"], app.config["REACT_APP_URL"]]
+                "origins": [
+                    app.config["BASE_SERVER_URL"],
+                    app.config["REACT_APP_URL"],
+                    "https://gleeful-cascaron-9766fa.netlify.app",
+                ]
             }
         },
         supports_credentials=True,

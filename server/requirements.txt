@@ -3,6 +3,5 @@ flask
 flask_cors
 pydantic
 python-dotenv
-supabase-py
 python-dateutil  # If you need it
 supabase

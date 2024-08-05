@@ -3,20 +3,20 @@ from unittest.mock import patch
 
 os.environ["APP_ENV"] = "test"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from server.app.models import SettingsModel, FilterContainerModel, FilterModel, Activation
-from server.app import app
-from server.app.cache import (
+from app.models import SettingsModel, FilterContainerModel, FilterModel, Activation
+from app import app
+from app.cache import (
     save_tokens,
     upsert_activations,
     load_active_activations_order_by_first_prospecting_activity_asc,
     load_inactive_activations,
 )
-from server.app.utils import add_days
-from server.app.tests.c import (
+from app.utils import add_days
+from app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,
     mock_tasks_for_criteria_with_unique_values_content,
 )
-from server.app.tests.mocks import (
+from app.tests.mocks import (
     MOCK_CONTACT_IDS,
     MOCK_ACCOUNT_IDS,
     add_mock_response,

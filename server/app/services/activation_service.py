@@ -13,7 +13,7 @@ from datetime import timedelta
 
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from server.app.salesforce_api import (
+from app.salesforce_api import (
     fetch_tasks_by_account_ids_from_date_not_in_ids,
     fetch_opportunities_by_account_ids_from_date,
     fetch_events_by_account_ids_from_date,
