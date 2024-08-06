@@ -13,7 +13,7 @@ const Login = () => {
     const isSandbox = loginUrlBase.includes("test.salesforce.com");
 
     try {
-      const clientId = process.env.REACT_APP_CLIENT_ID;
+      const clientId = config.clientId;
       const redirectUri = `${config.apiBaseUrl}/oauth/callback`;
 
       // Encode the code verifier and sandbox flag in the state parameter
