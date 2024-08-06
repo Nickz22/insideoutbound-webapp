@@ -11,12 +11,12 @@ class Config:
     SUPABASE_PROJECT_ID = os.getenv("SUPABASE_PROJECT_ID")
     SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
 
-    BASE_SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8000")
+    SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8000")
     REACT_APP_URL = os.getenv("REACT_APP_URL", "http://localhost:3000")
 
     CLIENT_ID = os.getenv("CLIENT_ID")
     CLIENT_SECRET = os.getenv("CLIENT_SECRET")
-    REDIRECT_URI = f"{BASE_SERVER_URL}/oauth/callback"
+    REDIRECT_URI = f"{SERVER_URL}/oauth/callback"
 
     # Session configuration
     SESSION_TYPE = "filesystem"  # You can change this to "redis" if you prefer
