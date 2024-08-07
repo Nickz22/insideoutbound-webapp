@@ -812,7 +812,6 @@ def _fetch_sobjects(soql_query, credentials):
             params={"q": soql_query},
         )
         response.raise_for_status()
-        raise Exception("TESTING SENTRY")
         return ApiResponse(
             success=True,
             data=response.json()["records"],
