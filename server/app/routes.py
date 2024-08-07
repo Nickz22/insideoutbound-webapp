@@ -2,7 +2,7 @@ import requests, json
 from flask import Blueprint, jsonify, redirect, request
 from urllib.parse import unquote
 from app.middleware import authenticate
-from app.utils import format_error_message
+from app.utils import format_error_message, log_error
 from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
@@ -38,11 +38,6 @@ from app.database.supabase_connection import (
     get_session_state,
 )
 from app.database.session_selector import fetch_supabase_session
-
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 bp = Blueprint("main", __name__)
 
@@ -102,9 +97,9 @@ def oauth_callback():
             }
             return jsonify(error_details), 500
     except Exception as e:
-        error_msg = format_error_message(e)
-        print(error_msg)
-        return jsonify({"error": f"Failed to retrieve access token: {error_msg}"}), 500
+        error_msg = f"Failed to retrieve access token: {format_error_message(e)}"
+        log_error(error_msg)
+        return jsonify({"error": error_msg}), 500
 
 
 @bp.route("/logout", methods=["POST"])
@@ -155,7 +150,9 @@ def refresh_token():
         response.success = True
         response.message = "Token refreshed successfully"
     except requests.exceptions.RequestException as e:
-        response.message = f"Failed to refresh token: {str(e)}"
+        error_msg = format_error_message(e)
+        response.message = f"Failed to refresh token: {str(error_msg)}"
+        log_error(response.message)
         response.type = "AuthenticationError"
 
     return jsonify(response.to_dict()), 200
@@ -178,9 +175,10 @@ def get_criteria_fields():
             response.success = True
     except Exception as e:
         response.success = False
-        error_msg = format_error_message(e)
-        print(error_msg)
-        response.message = f"Failed to retrieve event criteria fields: {error_msg}"
+        response.message = (
+            f"Failed to retrieve event criteria fields: {format_error_message(e)}"
+        )
+        log_error(response.message)
 
     return (
         jsonify(response.to_dict()),
@@ -217,7 +215,7 @@ def generate_filters():
     except Exception as e:
         response.success = False
         response.message = f"Failed to generate filters: {format_error_message(e)}"
-        print(response.message)
+        log_error(response.message)
         final_response = jsonify(response.to_dict()), 500
 
     return final_response
@@ -235,6 +233,7 @@ def get_instance_url():
         response.success = True
     except Exception as e:
         response.message = f"Failed to retrieve instance URL: {format_error_message(e)}"
+        log_error(response.message)
 
     return jsonify(response.to_dict()), get_status_code(response)
 
@@ -261,9 +260,10 @@ def get_prospecting_activities():
         ]
         response.success = True
     except Exception as e:
-        error_msg = format_error_message(e)
-        print(f"Failed to retrieve prospecting activities: {error_msg}")
-        response.message = f"Failed to retrieve prospecting activities: {error_msg}"
+        response.message = (
+            f"Failed to retrieve prospecting activities: {format_error_message(e)}"
+        )
+        log_error(response.message)
         response.type = "UnexpectedError"
 
     return jsonify(response.to_dict()), 200
@@ -308,8 +308,10 @@ def get_prospecting_activities_filtered_by_ids():
             ]
             response.success = True
     except Exception as e:
-        error_msg = format_error_message(e)
-        response.message = f"Failed to retrieve prospecting activities: {error_msg}"
+        response.message = (
+            f"Failed to retrieve prospecting activities: {format_error_message(e)}"
+        )
+        log_error(response.message)
 
     return jsonify(response.to_dict()), get_status_code(response)
 
@@ -321,29 +323,29 @@ def fetch_prospecting_activity():
 
     api_response = ApiResponse(data=[], message="", success=False)
     try:
-        response = update_activation_states()
+        raise Exception("TESTING")
+        # response = update_activation_states()
 
-        if response.success:
-            activations = response.data
+        # if response.success:
+        #     activations = response.data
 
-            api_response.data = [
-                {
-                    "summary": generate_summary(activations),
-                    "raw_data": [activation.to_dict() for activation in activations],
-                }
-            ]
-            api_response.success = True
-            api_response.message = "Prospecting activity data loaded successfully"
-        else:
-            api_response.message = response.message
+        #     api_response.data = [
+        #         {
+        #             "summary": generate_summary(activations),
+        #             "raw_data": [activation.to_dict() for activation in activations],
+        #         }
+        #     ]
+        #     api_response.success = True
+        #     api_response.message = "Prospecting activity data loaded successfully"
+        # else:
+        #     api_response.message = response.message
 
-        status_code = get_status_code(api_response)
-        raise Exception("testing")
+        # status_code = get_status_code(api_response)
     except Exception as e:
         api_response.message = (
             f"Failed to load prospecting activities data: {format_error_message(e)}"
         )
-        logger.error(api_response.message)
+        print(api_response.message, flush=True)
         status_code = get_status_code(api_response)
 
     return jsonify(api_response.to_dict()), status_code

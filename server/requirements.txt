@@ -3,5 +3,7 @@ flask
 flask_cors
 pydantic
 python-dotenv
-python-dateutil  # If you need it
+python-dateutil
 supabase
+logger
+colorlog
