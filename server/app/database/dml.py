@@ -1,15 +1,17 @@
+import json
+from datetime import datetime, timezone, timedelta
+from uuid import uuid4
+from os import environ
 from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
+    set_session_state,
 )
-from app.data_models import Activation, ApiResponse, Settings, UserModel
+from app.data_models import Activation, ApiResponse, Settings, UserModel, TokenData
 from app.mapper.mapper import (
     python_activation_to_supabase_dict,
     python_settings_to_supabase_dict,
 )
-from datetime import datetime
-from uuid import uuid4
-from os import environ
 from app.utils import get_salesforce_team_ids, format_error_message
 from app.database.settings_selector import load_settings
 
@@ -107,3 +109,29 @@ def save_settings(settings: Settings):
     ).execute()
 
     return True
+
+
+def save_session(token_data: TokenData, is_sandbox: bool):
+    session_token = str(uuid4())
+    salesforce_id = token_data.get("id").split("/")[-1]
+    org_id = token_data.get("org_id")
+    refresh_token = token_data.get("refresh_token")
+    session_state = {
+        "salesforce_id": salesforce_id,
+        "access_token": token_data["access_token"],
+        "refresh_token": refresh_token,
+        "instance_url": token_data["instance_url"],
+        "org_id": org_id,
+        "is_sandbox": is_sandbox,
+    }
+    set_session_state(session_state)
+    # Store session data in Supabase
+    now = datetime.now(timezone.utc).astimezone()
+    session_data = {
+        "id": session_token,
+        "expiry": (now + timedelta(hours=1)).isoformat(),
+        "state": json.dumps(session_state),
+    }
+    supabase = get_supabase_admin_client()
+    supabase.table("Session").insert(session_data).execute()
+    return session_token

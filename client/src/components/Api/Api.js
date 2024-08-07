@@ -10,6 +10,9 @@ const api = axios.create({
   baseURL: config.apiBaseUrl,
 });
 
+/**
+ * the history replace looks very strange here
+ */
 const getSessionToken = () => {
   const urlParams = new URLSearchParams(window.location.search);
   const sessionToken = urlParams.get("session_token");

@@ -32,3 +32,29 @@ def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResp
         return ApiResponse(
             success=False, message=f"Failed to load activations: {str(error_msg)}"
         )
+
+
+def load_inactive_activations() -> ApiResponse:
+    try:
+        supabase_client = get_supabase_admin_client()
+        team_member_ids = get_salesforce_team_ids(load_settings())
+
+        response = (
+            supabase_client.table("Activations")
+            .select("*")
+            .eq("status", "Unresponsive")
+            .in_("activated_by_id", team_member_ids)
+            .execute()
+        )
+
+        activations: List[Activation] = []
+        for row in response.data:
+            activation = supabase_dict_to_python_activation(row)
+            activations.append(activation)
+
+        return ApiResponse(data=activations if activations else [], success=True)
+    except Exception as e:
+        error_msg = format_error_message(e)
+        return ApiResponse(
+            success=False, message=f"Failed to load activations: {str(error_msg)}"
+        )

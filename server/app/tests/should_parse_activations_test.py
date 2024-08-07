@@ -3,14 +3,14 @@ from unittest.mock import patch
 
 os.environ["APP_ENV"] = "test"
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from app.models import SettingsModel, FilterContainerModel, FilterModel, Activation
+from app.data_models import SettingsModel, FilterContainerModel, FilterModel, TokenData
 from app import app
-from app.cache import (
-    save_tokens,
-    upsert_activations,
+from app.database.supabase_connection import save_session
+from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
     load_inactive_activations,
 )
+from app.database.dml import upsert_activations
 from app.utils import add_days
 from app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,
@@ -33,15 +33,6 @@ from app.tests.mocks import (
     get_five_mock_accounts,
 )
 
-##
-### Run an activation test and assert that the mock response handler is running
-### Then, start to mock responses to
-# (1) create an activation,
-# (2) increment the same activation,
-# (3) set the same activation as unresponsive and
-# (4) create a new activation in accordance with inactivity_threshold
-##
-
 
 class TestActivationLogic(unittest.TestCase):
     def setUp(self):
@@ -51,7 +42,15 @@ class TestActivationLogic(unittest.TestCase):
             f.write("[]")
 
         # save dummy access tokens because the OAuth flow is pretty hard to write a test for right now
-        save_tokens("test_access_token", "test_instance_url")
+        mock_token_data: TokenData = TokenData(
+            access_token="mock_access_token",
+            refresh_token="mock_refresh_token",
+            instance_url="mock_instance_url",
+            id="mock_id",
+            token_type="mock_token_type",
+            issued_at="mock_issued_at",
+        )
+        session_id = save_session(mock_token_data, True)
 
         # Creates a test client
         self.app = app.test_client()

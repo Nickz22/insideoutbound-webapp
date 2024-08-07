@@ -1,8 +1,6 @@
 import requests, json
 from flask import Blueprint, jsonify, redirect, request
 from urllib.parse import unquote
-from uuid import uuid4
-from datetime import datetime, timedelta, timezone
 from app.middleware import authenticate
 from app.utils import format_error_message
 from app.database.activation_selector import (
@@ -11,6 +9,7 @@ from app.database.activation_selector import (
 from app.database.settings_selector import load_settings
 from app.database.dml import (
     save_settings,
+    save_session,
     delete_all_activations,
     upsert_supabase_user,
 )
@@ -36,10 +35,14 @@ from app.salesforce_api import (
 from config import Config
 from app.database.supabase_connection import (
     get_supabase_admin_client,
-    set_session_state,
     get_session_state,
 )
 from app.database.session_selector import fetch_supabase_session
+
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 bp = Blueprint("main", __name__)
 
@@ -77,7 +80,7 @@ def oauth_callback():
         response = requests.post(token_url, data=payload)
         if response.status_code == 200:
             token_data = response.json()
-            session_token = create_session(token_data, is_sandbox)
+            session_token = save_session(token_data, is_sandbox)
             user: UserModel = fetch_logged_in_salesforce_user().data
             settings = load_settings()
             if not settings:
@@ -147,7 +150,7 @@ def refresh_token():
         token_data = response_sf.json()
         token_data["refresh_token"] = session_state["refresh_token"]
 
-        session_token = create_session(token_data, session_state["is_sandbox"])
+        session_token = save_session(token_data, session_state["is_sandbox"])
         response.data = [{"session_token": session_token}]
         response.success = True
         response.message = "Token refreshed successfully"
@@ -335,11 +338,12 @@ def fetch_prospecting_activity():
             api_response.message = response.message
 
         status_code = get_status_code(api_response)
+        raise Exception("testing")
     except Exception as e:
         api_response.message = (
             f"Failed to load prospecting activities data: {format_error_message(e)}"
         )
-        print(api_response.message)
+        logger.error(api_response.message)
         status_code = get_status_code(api_response)
 
     return jsonify(api_response.to_dict()), status_code
@@ -566,29 +570,3 @@ def get_status_code(response):
     return (
         200 if response.success else 400 if SESSION_EXPIRED in response.message else 503
     )
-
-
-def create_session(token_data, is_sandbox):
-    session_token = str(uuid4())
-    salesforce_id = token_data.get("id").split("/")[-1]
-    org_id = token_data.get("org_id")
-    refresh_token = token_data.get("refresh_token")
-    session_state = {
-        "salesforce_id": salesforce_id,
-        "access_token": token_data["access_token"],
-        "refresh_token": refresh_token,
-        "instance_url": token_data["instance_url"],
-        "org_id": org_id,
-        "is_sandbox": is_sandbox,
-    }
-    set_session_state(session_state)
-    # Store session data in Supabase
-    now = datetime.now(timezone.utc).astimezone()
-    session_data = {
-        "id": session_token,
-        "expiry": (now + timedelta(hours=1)).isoformat(),
-        "state": json.dumps(session_state),
-    }
-    supabase = get_supabase_admin_client()
-    supabase.table("Session").insert(session_data).execute()
-    return session_token

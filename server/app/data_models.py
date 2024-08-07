@@ -293,6 +293,15 @@ class UserModel(SerializableModel):
         )
 
 
+class TokenData(SerializableModel):
+    access_token: str
+    instance_url: str
+    id: str
+    token_type: str
+    issued_at: str
+    signature: str
+
+
 class AuthenticationError(Exception):
     def __init__(self, message="Authentication failed"):
         self.message = message
