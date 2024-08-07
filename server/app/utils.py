@@ -6,7 +6,7 @@ from functools import reduce
 import re
 from app.data_models import Settings
 from app.database.supabase_connection import get_session_state
-
+from sentry_sdk import capture_exception
 
 from log_config import setup_logger
 
@@ -21,17 +21,19 @@ def get_salesforce_team_ids(settings: Settings):
 
 
 # logging utils
-def log_error(message):
+def log_error(exception):
     try:
+        capture_exception(exception)
+        error_msg = format_error_message(exception)
         session_state = get_session_state()
         logger.error(
-            f"[{datetime.now()}] User ID: {session_state['salesforce_id']} - {message}"
+            f"[{datetime.now()}] User ID: {session_state['salesforce_id']} - {error_msg}"
         )
     except Exception as e:
         logger.warning(
             f"Error getting user ID from session state [{format_error_message(e)}]. Logging error without user ID."
         )
-        logger.error(f"[{datetime.now()}] - {message}")
+        logger.error(f"[{datetime.now()}] - {error_msg}")
 
 
 # filter utils

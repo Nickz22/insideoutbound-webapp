@@ -97,8 +97,8 @@ def oauth_callback():
             }
             return jsonify(error_details), 500
     except Exception as e:
+        log_error(e)
         error_msg = f"Failed to retrieve access token: {format_error_message(e)}"
-        log_error(error_msg)
         return jsonify({"error": error_msg}), 500
 
 
@@ -150,9 +150,9 @@ def refresh_token():
         response.success = True
         response.message = "Token refreshed successfully"
     except requests.exceptions.RequestException as e:
+        log_error(e)
         error_msg = format_error_message(e)
         response.message = f"Failed to refresh token: {str(error_msg)}"
-        log_error(response.message)
         response.type = "AuthenticationError"
 
     return jsonify(response.to_dict()), 200
@@ -174,11 +174,11 @@ def get_criteria_fields():
             response.data = criteria_fields.data
             response.success = True
     except Exception as e:
+        log_error(e)
         response.success = False
         response.message = (
             f"Failed to retrieve event criteria fields: {format_error_message(e)}"
         )
-        log_error(response.message)
 
     return (
         jsonify(response.to_dict()),
@@ -213,9 +213,9 @@ def generate_filters():
 
         final_response = jsonify(response.to_dict()), 200 if response.success else 400
     except Exception as e:
+        log_error(e)
         response.success = False
         response.message = f"Failed to generate filters: {format_error_message(e)}"
-        log_error(response.message)
         final_response = jsonify(response.to_dict()), 500
 
     return final_response
@@ -232,8 +232,8 @@ def get_instance_url():
         response.data = [get_session_state().get("instance_url")]
         response.success = True
     except Exception as e:
+        log_error(e)
         response.message = f"Failed to retrieve instance URL: {format_error_message(e)}"
-        log_error(response.message)
 
     return jsonify(response.to_dict()), get_status_code(response)
 
@@ -260,10 +260,10 @@ def get_prospecting_activities():
         ]
         response.success = True
     except Exception as e:
+        log_error(e)
         response.message = (
             f"Failed to retrieve prospecting activities: {format_error_message(e)}"
         )
-        log_error(response.message)
         response.type = "UnexpectedError"
 
     return jsonify(response.to_dict()), 200
@@ -308,10 +308,10 @@ def get_prospecting_activities_filtered_by_ids():
             ]
             response.success = True
     except Exception as e:
+        log_error(e)
         response.message = (
             f"Failed to retrieve prospecting activities: {format_error_message(e)}"
         )
-        log_error(response.message)
 
     return jsonify(response.to_dict()), get_status_code(response)
 
@@ -323,29 +323,28 @@ def fetch_prospecting_activity():
 
     api_response = ApiResponse(data=[], message="", success=False)
     try:
-        raise Exception("TESTING")
-        # response = update_activation_states()
+        response = update_activation_states()
 
-        # if response.success:
-        #     activations = response.data
+        if response.success:
+            activations = response.data
 
-        #     api_response.data = [
-        #         {
-        #             "summary": generate_summary(activations),
-        #             "raw_data": [activation.to_dict() for activation in activations],
-        #         }
-        #     ]
-        #     api_response.success = True
-        #     api_response.message = "Prospecting activity data loaded successfully"
-        # else:
-        #     api_response.message = response.message
+            api_response.data = [
+                {
+                    "summary": generate_summary(activations),
+                    "raw_data": [activation.to_dict() for activation in activations],
+                }
+            ]
+            api_response.success = True
+            api_response.message = "Prospecting activity data loaded successfully"
+        else:
+            api_response.message = response.message
 
-        # status_code = get_status_code(api_response)
+        status_code = get_status_code(api_response)
     except Exception as e:
+        log_error(e)
         api_response.message = (
             f"Failed to load prospecting activities data: {format_error_message(e)}"
         )
-        print(api_response.message, flush=True)
         status_code = get_status_code(api_response)
 
     return jsonify(api_response.to_dict()), status_code
@@ -361,6 +360,7 @@ def delete_all_prospecting_activity():
         delete_all_activations()
         response.success = True
     except Exception as e:
+        log_error(e)
         response.message = (
             f"Failed to delete prospecting activity: {format_error_message(e)}"
         )
@@ -381,8 +381,8 @@ def commit_settings():
         api_response.success = True
         api_response.message = "Settings saved successfully"
     except Exception as e:
+        log_error(e)
         error_msg = format_error_message(e)
-        print(error_msg)
         api_response.message = f"Failed to save settings: {error_msg}"
 
     return jsonify(api_response.to_dict()), 200
@@ -402,7 +402,7 @@ def get_settings():
         api_response.success = True
         return jsonify(api_response.to_dict()), 200
     except Exception as e:
-        print(f"Failed to retrieve settings: {str(e)}")
+        log_error(e)
         api_response.message = f"Failed to retrieve settings: {str(e)}"
 
     return api_response
@@ -418,8 +418,8 @@ def get_salesforce_users():
         response.data = fetch_salesforce_users().data
         response.success = True
     except Exception as e:
+        log_error(e)
         error_message = format_error_message(e)
-        print(error_message)
         response.message = f"Failed to retrieve Salesforce users: {error_message}"
 
     return jsonify(response.to_dict()), get_status_code(response)
@@ -440,8 +440,8 @@ def get_salesforce_tasks_by_user_ids():
             response.data = fetch_tasks_by_user_ids(user_ids).data
             response.success = True
     except Exception as e:
+        log_error(e)
         error_msg = format_error_message(e)
-        print(error_msg)
         response.message = (
             f"Failed to retrieve Salesforce tasks by user IDs: {error_msg}"
         )
@@ -464,6 +464,7 @@ def get_salesforce_events_by_user_ids():
             response.data = fetch_events_by_user_ids(user_ids).data
             response.success = True
     except Exception as e:
+        log_error(e)
         response.message = f"Failed to retrieve Salesforce events by user IDs: {format_error_message(e)}"
 
     return jsonify(response.__dict__), get_status_code(response)
@@ -479,10 +480,10 @@ def get_salesforce_user():
         response.data = [fetch_logged_in_salesforce_user().data]
         response.success = True
     except Exception as e:
+        log_error(e)
         response.message = (
             f"Failed to retrieve Salesforce users: {format_error_message(e)}"
         )
-        print(response.message)
 
     return jsonify(response.to_dict()), get_status_code(response)
 
@@ -497,8 +498,8 @@ def get_task_fields():
         response.data = fetch_task_fields().data
         response.success = True
     except Exception as e:
+        log_error(e)
         error_msg = format_error_message(e)
-        print(error_msg)
         response.message = f"Failed to retrieve task fields: {error_msg}"
 
     return jsonify(response.to_dict()), get_status_code(response)
@@ -513,6 +514,7 @@ def get_event_fields():
     try:
         response = fetch_event_fields()
     except Exception as e:
+        log_error(e)
         response.message = f"Failed to retrieve event fields: {format_error_message(e)}"
 
     return jsonify(response.__dict__), get_status_code(response)
@@ -535,7 +537,7 @@ def task_query_count():
         api_response.success = True
 
     except Exception as e:
-        print(f"Error in task_query_count: {e}")
+        log_error(e)
         api_response.message = (
             f"Failed to retrieve task query count: {format_error_message(e)}"
         )

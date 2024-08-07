@@ -1,6 +1,8 @@
 from flask import Flask
 from flask_cors import CORS
 from config import Config
+import sentry_sdk
+from sentry_sdk.integrations.flask import FlaskIntegration
 
 import os
 
@@ -10,6 +12,20 @@ REACT_APP_URL = os.getenv("REACT_APP_URL", "http://localhost:3000")
 
 def create_app():
     app = Flask(__name__)
+
+    sentry_sdk.init(
+        integrations=[FlaskIntegration()],
+        dsn="https://068431a7f1d4b25d48014f759db6d5ca@o4507733909766144.ingest.us.sentry.io/4507733911994368",
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        traces_sample_rate=1.0,
+        # Set profiles_sample_rate to 1.0 to profile 100%
+        # of sampled transactions.
+        # We recommend adjusting this value in production.
+        profiles_sample_rate=1.0,
+        environment="development",
+    )
+
     app.config.from_object(Config)
 
     CORS(

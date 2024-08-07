@@ -811,17 +811,14 @@ def _fetch_sobjects(soql_query, credentials):
             headers=headers,
             params={"q": soql_query},
         )
-        if response.status_code == 200:
-            return ApiResponse(
-                success=True,
-                data=response.json()["records"],
-                message=None,
-                status_code=200,
-            )
-        else:
-            raise Exception(
-                f"Failed to fetch sobjects ({response.status_code}): {get_http_error_message(response)}"
-            )
+        response.raise_for_status()
+        raise Exception("TESTING SENTRY")
+        return ApiResponse(
+            success=True,
+            data=response.json()["records"],
+            message=None,
+            status_code=200,
+        )
     except Exception as e:
         raise Exception(format_error_message(e))
 
