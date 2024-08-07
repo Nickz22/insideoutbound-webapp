@@ -5,6 +5,12 @@ from datetime import timedelta, datetime, date, timezone
 from functools import reduce
 import re
 from app.data_models import Settings
+from app.database.supabase_connection import get_session_state
+
+
+from log_config import setup_logger
+
+logger = setup_logger(__name__)
 
 
 def get_salesforce_team_ids(settings: Settings):
@@ -12,6 +18,20 @@ def get_salesforce_team_ids(settings: Settings):
     if settings.team_member_ids:
         team_member_ids.extend(settings.team_member_ids)
     return team_member_ids
+
+
+# logging utils
+def log_error(message):
+    try:
+        session_state = get_session_state()
+        logger.error(
+            f"[{datetime.now()}] User ID: {session_state['salesforce_id']} - {message}"
+        )
+    except Exception as e:
+        logger.warning(
+            f"Error getting user ID from session state [{format_error_message(e)}]. Logging error without user ID."
+        )
+        logger.error(f"[{datetime.now()}] - {message}")
 
 
 # filter utils
