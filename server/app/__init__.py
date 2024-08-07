@@ -8,6 +8,7 @@ import os
 
 SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8000")
 REACT_APP_URL = os.getenv("REACT_APP_URL", "http://localhost:3000")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 
 def create_app():
@@ -23,7 +24,7 @@ def create_app():
         # of sampled transactions.
         # We recommend adjusting this value in production.
         profiles_sample_rate=1.0,
-        environment="development",
+        environment=ENVIRONMENT,
     )
 
     app.config.from_object(Config)
