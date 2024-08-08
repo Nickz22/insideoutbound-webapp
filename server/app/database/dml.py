@@ -116,13 +116,19 @@ def save_settings(settings: Settings):
 
     return True
 
+
 def delete_session(session_token: str):
     supabase = get_supabase_admin_client()
     supabase.table("Session").delete().eq("id", session_token).execute()
     return True
 
+
 def save_session(token_data: TokenData, is_sandbox: bool):
-    token_dict = token_data.to_dict()
+    ## TODO: change the invokers of save_session to provide a token_data every time
+    if isinstance(token_data, dict):
+        token_dict = token_data
+    else:
+        token_dict = token_data.to_dict()
     session_token = str(uuid4())
     salesforce_id = token_dict.get("id").split("/")[-1]
     org_id = token_dict.get("org_id")

@@ -1,0 +1,51 @@
+name: Python Tests
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    environment: Python  # Or whatever you named your environment
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.9
+    
+    - name: Set environment variables
+      run: |
+        # Set sensitive variables from GitHub Environment Secrets
+        echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> $GITHUB_ENV
+        echo "SECRET_KEY=${{ secrets.SECRET_KEY }}" >> $GITHUB_ENV
+        echo "CLIENT_ID=${{ secrets.CLIENT_ID }}" >> $GITHUB_ENV
+        echo "CLIENT_SECRET=${{ secrets.CLIENT_SECRET }}" >> $GITHUB_ENV
+        echo "SUPABASE_KEY=${{ secrets.SUPABASE_KEY }}" >> $GITHUB_ENV
+        echo "SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}" >> $GITHUB_ENV
+        echo "SUPABASE_ALL_USERS_PASSWORD=${{ secrets.SUPABASE_ALL_USERS_PASSWORD }}" >> $GITHUB_ENV
+
+        # Set non-sensitive variables from GitHub Environment Variables
+        echo "SERVER_URL=${{ vars.SERVER_URL }}" >> $GITHUB_ENV
+        echo "REACT_APP_URL=${{ vars.REACT_APP_URL }}" >> $GITHUB_ENV
+        echo "DATABASE_URL=${{ vars.DATABASE_URL }}" >> $GITHUB_ENV
+        echo "SUPABASE_URL=${{ vars.SUPABASE_URL }}" >> $GITHUB_ENV
+        echo "SUPABASE_PROJECT_ID=${{ vars.SUPABASE_PROJECT_ID }}" >> $GITHUB_ENV
+        echo "ENVIRONMENT=${{ vars.ENVIRONMENT }}" >> $GITHUB_ENV
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r server/requirements.txt
+    
+    - name: Debug Environment Variables
+      run: |
+        echo "Printing environment variables:"
+        env | sort
+    
+    - name: Run tests
+      run: |
+        python -m unittest discover server/app/tests
