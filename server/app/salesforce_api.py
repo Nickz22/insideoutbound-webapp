@@ -1,7 +1,7 @@
 import requests
 from typing import List, Dict
-from app.utils import pluck, format_error_message
-from app.data_models import (
+from server.app.utils import pluck, format_error_message
+from server.app.data_models import (
     ApiResponse,
     Contact,
     Account,
@@ -11,8 +11,8 @@ from app.data_models import (
     UserModel,
     UserSObject,
 )
-from app.database.supabase_connection import get_session_state
-from app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
+from server.app.database.supabase_connection import get_session_state
+from server.app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 
 
 def get_credentials():
@@ -805,19 +805,38 @@ def _fetch_sobjects(soql_query, credentials):
         access_token, instance_url = credentials
         if not access_token or not instance_url:
             raise Exception(SESSION_EXPIRED)
+
         headers = {"Authorization": f"Bearer {access_token}"}
-        response = requests.get(
-            f"{instance_url}/services/data/v55.0/query",
-            headers=headers,
-            params={"q": soql_query},
-        )
-        response.raise_for_status()
+        url = f"{instance_url}/services/data/v55.0/query"
+
+        all_records = []
+        next_records_url = None
+
+        while True:
+            if next_records_url:
+                response = requests.get(next_records_url, headers=headers)
+            else:
+                response = requests.get(url, headers=headers, params={"q": soql_query})
+
+            response.raise_for_status()
+            data = response.json()
+
+            all_records.extend(data["records"])
+
+            # Check if there are more records to fetch
+            if data.get("done", True):
+                break
+
+            next_records_url = f"{instance_url}{data['nextRecordsUrl']}"
+
         return ApiResponse(
             success=True,
-            data=response.json()["records"],
+            data=all_records,
             message=None,
             status_code=200,
         )
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"API request failed: {format_error_message(e)}")
     except Exception as e:
         raise Exception(format_error_message(e))
 

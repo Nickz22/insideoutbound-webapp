@@ -29,3 +29,6 @@ client/src/.DS_Store
 
 # ignore py cache
 *.pyc
+client/.env
+server/.env
+flask_session

@@ -4,11 +4,11 @@ from typing import Any, Set
 from datetime import timedelta, datetime, date, timezone
 from functools import reduce
 import re
-from app.data_models import Settings
-from app.database.supabase_connection import get_session_state
+from server.app.data_models import Settings
+from server.app.database.supabase_connection import get_session_state
 from sentry_sdk import capture_exception, set_user
 
-from log_config import setup_logger
+from server.app.log_config import setup_logger
 
 logger = setup_logger(__name__)
 
@@ -22,11 +22,11 @@ def get_salesforce_team_ids(settings: Settings):
 
 # logging utils
 def log_error(exception):
+    error_msg = format_error_message(exception)
     try:
         session_state = get_session_state()
         set_user({"id": session_state["salesforce_id"]})
         capture_exception(exception)
-        error_msg = format_error_message(exception)
         logger.error(
             f"[{datetime.now()}] User ID: {session_state['salesforce_id']} - {error_msg}"
         )

@@ -1,16 +1,27 @@
-import random
-from app.tests.utils import is_valid_salesforce_query
+import random, copy
+from server.app.tests.utils import is_valid_salesforce_query
 from unittest.mock import MagicMock
-from app.tests.c import (
+from server.app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,  # 3
     mock_tasks_for_criteria_with_unique_values_content,  # 3
 )
-from app.data_models import TaskSObject
 from typing import List, Dict
 from datetime import datetime
 
 MOCK_CONTACT_IDS = [f"mock_contact_id{i}" for i in range(10)]
 MOCK_ACCOUNT_IDS = [f"mock_account_id{i}" for i in range(1, 6)]
+MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT = [
+    {
+        "fields": [
+            {"name": "Id", "label": "Account ID", "type": "id"},
+            {"name": "Name", "label": "Account Name", "type": "string"},
+            {"name": "BillingStreet", "label": "Billing Street", "type": "textarea"},
+            {"name": "Phone", "label": "Phone", "type": "phone"},
+            {"name": "Industry", "label": "Industry", "type": "picklist"},
+        ]
+    }
+]
+
 
 today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000+0000")
 
@@ -23,6 +34,8 @@ sobject_api_mock_response_by_request_key: Dict[str, List[Dict]] = {
     "fetch_events_by_account_ids_from_date": [],
     "fetch_contacts_by_account_ids": [],
     "fetch_accounts_not_in_ids": [],
+    "fetch_logged_in_salesforce_user": [],
+    "fetch_sobject_fields__account": MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT,
 }
 
 
@@ -55,7 +68,7 @@ def response_based_on_query(url, **kwargs):
     print(f"Parameters: {kwargs}")
     try:
         query_param = kwargs.get("params", {}).get("q", "")
-        is_valid_query = is_valid_salesforce_query(query_param)
+        is_valid_query = "/describe" or is_valid_salesforce_query(query_param) in url
 
         if not is_valid_query:
             return MagicMock(
@@ -91,7 +104,8 @@ def response_based_on_query(url, **kwargs):
             (
                 "AccountId IN" in query_param and "FROM Contact" in query_param
             ): "fetch_contacts_by_account_ids",
-            ("SELECT Id FROM Account" in query_param): "fetch_accounts_not_in_ids",
+            ("SELECT Id,Name FROM Account" in query_param): "fetch_accounts_not_in_ids",
+            ("Account" in url and "describe" in url): "fetch_sobject_fields__account",
         }
 
         # Determine which mock response to use based on the query characteristics
@@ -115,7 +129,9 @@ def response_based_on_query(url, **kwargs):
 
 
 # mock data
-def get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(n, x):
+def get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
+    n, x, assignee_id
+):
     if x > len(MOCK_CONTACT_IDS):
         raise ValueError("Number of contacts exceeds the number of mock contact")
     if n > 3:
@@ -123,13 +139,16 @@ def get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(n, x):
     cloned_tasks = []
     for i in range(x):
         for j in range(n):
-            task_copy = TaskSObject(**mock_tasks_for_criteria_with_contains_content[j])
-            task_copy.WhoId = MOCK_CONTACT_IDS[i]
-            cloned_tasks.append(task_copy.to_dict())
+            task_copy = copy.deepcopy(mock_tasks_for_criteria_with_contains_content[j])
+            task_copy["WhoId"] = MOCK_CONTACT_IDS[i]
+            task_copy["OwnerId"] = assignee_id
+            cloned_tasks.append(task_copy)
     return cloned_tasks
 
 
-def get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(n, x):
+def get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(
+    n, x, assignee_id
+):
     if x > len(MOCK_CONTACT_IDS):
         raise ValueError("Number of contacts exceeds the number of mock contact")
     if n > 3:
@@ -137,31 +156,42 @@ def get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(n, 
     cloned_tasks = []
     for i in range(x):
         for j in range(n):
-            task_copy = TaskSObject(
-                **mock_tasks_for_criteria_with_unique_values_content[j]
+            task_copy = copy.deepcopy(
+                mock_tasks_for_criteria_with_unique_values_content[j]
             )
-            task_copy.WhoId = MOCK_CONTACT_IDS[i]
-            cloned_tasks.append(task_copy.to_dict())
+            task_copy["WhoId"] = MOCK_CONTACT_IDS[i]
+            task_copy["OwnerId"] = assignee_id
+            cloned_tasks.append(task_copy)
     return cloned_tasks
 
 
-def get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query():
-    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(3, 2)
-
-
-def get_one_mock_task_per_contact_for_contains_content_criteria_query():
+def get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query(
+    assignee_id,
+):
     return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
-        1, len(MOCK_CONTACT_IDS)
+        3, 2, assignee_id=assignee_id
     )
 
 
-def get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query():
-    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(3, 10)
+def get_one_mock_task_per_contact_for_contains_content_criteria_query(assignee_id):
+    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
+        1, len(MOCK_CONTACT_IDS), assignee_id=assignee_id
+    )
 
 
-def get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query():
+def get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query(
+    assignee_id,
+):
+    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
+        3, 10, assignee_id=assignee_id
+    )
+
+
+def get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query(
+    assignee_id,
+):
     return get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(
-        3, 10
+        3, 10, assignee_id=assignee_id
     )
 
 
@@ -213,6 +243,7 @@ def get_mock_opportunity_for_account(account_id):
         "Amount": round(random.uniform(1000, 100000), 2),
         "StageName": "Prospecting",
         "CreatedDate": today,
+        "CloseDate": datetime.today().date().isoformat(),
     }
 
 

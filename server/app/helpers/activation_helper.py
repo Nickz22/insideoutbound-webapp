@@ -1,6 +1,6 @@
 from datetime import datetime
 from collections import defaultdict
-from app.data_models import Activation
+from server.app.data_models import Activation
 
 
 def generate_summary(activations: list[Activation]) -> dict:
