@@ -1,4 +1,4 @@
-from app.data_models import (
+from server.app.data_models import (
     Account,
     Settings,
     FilterContainer,
@@ -15,7 +15,7 @@ from typing import Dict
 from datetime import datetime, date
 import json
 from uuid import UUID
-from app.utils import (
+from server.app.utils import (
     surround_numbers_with_underscores,
     remove_underscores_from_numbers,
 )

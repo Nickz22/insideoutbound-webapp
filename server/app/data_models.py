@@ -299,7 +299,6 @@ class TokenData(SerializableModel):
     id: str
     token_type: str
     issued_at: str
-    signature: str
 
 
 class AuthenticationError(Exception):

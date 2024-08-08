@@ -2,7 +2,7 @@ import os
 from supabase import create_client, Client
 from flask import g
 from dotenv import load_dotenv
-from app.data_models import AuthenticationError
+from server.app.data_models import AuthenticationError
 
 load_dotenv()
 

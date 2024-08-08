@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from config import Config
+from server.config import Config
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 
@@ -14,18 +14,19 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 def create_app():
     app = Flask(__name__)
 
-    sentry_sdk.init(
-        integrations=[FlaskIntegration()],
-        dsn="https://068431a7f1d4b25d48014f759db6d5ca@o4507733909766144.ingest.us.sentry.io/4507733911994368",
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for performance monitoring.
-        traces_sample_rate=1.0,
-        # Set profiles_sample_rate to 1.0 to profile 100%
-        # of sampled transactions.
-        # We recommend adjusting this value in production.
-        profiles_sample_rate=1.0,
-        environment=ENVIRONMENT,
-    )
+    if os.environ.get("FLASK_ENV") != "testing":
+        sentry_sdk.init(
+            integrations=[FlaskIntegration()],
+            dsn="https://068431a7f1d4b25d48014f759db6d5ca@o4507733909766144.ingest.us.sentry.io/4507733911994368",
+            # Set traces_sample_rate to 1.0 to capture 100%
+            # of transactions for performance monitoring.
+            traces_sample_rate=1.0,
+            # Set profiles_sample_rate to 1.0 to profile 100%
+            # of sampled transactions.
+            # We recommend adjusting this value in production.
+            profiles_sample_rate=1.0,
+            environment=ENVIRONMENT,
+        )
 
     app.config.from_object(Config)
 
@@ -40,7 +41,7 @@ def create_app():
     )
 
     # Import and register blueprints
-    from app.routes import bp
+    from server.app.routes import bp
 
     app.register_blueprint(bp)
 

@@ -1,5 +1,5 @@
-from app.database.supabase_connection import get_supabase_admin_client
-from app.data_models import AuthenticationError
+from server.app.database.supabase_connection import get_supabase_admin_client
+from server.app.data_models import AuthenticationError
 
 
 def fetch_supabase_user(salesforce_id: str):

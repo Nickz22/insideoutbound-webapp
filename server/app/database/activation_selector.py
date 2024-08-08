@@ -1,10 +1,10 @@
 from typing import List
-from app.data_models import Activation
-from app.data_models import ApiResponse
-from app.database.supabase_connection import get_supabase_admin_client
-from app.mapper.mapper import supabase_dict_to_python_activation
-from app.database.settings_selector import load_settings
-from app.utils import get_salesforce_team_ids, format_error_message
+from server.app.data_models import Activation
+from server.app.data_models import ApiResponse
+from server.app.database.supabase_connection import get_supabase_admin_client
+from server.app.mapper.mapper import supabase_dict_to_python_activation
+from server.app.database.settings_selector import load_settings
+from server.app.utils import get_salesforce_team_ids, format_error_message
 
 
 def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResponse:

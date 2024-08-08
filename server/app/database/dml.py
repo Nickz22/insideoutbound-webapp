@@ -2,18 +2,24 @@ import json
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from os import environ
-from app.database.supabase_connection import (
+from server.app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
     set_session_state,
 )
-from app.data_models import Activation, ApiResponse, Settings, UserModel, TokenData
-from app.mapper.mapper import (
+from server.app.data_models import (
+    Activation,
+    ApiResponse,
+    Settings,
+    UserModel,
+    TokenData,
+)
+from server.app.mapper.mapper import (
     python_activation_to_supabase_dict,
     python_settings_to_supabase_dict,
 )
-from app.utils import get_salesforce_team_ids, format_error_message
-from app.database.settings_selector import load_settings
+from server.app.utils import get_salesforce_team_ids, format_error_message
+from server.app.database.settings_selector import load_settings
 
 SUPABASE_ALL_USERS_PASSWORD = environ.get("SUPABASE_ALL_USERS_PASSWORD")
 from datetime import datetime
@@ -110,17 +116,22 @@ def save_settings(settings: Settings):
 
     return True
 
+def delete_session(session_token: str):
+    supabase = get_supabase_admin_client()
+    supabase.table("Session").delete().eq("id", session_token).execute()
+    return True
 
 def save_session(token_data: TokenData, is_sandbox: bool):
+    token_dict = token_data.to_dict()
     session_token = str(uuid4())
-    salesforce_id = token_data.get("id").split("/")[-1]
-    org_id = token_data.get("org_id")
-    refresh_token = token_data.get("refresh_token")
+    salesforce_id = token_dict.get("id").split("/")[-1]
+    org_id = token_dict.get("org_id")
+    refresh_token = token_dict.get("refresh_token")
     session_state = {
         "salesforce_id": salesforce_id,
-        "access_token": token_data["access_token"],
+        "access_token": token_dict["access_token"],
         "refresh_token": refresh_token,
-        "instance_url": token_data["instance_url"],
+        "instance_url": token_dict["instance_url"],
         "org_id": org_id,
         "is_sandbox": is_sandbox,
     }
