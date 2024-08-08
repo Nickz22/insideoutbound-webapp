@@ -8,8 +8,7 @@ import {
   Paper,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import CategoryForm from "../components/ProspectingCategoryForm/ProspectingCategoryForm";
-import CategoryOverview from "../components/ProspectingCategoryOverview/ProspectingCategoryOverview";
+import ProspectingCriteriaSelector from "../components/ProspectingCriteriaSelector/ProspectingCriteriaSelector";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
 import ProgressTracker from "../components/ProgressTracker/ProgressTracker";
 import {
@@ -34,29 +33,12 @@ import {
 
 import { ONBOARD_WIZARD_STEPS } from "../utils/c";
 
-/**
- * @param {{ categoryFormTableData: TableData, setSelectedColumns: Function, onAddCategory: Function, onDone: React.MouseEventHandler}} props
- */
-const CategoryFormWithHeader = ({
-  categoryFormTableData,
-  setSelectedColumns,
-  onAddCategory,
-  onDone,
-}) => {
-  return (
-    <Box>
-      <Typography variant="h5" gutterBottom sx={{ mb: 3 }}>
-        Prospecting Activity Criteria
-      </Typography>
-      <CategoryForm
-        initialTableData={categoryFormTableData}
-        setSelectedColumns={setSelectedColumns}
-        onAddCategory={onAddCategory}
-        onDone={onDone}
-      />
-    </Box>
-  );
-};
+const REQUIRED_PROSPECTING_CATEGORIES = [
+  "Inbound Call",
+  "Outbound Call",
+  "Inbound Email",
+  "Outbound Email",
+];
 
 const Onboard = () => {
   const navigate = useNavigate();
@@ -64,7 +46,16 @@ const Onboard = () => {
   /** {@type {[Map<string, List<SObject>, Function]}} */
   const [categories, setCategories] = useState(new Map());
   /** @type {[FilterContainer[], Function]} */
-  const [filters, setFilters] = useState([]);
+  const [filters, setFilters] = useState(
+    REQUIRED_PROSPECTING_CATEGORIES.map((category) => ({
+      name: category,
+      filters: [],
+      filterLogic: "",
+      direction: category.toLowerCase().includes("inbound")
+        ? "Inbound"
+        : "Outbound",
+    }))
+  );
   /** @type {[{ [key: string]: any }, function]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
   const [isLargeDialog, setIsLargeDialog] = useState(false);
@@ -80,7 +71,6 @@ const Onboard = () => {
   const [tasks, setTasks] = useState([]);
   const taskSObjectFields = useRef([]);
   const taskFilterFields = useRef([]);
-  const [isProcessingCategories, setIsProcessingCategories] = useState(false);
 
   useEffect(() => {
     const setInitialCategoryFormTableData = async () => {
@@ -194,51 +184,6 @@ const Onboard = () => {
     }
   }, [isTransitioning]);
 
-  useEffect(() => {
-    const processCategories = async () => {
-      if (categories.size === 4 && isProcessingCategories) {
-        try {
-          const selectedColumns = categoryFormTableData.columns;
-          const filterContainersPromises = Array.from(categories.entries()).map(
-            async ([category, tasks]) => {
-              try {
-                const response = await generateCriteria(tasks, selectedColumns);
-                return {
-                  ...response.data[0],
-                  name: category,
-                  direction: category.toLowerCase().includes("inbound")
-                    ? "Inbound"
-                    : "Outbound",
-                };
-              } catch (error) {
-                console.error("Error processing category:", category, error);
-                return {
-                  name: category,
-                  filters: [{ field: "", operator: "", value: "" }],
-                  direction: category.toLowerCase().includes("inbound")
-                    ? "Inbound"
-                    : "Outbound",
-                };
-              }
-            }
-          );
-
-          const filterContainers = await Promise.all(filterContainersPromises);
-          setFilters(filterContainers);
-          setGatheringResponses((prev) => ({
-            ...prev,
-            criteria: { value: filterContainers },
-          }));
-        } finally {
-          setIsProcessingCategories(false);
-          handleNext();
-        }
-      }
-    };
-
-    processCategories();
-  }, [categories, isProcessingCategories]);
-
   const handleStepClick = (clickedStep) => {
     if (clickedStep < step) {
       setStep(clickedStep);
@@ -337,37 +282,28 @@ const Onboard = () => {
   /**
    * @param {FilterContainer} filterContainer
    */
-  const handleProspectingFilterChanged = (filterContainer) => {
-    setFilters(
-      /** @param {FilterContainer[]} prev */
-      (prev) =>
-        prev.map((prevFilterContainer) => {
-          const isSameFilter =
-            prevFilterContainer?.name === filterContainer.name;
-          return isSameFilter ? filterContainer : prevFilterContainer;
-        })
+  const handleProspectingFilterChanged = (updatedFilter) => {
+    setFilters((prev) =>
+      prev.map((filter) =>
+        filter.name === updatedFilter.name ? updatedFilter : filter
+      )
     );
-    try {
-      setGatheringResponses(
-        /** @param {{ [key: string]: any }} prev */
-        (prev) => {
-          const newResponses = { ...prev };
-          newResponses["criteria"].value = prev["criteria"].value.map(
-            /**
-             * @param {FilterContainer} prevCriteria
-             */
-            (prevCriteria) => {
-              const isSameCriteria =
-                prevCriteria?.name === filterContainer.name;
-              return isSameCriteria ? filterContainer : prevCriteria;
-            }
-          );
-          return newResponses;
-        }
+
+    setGatheringResponses((prev) => {
+      const newResponses = { ...prev };
+      if (!newResponses.criteria) {
+        newResponses.criteria = { value: [] };
+      }
+      const criteriaIndex = newResponses.criteria.value.findIndex(
+        (criteria) => criteria.name === updatedFilter.name
       );
-    } catch (e) {
-      console.error("Error updating criteria", e);
-    }
+      if (criteriaIndex !== -1) {
+        newResponses.criteria.value[criteriaIndex] = updatedFilter;
+      } else {
+        newResponses.criteria.value.push(updatedFilter);
+      }
+      return newResponses;
+    });
   };
 
   const setSelectedColumns = useCallback(
@@ -381,61 +317,22 @@ const Onboard = () => {
     []
   );
 
-  /**
-   *
-   * @param {string} category
-   * @param {Set<string>} selectedTaskIds
-   * @returns
-   */
-  const addCategory = (category, selectedTaskIds) => {
-    return new Promise((resolve) => {
-      const newCategories = new Map(categories);
+  const handleTaskSelection = async (selectedTaskIds) => {
+    try {
       const selectedTasks = tasks.filter((task) =>
-        selectedTaskIds.has(task.id)
+        selectedTaskIds.includes(task.id)
       );
-      newCategories.set(category, selectedTasks);
-
-      const remainingTasks = tasks.filter(
-        (task) => !selectedTaskIds.has(task.id)
+      const response = await generateCriteria(
+        selectedTasks,
+        categoryFormTableData.columns
       );
-
-      setCategories(newCategories);
-      setTasks(remainingTasks);
-      setCategoryFormTableData((prev) => {
-        const newData = {
-          ...prev,
-          data: remainingTasks,
-          selectedIds: new Set(),
-        };
-        resolve(newData);
-        return newData;
-      });
-    });
-  };
-
-  const handleProspectingCategoriesComplete = async () => {
-    setIsProcessingCategories(true);
+      return response.data[0];
+    } catch (error) {
+      console.error("Error generating criteria:", error);
+    }
   };
 
   const renderStep = () => {
-    if (isProcessingCategories) {
-      return (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "100%",
-          }}
-        >
-          <CircularProgress />
-          <Typography variant="h6" sx={{ ml: 2 }}>
-            Processing categories...
-          </Typography>
-        </Box>
-      );
-    }
-
     if (step <= ONBOARD_WIZARD_STEPS.length) {
       return (
         <InfoGatheringStep
@@ -448,20 +345,13 @@ const Onboard = () => {
       );
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
       return (
-        <CategoryFormWithHeader
-          categoryFormTableData={categoryFormTableData}
-          setSelectedColumns={setSelectedColumns}
-          onAddCategory={addCategory}
-          onDone={handleProspectingCategoriesComplete}
-        />
-      );
-    } else if (step === ONBOARD_WIZARD_STEPS.length + 2) {
-      return (
-        <CategoryOverview
-          proposedFilterContainers={filters}
-          onSave={saveSettings}
+        <ProspectingCriteriaSelector
+          initialFilterContainers={filters}
           taskFilterFields={taskFilterFields.current}
+          tableData={categoryFormTableData}
           onFilterChange={handleProspectingFilterChanged}
+          onTaskSelection={handleTaskSelection}
+          onSave={saveSettings}
         />
       );
     } else {

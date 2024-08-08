@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 /**
  * @typedef {import('types').FilterContainer} FilterContainer
@@ -13,14 +13,14 @@ import { useState, useCallback } from "react";
  * @returns
  */
 export const useFilterLogic = (initialFilterContainer, filterFields) => {
-  const [filterContainer, setFilterContainer] = useState(
-    initialFilterContainer || {
-      filterLogic: "",
-      filters: [],
-      name: "",
-      direction: "",
-    }
-  );
+  const [filterContainer, setFilterContainer] = useState({
+    ...initialFilterContainer,
+  });
+
+  useEffect(() => {
+    setFilterContainer(initialFilterContainer);
+  }, [initialFilterContainer]);
+
   /** @type {[{[key: number]: any}, Function]} */
   const [logicErrors, setLogicErrors] = useState({});
 
