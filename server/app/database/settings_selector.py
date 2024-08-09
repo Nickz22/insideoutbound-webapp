@@ -1,9 +1,9 @@
-from server.app.database.supabase_connection import (
+from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
 )
-from server.app.data_models import Settings
-from server.app.mapper.mapper import supabase_dict_to_python_settings
+from app.data_models import Settings
+from app.mapper.mapper import supabase_dict_to_python_settings
 from typing import Optional
 
 

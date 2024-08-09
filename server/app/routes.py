@@ -1,28 +1,28 @@
 import requests, json
 from flask import Blueprint, jsonify, redirect, request
 from urllib.parse import unquote
-from server.app.middleware import authenticate
-from server.app.utils import format_error_message, log_error
-from server.app.database.activation_selector import (
+from app.middleware import authenticate
+from app.utils import format_error_message, log_error
+from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
-from server.app.database.settings_selector import load_settings
-from server.app.database.dml import (
+from app.database.settings_selector import load_settings
+from app.database.dml import (
     save_settings,
     save_session,
     delete_all_activations,
     upsert_supabase_user,
 )
-from server.app.constants import SESSION_EXPIRED
-from server.app.mapper.mapper import (
+from app.constants import SESSION_EXPIRED
+from app.mapper.mapper import (
     convert_filter_container_model_to_filter_container,
     convert_settings_model_to_settings,
     convert_settings_to_settings_model,
 )
-from server.app.helpers.activation_helper import generate_summary
-from server.app.services.setting_service import define_criteria_from_events_or_tasks
-from server.app.engine.activation_engine import update_activation_states
-from server.app.salesforce_api import (
+from app.helpers.activation_helper import generate_summary
+from app.services.setting_service import define_criteria_from_events_or_tasks
+from app.engine.activation_engine import update_activation_states
+from app.salesforce_api import (
     fetch_criteria_fields,
     fetch_task_fields,
     fetch_event_fields,
@@ -33,18 +33,18 @@ from server.app.salesforce_api import (
     get_task_query_count,
 )
 from config import Config
-from server.app.database.supabase_connection import (
+from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
 )
-from server.app.database.session_selector import fetch_supabase_session
+from app.database.session_selector import fetch_supabase_session
 
 bp = Blueprint("main", __name__)
 
 
 @bp.route("/oauth/callback", methods=["GET"])
 def oauth_callback():
-    from server.app.data_models import UserModel
+    from app.data_models import UserModel
 
     try:
         code = request.args.get("code")
@@ -105,7 +105,7 @@ def oauth_callback():
 @bp.route("/logout", methods=["POST"])
 @authenticate
 def logout():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     api_response = ApiResponse(data=[], message="", success=False)
     admin_supabase = get_supabase_admin_client()
@@ -118,7 +118,7 @@ def logout():
 
 @bp.route("/refresh_token", methods=["POST"])
 def refresh_token():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     session_token = request.headers.get("X-Session-Token")
@@ -161,7 +161,7 @@ def refresh_token():
 @bp.route("/get_criteria_fields", methods=["GET"])
 @authenticate
 def get_criteria_fields():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     try:
         response = ApiResponse(data=[], message="", success=False)
@@ -189,7 +189,7 @@ def get_criteria_fields():
 @bp.route("/generate_filters", methods=["POST"])
 @authenticate
 def generate_filters():
-    from server.app.data_models import ApiResponse, TableColumn
+    from app.data_models import ApiResponse, TableColumn
 
     response = ApiResponse(data=[], message="", success=True)
     final_response = None
@@ -225,7 +225,7 @@ def generate_filters():
 @bp.route("/get_instance_url", methods=["GET"])
 @authenticate
 def get_instance_url():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -241,7 +241,7 @@ def get_instance_url():
 @bp.route("/get_prospecting_activities", methods=["GET"])
 @authenticate
 def get_prospecting_activities():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -272,7 +272,7 @@ def get_prospecting_activities():
 @bp.route("/get_prospecting_activities_filtered_by_ids", methods=["GET"])
 @authenticate
 def get_prospecting_activities_filtered_by_ids():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -319,7 +319,7 @@ def get_prospecting_activities_filtered_by_ids():
 @bp.route("/fetch_prospecting_activity", methods=["POST"])
 @authenticate
 def fetch_prospecting_activity():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     api_response = ApiResponse(data=[], message="", success=False)
     try:
@@ -353,7 +353,7 @@ def fetch_prospecting_activity():
 @bp.route("/delete_all_prospecting_activity", methods=["POST"])
 @authenticate
 def delete_all_prospecting_activity():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -371,7 +371,7 @@ def delete_all_prospecting_activity():
 @bp.route("/save_settings", methods=["POST"])
 @authenticate
 def commit_settings():
-    from server.app.data_models import SettingsModel, ApiResponse
+    from app.data_models import SettingsModel, ApiResponse
 
     api_response = ApiResponse(data=[], message="", success=False)
     try:
@@ -391,7 +391,7 @@ def commit_settings():
 @bp.route("/get_settings", methods=["GET"])
 @authenticate
 def get_settings():
-    from server.app.data_models import SettingsModel, ApiResponse
+    from app.data_models import SettingsModel, ApiResponse
 
     api_response = ApiResponse(data=[], message="", success=False)
 
@@ -411,7 +411,7 @@ def get_settings():
 @bp.route("/get_salesforce_users", methods=["GET"])
 @authenticate
 def get_salesforce_users():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -428,7 +428,7 @@ def get_salesforce_users():
 @bp.route("/get_salesforce_tasks_by_user_ids", methods=["GET"])
 @authenticate
 def get_salesforce_tasks_by_user_ids():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -452,7 +452,7 @@ def get_salesforce_tasks_by_user_ids():
 @bp.route("/get_salesforce_events_by_user_ids", methods=["GET"])
 @authenticate
 def get_salesforce_events_by_user_ids():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -473,7 +473,7 @@ def get_salesforce_events_by_user_ids():
 @bp.route("/get_salesforce_user", methods=["GET"])
 @authenticate
 def get_salesforce_user():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -491,7 +491,7 @@ def get_salesforce_user():
 @bp.route("/get_task_fields", methods=["GET"])
 @authenticate
 def get_task_fields():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -508,7 +508,7 @@ def get_task_fields():
 @bp.route("/get_event_fields", methods=["GET"])
 @authenticate
 def get_event_fields():
-    from server.app.data_models import ApiResponse
+    from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
@@ -523,7 +523,7 @@ def get_event_fields():
 @bp.route("/get_task_query_count", methods=["POST"])
 @authenticate
 def task_query_count():
-    from server.app.data_models import ApiResponse, FilterContainerModel
+    from app.data_models import ApiResponse, FilterContainerModel
 
     api_response = ApiResponse(data=[], message="", success=False)
     try:
@@ -547,7 +547,7 @@ def task_query_count():
 
 @bp.app_errorhandler(Exception)
 def handle_exception(e):
-    from server.app.data_models import AuthenticationError
+    from app.data_models import AuthenticationError
 
     error_msg = format_error_message(e)
     print(error_msg)

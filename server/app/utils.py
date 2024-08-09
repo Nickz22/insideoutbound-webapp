@@ -4,11 +4,11 @@ from typing import Any, Set
 from datetime import timedelta, datetime, date, timezone
 from functools import reduce
 import re
-from server.app.data_models import Settings
-from server.app.database.supabase_connection import get_session_state
+from app.data_models import Settings
+from app.database.supabase_connection import get_session_state
 from sentry_sdk import capture_exception, set_user
 
-from server.app.log_config import setup_logger
+from app.log_config import setup_logger
 
 logger = setup_logger(__name__)
 

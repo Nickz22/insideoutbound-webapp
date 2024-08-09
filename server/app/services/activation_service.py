@@ -1,5 +1,5 @@
 import os, sys
-from server.app.data_models import (
+from app.data_models import (
     Settings,
     Activation,
     FilterContainer,
@@ -13,12 +13,12 @@ from datetime import timedelta
 
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from server.app.salesforce_api import (
+from app.salesforce_api import (
     fetch_tasks_by_account_ids_from_date_not_in_ids,
     fetch_opportunities_by_account_ids_from_date,
     fetch_events_by_account_ids_from_date,
 )
-from server.app.utils import (
+from app.utils import (
     generate_unique_id,
     add_days,
     is_model_date_field_within_window,
@@ -30,7 +30,7 @@ from server.app.utils import (
     parse_datetime_string_with_timezone,
 )
 from datetime import datetime, date
-from server.app.mapper.mapper import convert_dict_to_opportunity
+from app.mapper.mapper import convert_dict_to_opportunity
 
 
 def find_unresponsive_activations(
@@ -754,7 +754,7 @@ def create_activation(
 def create_prospecting_effort(
     activation_id, status, date_entered, tasks, task_ids_by_criteria_name
 ):
-    date_value_date_entered=None
+    date_value_date_entered = None
     if isinstance(date_entered, datetime):
         date_value_date_entered = date_entered.date()
     else:
