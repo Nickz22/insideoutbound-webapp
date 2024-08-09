@@ -1,6 +1,10 @@
 from flask import Flask
 from flask_cors import CORS
-from config import Config
+# temporary measure to make this import work for both tests and render build
+try:
+    from config import Config
+except ImportError:
+    from server.config import Config
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 
