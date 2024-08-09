@@ -1,7 +1,7 @@
 import requests
 from typing import List, Dict
-from server.app.utils import pluck, format_error_message
-from server.app.data_models import (
+from app.utils import pluck, format_error_message
+from app.data_models import (
     ApiResponse,
     Contact,
     Account,
@@ -11,8 +11,8 @@ from server.app.data_models import (
     UserModel,
     UserSObject,
 )
-from server.app.database.supabase_connection import get_session_state
-from server.app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
+from app.database.supabase_connection import get_session_state
+from app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 
 
 def get_credentials():

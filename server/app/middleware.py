@@ -2,11 +2,11 @@ from flask import request, g
 import json
 from functools import wraps
 from datetime import datetime, timezone
-from server.app.data_models import AuthenticationError
-from server.app.database.supabase_connection import (
+from app.data_models import AuthenticationError
+from app.database.supabase_connection import (
     set_session_state,
 )
-from server.app.database.session_selector import fetch_supabase_session
+from app.database.session_selector import fetch_supabase_session
 from dateutil import parser
 
 

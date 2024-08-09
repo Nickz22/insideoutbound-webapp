@@ -2,24 +2,24 @@ import json
 from datetime import datetime, timezone, timedelta
 from uuid import uuid4
 from os import environ
-from server.app.database.supabase_connection import (
+from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
     set_session_state,
 )
-from server.app.data_models import (
+from app.data_models import (
     Activation,
     ApiResponse,
     Settings,
     UserModel,
     TokenData,
 )
-from server.app.mapper.mapper import (
+from app.mapper.mapper import (
     python_activation_to_supabase_dict,
     python_settings_to_supabase_dict,
 )
-from server.app.utils import get_salesforce_team_ids, format_error_message
-from server.app.database.settings_selector import load_settings
+from app.utils import get_salesforce_team_ids, format_error_message
+from app.database.settings_selector import load_settings
 
 SUPABASE_ALL_USERS_PASSWORD = environ.get("SUPABASE_ALL_USERS_PASSWORD")
 from datetime import datetime

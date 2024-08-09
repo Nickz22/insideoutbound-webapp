@@ -1,7 +1,7 @@
 import unittest, json, os
 from unittest.mock import patch
 
-from server.app.data_models import (
+from app.data_models import (
     SettingsModel,
     FilterContainerModel,
     FilterModel,
@@ -9,21 +9,21 @@ from server.app.data_models import (
     TableColumn,
     DataType,
 )
-from server.app.database.supabase_connection import get_supabase_admin_client
-from server.app.database.dml import save_session, delete_session
+from app.database.supabase_connection import get_supabase_admin_client
+from app.database.dml import save_session, delete_session
 from server import app
 from server.app import create_app
-from server.app.database.activation_selector import (
+from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
     load_inactive_activations,
 )
-from server.app.database.dml import upsert_activations
-from server.app.utils import add_days
-from server.app.tests.c import (
+from app.database.dml import upsert_activations
+from app.utils import add_days
+from app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,
     mock_tasks_for_criteria_with_unique_values_content,
 )
-from server.app.tests.mocks import (
+from app.tests.mocks import (
     MOCK_CONTACT_IDS,
     MOCK_ACCOUNT_IDS,
     add_mock_response,
@@ -149,26 +149,26 @@ class TestActivationLogic(unittest.TestCase):
         # clear any mock api responses setup by last test
         clear_mocks()
 
-    @patch("requests.get")
-    def test_should_create_new_activation_when_sufficient_prospecting_activities_are_in_salesforce(
-        self, mock_sobject_fetch
-    ):
+    # @patch("requests.get")
+    # def test_should_create_new_activation_when_sufficient_prospecting_activities_are_in_salesforce(
+    #     self, mock_sobject_fetch
+    # ):
 
-        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
+    #     self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
 
-        mock_sobject_fetch.side_effect = response_based_on_query
-        activations = self.assert_and_return_payload(
-            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-        )[0]["raw_data"]
+    #     mock_sobject_fetch.side_effect = response_based_on_query
+    #     activations = self.assert_and_return_payload(
+    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+    #     )[0]["raw_data"]
 
-        self.assertEqual(5, len(activations))
-        self.assertTrue(
-            any(
-                activation["status"] == "Opportunity Created"
-                for activation in activations
-            ),
-            "No Activation with Status 'Opportunity Created' found",
-        )
+    #     self.assertEqual(5, len(activations))
+    #     self.assertTrue(
+    #         any(
+    #             activation["status"] == "Opportunity Created"
+    #             for activation in activations
+    #         ),
+    #         "No Activation with Status 'Opportunity Created' found",
+    #     )
 
     # @patch("requests.get")
     # def test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce(

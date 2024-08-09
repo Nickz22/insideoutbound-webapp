@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from server.config import Config
+from config import Config
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 
@@ -41,7 +41,7 @@ def create_app():
     )
 
     # Import and register blueprints
-    from server.app.routes import bp
+    from app.routes import bp
 
     app.register_blueprint(bp)
 
