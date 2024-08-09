@@ -587,7 +587,7 @@ def create_activation(
         else None
     )
     
-    if engaged_date != None:
+    if engaged_date != None and isinstance(engaged_date, datetime):
         engaged_date = engaged_date.date()
 
     # Determine the activated_date based on the activation condition
