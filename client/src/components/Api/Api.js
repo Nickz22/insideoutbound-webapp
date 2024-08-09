@@ -14,16 +14,20 @@ const api = axios.create({
  * the history replace looks very strange here
  */
 const getSessionToken = () => {
-  const urlParams = new URLSearchParams(window.location.search);
-  const sessionToken = urlParams.get("session_token");
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sessionToken = urlParams.get("session_token");
 
-  if (sessionToken) {
-    localStorage.setItem("sessionToken", sessionToken);
-    // Clean up the URL
-    window.history.replaceState({}, document.title, "/app/prospecting");
+    if (sessionToken) {
+      localStorage.setItem("sessionToken", sessionToken);
+      // Clean up the URL
+      window.history.replaceState({}, document.title, "/app/prospecting");
+    }
+
+    return localStorage.getItem("sessionToken");
+  } catch (e) {
+    window.location.href = "/";
   }
-
-  return localStorage.getItem("sessionToken");
 };
 
 api.interceptors.request.use((config) => {
@@ -96,7 +100,7 @@ export const getInstanceUrl = async () => {
 export const getLoggedInUser = async () => {
   const response = await api.get("/get_salesforce_user");
   return { ...response.data, statusCode: response.status };
-}
+};
 
 /**
  * @returns {Promise<ApiResponse>}

@@ -13,36 +13,27 @@ import {
   Grid,
   Tooltip,
 } from "@mui/material";
+import { generateCriteria } from "../Api/Api";
 import parse from "html-react-parser";
-import CustomTable from "./../CustomTable/CustomTable";
-import FilterContainer from "../FilterContainer/FilterContainer";
-import { useNavigate } from "react-router-dom";
+import ProspectingCriteriaSelector from "../ProspectingCriteriaSelector/ProspectingCriteriaSelector";
 
 /**
- * @typedef {import('@mui/material/Select').SelectChangeEvent<string>} SelectChangeEvent
- * @typedef {import('types').OnboardWizardStep} OnboardWizardStep
  * @typedef {import('types').OnboardWizardStepInput} OnboardWizardStepInput
- * @typedef {import('types').TableColumn} TableColumn
- * @typedef {import('types').TableData} TableData
- * @typedef {import('types').Settings} Settings
  */
 
-/**
- * @param {{ stepData: OnboardWizardStep, onComplete: Function, onTableDisplay: Function, settings: Settings}} props
- */
 const InfoGatheringStep = ({
   stepData,
   onComplete,
   onTableDisplay,
   settings,
 }) => {
-  const navigate = useNavigate();
   const [inputValues, setInputValues] = useState({});
   const [tableData, setTableData] = useState(null);
-  const [criteriaData, setCriteriaData] = useState(null);
+  const [filterFields, setFilterFields] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
   const settingsRef = useRef(settings);
   const [renderedDescription, setRenderedDescription] = useState("");
+  const [prospectingFilters, setProspectingFilters] = useState({});
 
   useEffect(() => {
     settingsRef.current = settings;
@@ -60,106 +51,40 @@ const InfoGatheringStep = ({
     }
   }, [stepData, inputValues]);
 
-  /**
-   * @param {string} inputSetting
-   * @param {boolean} isLoading
-   */
   const setLoadingState = (inputSetting, isLoading) => {
     setLoadingStates((prev) => ({ ...prev, [inputSetting]: isLoading }));
   };
 
   useEffect(() => {
-    const criteriaInput = stepData.inputs.find(
-      (input) => input.inputType === "criteria"
-    );
-    const shouldRender =
-      !criteriaInput?.renderEval || criteriaInput.renderEval(tableData);
-    if (criteriaInput && shouldRender && tableData) {
-      fetchCriteriaData(criteriaInput);
-    }
-  }, [stepData, tableData]);
-
-  /**
-   * @param {OnboardWizardStepInput} input
-   */
-  const fetchCriteriaData = async (input) => {
-    if (input.dataFetcher && tableData) {
-      setLoadingState(input.setting, true);
-      try {
-        const data = await input.dataFetcher(tableData);
-        if (data.success) {
-          setCriteriaData(data.data[0]);
-          handleCriteriaChange(data.data[0].filterContainer);
-        } else if (data.message?.toLowerCase().includes("session expired")) {
-          navigate("/");
-        }
-      } finally {
-        setLoadingState(input.setting, false);
-      }
-    }
-  };
-
-  /**
-   * @param {FilterContainer} newFilterContainer
-   */
-  const handleCriteriaChange = (newFilterContainer) => {
-    setInputValues((prev) => ({
-      ...prev,
-      [stepData.inputs.find((input) => input.inputType === "criteria").setting]:
-        newFilterContainer,
-    }));
-  };
-
-  const prevMeetingObject = useRef();
-
-  useEffect(() => {
-    const fetchTableData = async () => {
-      const tableInput = stepData.inputs.find(
-        (input) =>
-          input.inputType === "table" &&
-          shouldRenderInput(input, stepData.inputs.indexOf(input))
+    const fetchData = async () => {
+      const criteriaInput = stepData.inputs.find(
+        /** @param {OnboardWizardStepInput} input */
+        (input) => input.inputType === "prospectingCriteria"
       );
-
-      if (tableInput && tableInput.dataFetcher) {
-        setLoadingState(tableInput.setting, true);
+      if (criteriaInput && criteriaInput.renderEval(inputValues)) {
+        setLoadingState(criteriaInput.setting, true);
         try {
-          const data = await tableInput.dataFetcher({
+          const data = await criteriaInput.dataFetcher({
             ...settingsRef.current,
             ...inputValues,
           });
-          if (
-            !data.success &&
-            data.message?.toLowerCase().includes("session expired")
-          ) {
-            navigate("/");
-          }
-          if (data.success && data.data.length > 0) {
-            setTableData({
-              availableColumns: tableInput.availableColumns,
-              columns: tableInput.columns,
-              data: data.data,
-              selectedIds: new Set(),
-            });
-            onTableDisplay(true);
-          } else if (data.message?.toLowerCase().includes("session expired")) {
-            navigate("/");
-          }
+          setTableData({ ...data.data });
+          onTableDisplay(true);
+
+          const fields = await criteriaInput.fetchFilterFields({
+            ...settingsRef.current,
+            ...inputValues,
+          });
+          setFilterFields(fields);
+        } catch (error) {
+          console.error("Error fetching data:", error);
         } finally {
-          setLoadingState(tableInput.setting, false);
+          setLoadingState(criteriaInput.setting, false);
         }
-      } else {
-        setTableData(null);
-        onTableDisplay(false);
       }
     };
 
-    if (
-      inputValues["meetingObject"] !== prevMeetingObject.current ||
-      prevMeetingObject.current === undefined
-    ) {
-      fetchTableData();
-      prevMeetingObject.current = inputValues["meetingObject"];
-    }
+    fetchData();
   }, [stepData, inputValues, settingsRef]);
 
   const handleInputChange = (event, setting) => {
@@ -169,16 +94,6 @@ const InfoGatheringStep = ({
     }));
   };
 
-  const handleTableSelectionChange = (newSelectedIds) => {
-    setTableData((prev) =>
-      prev ? { ...prev, selectedIds: newSelectedIds } : null
-    );
-  };
-
-  const handleColumnsChange = (newColumns) => {
-    setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
-  };
-
   const handleSubmit = () => {
     const completedInputs = Object.entries(inputValues).map(
       ([setting, value]) => ({
@@ -186,27 +101,33 @@ const InfoGatheringStep = ({
         value,
       })
     );
-
-    const tableInput = stepData.inputs.find(
-      (input) => input.inputType === "table"
+    completedInputs.push(
+      ...Object.entries(prospectingFilters).map(([setting, value]) => ({
+        label: setting,
+        value,
+      }))
     );
-    if (tableInput && tableData && tableData.selectedIds.size > 0) {
-      completedInputs.push({
-        label: tableInput.setting,
-        value: tableData.data.filter((row) =>
-          tableData.selectedIds.has(row.id)
-        ),
-      });
-    }
-
     onComplete(completedInputs);
   };
 
-  /**
-   *
-   * @param {OnboardWizardStepInput} input
-   * @returns
-   */
+  const handleProspectingFilterChange = (updatedFilter, setting) => {
+    setProspectingFilters((prev) => ({
+      ...prev,
+      [setting]: updatedFilter,
+    }));
+  };
+
+  const handleTaskSelection = async (selectedTaskIds) => {
+    if (tableData) {
+      const selectedTasks = tableData.data.filter((task) =>
+        selectedTaskIds.includes(task.id)
+      );
+      const response = await generateCriteria(selectedTasks, tableData.columns);
+      return response.data[0];
+    }
+    return null;
+  };
+
   const renderInput = (input) => {
     const isLoading = loadingStates[input.setting];
 
@@ -260,44 +181,35 @@ const InfoGatheringStep = ({
         ) : (
           inputComponent
         );
-      case "table":
+      case "prospectingCriteria":
         return (
           <Box sx={{ mt: 2, mb: 2 }}>
             {isLoading ? (
               <CircularProgress />
             ) : (
-              tableData && (
+              tableData &&
+              filterFields && (
                 <>
-                  <Typography variant="caption" gutterBottom>
-                    {input.inputLabel}
-                  </Typography>
-                  <CustomTable
+                  <Typography variant="body1">{input.inputLabel}</Typography>
+                  <ProspectingCriteriaSelector
+                    initialFilterContainers={[
+                      prospectingFilters[input.setting] || {
+                        name: input.setting,
+                        filters: [],
+                        filterLogic: "",
+                      },
+                    ]}
+                    filterFields={filterFields}
                     tableData={tableData}
-                    onSelectionChange={handleTableSelectionChange}
-                    onColumnsChange={handleColumnsChange}
-                    paginate={true}
+                    onFilterChange={(updatedFilter) =>
+                      handleProspectingFilterChange(
+                        updatedFilter,
+                        input.setting
+                      )
+                    }
+                    onTaskSelection={handleTaskSelection}
                   />
                 </>
-              )
-            )}
-          </Box>
-        );
-      case "criteria":
-        return (
-          <Box sx={{ mt: 2, mb: 2 }}>
-            {isLoading ? (
-              <CircularProgress />
-            ) : (
-              criteriaData && (
-                <FilterContainer
-                  initialFilterContainer={criteriaData.filterContainer}
-                  filterFields={criteriaData.filterFields}
-                  filterOperatorMapping={criteriaData.filterOperatorMapping}
-                  hasNameField={criteriaData.hasNameField}
-                  hasDirectionField={criteriaData.hasDirectionField}
-                  onLogicChange={handleCriteriaChange}
-                  onValueChange={handleCriteriaChange}
-                />
               )
             )}
           </Box>
@@ -307,17 +219,10 @@ const InfoGatheringStep = ({
     }
   };
 
-  /**
-   * @param {OnboardWizardStepInput} input
-   * @param {number} index
-   */
   const shouldRenderInput = (input, index) => {
     if (!input.renderEval) return true;
-    if (index === 0) return true; // Always render the first input
-    const shouldRender = input.renderEval(
-      input.inputType === "criteria" ? tableData : inputValues
-    );
-    return shouldRender;
+    if (index === 0) return true;
+    return input.renderEval(inputValues);
   };
 
   return (
