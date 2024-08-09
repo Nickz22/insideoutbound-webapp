@@ -630,7 +630,7 @@ def create_activation(
         activated_date=activated_date,
         days_activated=(today - activated_date).days,
         engaged_date = engaged_date
-        days_engaged=(today - engaged_date.date()).days if engaged_date != None else None,
+        days_engaged = (today - engaged_date.date()).days if isinstance(engaged_date, datetime) else None
         active_contact_ids=active_contact_ids,
         activated_by_id=last_valid_task_creator_id,
         first_prospecting_activity=account_first_prospecting_activity,
