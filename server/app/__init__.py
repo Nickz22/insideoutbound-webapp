@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
-from server.config import Config
+from config import Config
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 
