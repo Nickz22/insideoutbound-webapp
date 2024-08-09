@@ -12,14 +12,20 @@ import { useState, useEffect, useCallback } from "react";
  * @param {CriteriaField[]} filterFields
  * @returns
  */
-export const useFilterLogic = (initialFilterContainer, filterFields) => {
+export const useFilterLogic = (initialFilterContainer, initialFilterFields) => {
   const [filterContainer, setFilterContainer] = useState({
     ...initialFilterContainer,
   });
 
+  const [filterFields, setFilterFields] = useState(initialFilterFields);
+
   useEffect(() => {
     setFilterContainer(initialFilterContainer);
   }, [initialFilterContainer]);
+
+  useEffect(() => {
+    setFilterFields(initialFilterFields);
+  }, [initialFilterFields]);
 
   /** @type {[{[key: number]: any}, Function]} */
   const [logicErrors, setLogicErrors] = useState({});

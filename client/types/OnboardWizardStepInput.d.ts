@@ -13,7 +13,7 @@ import { TableColumn } from "./TableColumn";
  */
 export interface OnboardWizardStepInput {
   setting: string;
-  inputType: "text" | "number" | "picklist" | "table" | "criteria";
+  inputType: "text" | "number" | "picklist" | "table" | "criteria" | "prospectingCriteria";
   inputLabel?: string;
   tooltip?: string;
   options?: string[];

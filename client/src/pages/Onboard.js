@@ -1,12 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import {
-  CircularProgress,
-  Dialog,
-  DialogContent,
-  Box,
-  Typography,
-  Paper,
-} from "@mui/material";
+import React, { useState, useEffect, useRef } from "react";
+import { Dialog, DialogContent, Box, Paper } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import ProspectingCriteriaSelector from "../components/ProspectingCriteriaSelector/ProspectingCriteriaSelector";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
@@ -43,8 +36,6 @@ const REQUIRED_PROSPECTING_CATEGORIES = [
 const Onboard = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // Start from step 1
-  /** {@type {[Map<string, List<SObject>, Function]}} */
-  const [categories, setCategories] = useState(new Map());
   /** @type {[FilterContainer[], Function]} */
   const [filters, setFilters] = useState(
     REQUIRED_PROSPECTING_CATEGORIES.map((category) => ({
@@ -306,17 +297,6 @@ const Onboard = () => {
     });
   };
 
-  const setSelectedColumns = useCallback(
-    /** @param {TableColumn[]} newColumns */
-    (newColumns) => {
-      setCategoryFormTableData(
-        /** @param {TableData} prev */
-        (prev) => ({ ...prev, columns: newColumns })
-      );
-    },
-    []
-  );
-
   const handleTaskSelection = async (selectedTaskIds) => {
     try {
       const selectedTasks = tasks.filter((task) =>
@@ -346,8 +326,9 @@ const Onboard = () => {
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
       return (
         <ProspectingCriteriaSelector
+          title="Prospecting Activity Criteria"
           initialFilterContainers={filters}
-          taskFilterFields={taskFilterFields.current}
+          filterFields={taskFilterFields.current}
           tableData={categoryFormTableData}
           onFilterChange={handleProspectingFilterChanged}
           onTaskSelection={handleTaskSelection}

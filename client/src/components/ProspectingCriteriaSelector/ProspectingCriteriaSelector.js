@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { debounce } from "lodash";
 import {
   Typography,
   Button,
@@ -22,11 +23,12 @@ import { FILTER_OPERATOR_MAPPING } from "src/utils/c";
  */
 
 /**
- * @param {{initialFilterContainers: FilterContainer[], taskFilterFields: CriteriaField[], tableData: TableData, onFilterChange: function, onTaskSelection: function, onSave: function}} props
+ * @param {{title?: string, initialFilterContainers: FilterContainer[], filterFields: CriteriaField[], tableData: TableData, onFilterChange: function, onTaskSelection: function, onSave?: function}} props
  */
 const ProspectingCriteriaSelector = ({
+  title,
   initialFilterContainers,
-  taskFilterFields,
+  filterFields,
   tableData,
   onFilterChange,
   onTaskSelection,
@@ -37,8 +39,8 @@ const ProspectingCriteriaSelector = ({
   );
   const [isGeneratingCriteria, setIsGeneratingCriteria] = useState(false);
   const [currentFilter, setCurrentFilter] = useState(null);
-  const [showTaskTable, setShowTaskTable] = useState(false);
-  const [selectedTaskIds, setSelectedTaskIds] = useState(new Set());
+  const [showTable, setShowTable] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
   const [activeStep, setActiveStep] = useState(0);
 
   useEffect(() => {
@@ -48,27 +50,41 @@ const ProspectingCriteriaSelector = ({
     setCurrentFilter(initialFilterContainers[activeStep]);
   }, [initialFilterContainers, activeStep]);
 
+  const debouncedOnFilterChange = useCallback(
+    debounce((updatedFilter, onFilterChange) => {
+      onFilterChange(updatedFilter);
+    }, 1000),
+    []
+  );
+
+  const debouncedSetCurrentFilter = useCallback(
+    debounce((updatedFilter) => {
+      setCurrentFilter(updatedFilter);
+    }, 1000),
+    []
+  );
+
   const handleFilterChange = (updatedFilter) => {
-    setCurrentFilter(updatedFilter);
+    debouncedSetCurrentFilter(updatedFilter);
     const newFilters = filterContainers.map((filter) =>
       filter.name === updatedFilter.name ? updatedFilter : filter
     );
     setFilterContainers(newFilters);
-    onFilterChange(updatedFilter);
+
+    // Use the debounced function
+    debouncedOnFilterChange(updatedFilter, onFilterChange);
   };
 
   const handleTaskSelectionChange = (newSelectedIds) => {
-    setSelectedTaskIds(newSelectedIds);
+    setSelectedIds(newSelectedIds);
   };
 
   const handleGenerateCriteria = async () => {
     setIsGeneratingCriteria(true);
     try {
-      const generatedCriteria = await onTaskSelection(
-        Array.from(selectedTaskIds)
-      );
+      const generatedCriteria = await onTaskSelection(Array.from(selectedIds));
       if (generatedCriteria) {
-        setShowTaskTable(false);
+        setShowTable(false);
         generatedCriteria.name = currentFilter.name;
         handleFilterChange(generatedCriteria);
       }
@@ -80,8 +96,8 @@ const ProspectingCriteriaSelector = ({
   const handleNext = () => {
     setActiveStep((prevActiveStep) => prevActiveStep + 1);
     setCurrentFilter(null); // Clear the current filter
-    setSelectedTaskIds(new Set()); // Clear selected tasks
-    setShowTaskTable(false); // Hide the task table
+    setSelectedIds(new Set()); // Clear selected tasks
+    setShowTable(false); // Hide the task table
   };
 
   const handleBack = () => {
@@ -101,9 +117,11 @@ const ProspectingCriteriaSelector = ({
 
   return (
     <Box sx={{ p: 4, pb: 10 }}>
-      <Typography variant="h4" fontWeight="lighter" gutterBottom>
-        Prospecting Activity Criteria
-      </Typography>
+      {title && (
+        <Typography variant="h4" fontWeight="lighter" gutterBottom>
+          {title}
+        </Typography>
+      )}
 
       {showProgressBar && (
         <Stepper activeStep={activeStep} sx={{ mb: 4 }}>
@@ -123,17 +141,17 @@ const ProspectingCriteriaSelector = ({
         <FormControlLabel
           control={
             <Switch
-              checked={showTaskTable}
-              onChange={(e) => setShowTaskTable(e.target.checked)}
+              checked={showTable}
+              onChange={(e) => setShowTable(e.target.checked)}
             />
           }
-          label="Show Task Table to Generate Criteria"
+          label="Show Table to Generate Criteria"
         />
 
-        {showTaskTable && (
+        {showTable && (
           <Box sx={{ my: 2 }}>
             <CustomTable
-              tableData={{ ...tableData, selectedIds: selectedTaskIds }}
+              tableData={{ ...tableData, selectedIds: selectedIds }}
               onSelectionChange={handleTaskSelectionChange}
               paginate={true}
             />
@@ -156,7 +174,7 @@ const ProspectingCriteriaSelector = ({
         {currentFilter && (
           <FilterContainer
             initialFilterContainer={currentFilter}
-            filterFields={taskFilterFields}
+            filterFields={filterFields}
             filterOperatorMapping={FILTER_OPERATOR_MAPPING}
             hasNameField={true}
             isNameReadOnly={true}

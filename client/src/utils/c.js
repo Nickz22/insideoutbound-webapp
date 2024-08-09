@@ -1,12 +1,9 @@
 import {
-  generateCriteria,
   fetchEventFilterFields,
   fetchTaskFilterFields,
   fetchSalesforceUsers,
-  // fetchTaskFields,
   fetchSalesforceTasksByUserIds,
   fetchSalesforceEventsByUserIds,
-  // fetchEventFields,
 } from "./../components/Api/Api";
 /**
  * @typedef {import('types').TableData} TableData
@@ -226,163 +223,82 @@ export const ONBOARD_WIZARD_STEPS = [
         },
       },
       {
-        columns: [
-          {
-            id: "select",
-            label: "Select",
-            dataType: "select",
-          },
-          {
-            id: "Subject",
-            label: "Subject",
-            dataType: "string",
-          },
-          {
-            id: "Status",
-            label: "Status",
-            dataType: "string",
-          },
-          {
-            id: "TaskSubtype",
-            label: "TaskSubtype",
-            dataType: "string",
-          },
-        ],
-        setting: "",
-        inputLabel:
-          "Select Tasks that should set an Account as 'approached'. We'll create filters from your selections - don't worry, you'll have a chance to confirm them later.",
-        inputType: "table",
-        renderEval: (priorInputValues) => {
-          return (
-            priorInputValues["meetingObject"] ===
-            "We use the task object for that"
-          );
-        },
-        dataFetcher:
-          /** @param {Settings} settings */
-          async (settings) => {
-            if (!settings.meetingObject) {
-              return {
-                success: false,
-                data: [],
-                message: "Meeting object not provided",
-              };
-            }
-
-            /** @type {string[]} */
-            const salesforceUserIds = [
-              ...(settings.teamMemberIds || []),
-              settings.salesforceUserId,
-            ];
-            const response = await fetchSalesforceTasksByUserIds(
-              salesforceUserIds
-            );
-            response.data = response.data.map(
-              /** @param {SObject} task */
-              (task) => ({ ...task, id: task.Id })
-            );
-            return response;
-          },
-      },
-      {
-        columns: [
-          {
-            id: "select",
-            label: "Select",
-            dataType: "select",
-          },
-          {
-            id: "Subject",
-            label: "Subject",
-            dataType: "string",
-          },
-          {
-            id: "EventSubtype",
-            label: "Event Subtype",
-            dataType: "string",
-          },
-          {
-            id: "Type",
-            label: "Type",
-            dataType: "string",
-          },
-        ],
-        setting: "",
-        inputType: "table",
-        inputLabel:
-          "Select Events that should set an Account as 'approached'. We'll create filters from your selections - don't worry, you'll have a chance to confirm them later.",
-        renderEval: (priorInputValues) => {
-          return (
-            priorInputValues["meetingObject"] ===
-            "We use the event object for that"
-          );
-        },
-        dataFetcher:
-          /** @param {Settings} settings */
-          async (settings) => {
-            if (!settings.meetingObject) {
-              return {
-                success: false,
-                data: [],
-                message: "Meeting object not provided",
-              };
-            }
-
-            /** @type {string[]} */
-            const salesforceUserIds = [
-              ...(settings.teamMemberIds || []),
-              settings.salesforceUserId,
-            ];
-
-            const response = await fetchSalesforceEventsByUserIds(
-              salesforceUserIds
-            );
-            response.data = response.data.map(
-              /** @param {SObject} event */
-              (event) => ({ ...event, id: event.Id })
-            );
-            return response;
-          },
-      },
-      {
         setting: "meetingsCriteria",
-        inputType: "criteria",
-        renderEval: (tableData) => {
-          return tableData && tableData["selectedIds"]
-            ? Array.from(tableData["selectedIds"]).length > 0
-            : false;
+        inputType: "prospectingCriteria",
+        inputLabel:
+          "Define criteria for Tasks/Events that should set an Account as 'approached'.",
+        renderEval: (priorInputValues) => {
+          return priorInputValues["meetingObject"] !== undefined;
         },
-        dataFetcher:
-          /**
-           * @param {TableData} tableData
-           * @return {Promise<ApiResponse>}
-           **/
-          async (tableData) => {
-            const criteriaResponse = await generateCriteria(
-              tableData.data.filter((record) =>
-                tableData.selectedIds.has(record.Id)
-              ),
-              tableData.columns
-            );
-            const filterFieldsResponse = Array.from(
-              tableData.selectedIds
-            )[0]?.startsWith("00T")
+        dataFetcher: async (settings) => {
+          if (!settings.meetingObject) {
+            return {
+              success: false,
+              data: [],
+              message: "Meeting object not provided",
+            };
+          }
+
+          const salesforceUserIds = [
+            ...(settings.teamMemberIds || []),
+            settings.salesforceUserId,
+          ];
+
+          /** @type {TableData} */
+          const tableData = {
+            columns: [
+              {
+                id: "select",
+                label: "Select",
+                dataType: "select",
+              },
+              {
+                id: "Subject",
+                label: "Subject",
+                dataType: "string",
+              },
+              {
+                id: "Status",
+                label: "Status",
+                dataType: "string",
+              },
+            ],
+            availableColumns: [],
+            data: [],
+            selectedIds: new Set(),
+          };
+          const isEvent = settings.meetingObject.toLowerCase().includes("task")
+            ? false
+            : true;
+          const tableDataResponse = !isEvent
+            ? await fetchSalesforceTasksByUserIds(salesforceUserIds)
+            : await fetchSalesforceEventsByUserIds(salesforceUserIds);
+          tableData.data = tableDataResponse.data.map(
+            /** @param {SObject} item */ (item) => ({
+              ...item,
+              id: item.Id,
+            })
+          );
+
+          const fieldsResponse = !isEvent
+            ? await fetchTaskFilterFields()
+            : await fetchEventFilterFields();
+          tableData.availableColumns = fieldsResponse.data.map(
+            /**@param {SObjectField} field*/ (field) => ({
+              id: field.name,
+              label: field.label,
+              dataType: field.type,
+            })
+          );
+          return { success: true, data: tableData, message: "" };
+        },
+        fetchFilterFields: async (settings) => {
+          const response =
+            settings.meetingObject === "We use the task object for that"
               ? await fetchTaskFilterFields()
               : await fetchEventFilterFields();
-
-            return {
-              success: criteriaResponse.success && filterFieldsResponse.success,
-              message: criteriaResponse.message || filterFieldsResponse.message,
-              data: [
-                {
-                  filterContainer: criteriaResponse.data[0],
-                  filterFields: filterFieldsResponse.data,
-                  filterOperatorMapping: FILTER_OPERATOR_MAPPING,
-                  hasNameField: true,
-                },
-              ],
-            };
-          },
+          return response.data;
+        },
       },
     ],
     descriptionRenderer: (description) => {
