@@ -754,13 +754,18 @@ def create_activation(
 def create_prospecting_effort(
     activation_id, status, date_entered, tasks, task_ids_by_criteria_name
 ):
+    date_value_date_entered=None
+    if isinstance(date_entered, datetime):
+        date_value_date_entered = date_entered.date()
+    else:
+        date_value_date_entered = date_entered
     return ProspectingEffort(
         activation_id=activation_id,
         prospecting_metadata=create_prospecting_metadata(
             [task["Id"] for task in tasks], task_ids_by_criteria_name, tasks
         ),
         status=status,
-        date_entered=date_entered,
+        date_entered=date_value_date_entered,
         task_ids=[task["Id"] for task in tasks],
     )
 
