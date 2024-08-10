@@ -222,7 +222,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                         activation_id=activation.id,
                         prospecting_metadata=[],
                         status=new_status,
-                        date_entered=task_created_datetime,
+                        date_entered=task_created_datetime.date(),
                         task_ids=[],
                     )
                     activation.prospecting_effort.append(new_pe)
@@ -277,15 +277,27 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                 activation.days_engaged = (today - activation.engaged_date).days
 
             # Update opportunity if necessary
-            if opportunities and activation.status == StatusEnum.opportunity_created:
-                activation.opportunity = convert_dict_to_opportunity(opportunities[0])
+            activation.opportunity = (
+                convert_dict_to_opportunity(opportunities[0]) if opportunities else None
+            )
+            if (
+                activation.opportunity
+                and activation.status != StatusEnum.opportunity_created
+            ):
+                activation.status = StatusEnum.opportunity_created
 
             # Update meeting/event if necessary
-            if meetings and activation.status in [
-                StatusEnum.meeting_set,
-                StatusEnum.opportunity_created,
-            ]:
-                activation.event_ids = [meeting["Id"] for meeting in meetings]
+            if meetings:
+                if activation.event_ids is None:
+                    activation.event_ids = []
+                activation.event_ids.extend([meeting["Id"] for meeting in meetings])
+
+            if (
+                activation.event_ids
+                and len(activation.event_ids) > 0
+                and activation.status in [StatusEnum.activated, StatusEnum.engaged]
+            ):
+                activation.status = StatusEnum.meeting_set
 
         response.data = list(activations_by_account_id.values())
         response.success = True
@@ -494,6 +506,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     last_prospecting_activity = parse_datetime_string_with_timezone(
                         task.get("CreatedDate")
                     ).date()
+
+                    is_active_via_meeting_or_opportunity = len(active_contact_ids) == 0
+                    active_contact_ids = (
+                        list(valid_task_ids_by_who_id.keys())
+                        if is_active_via_meeting_or_opportunity
+                        else active_contact_ids
+                    )
                     activation = create_activation(
                         contact_by_id,
                         account_first_prospecting_activity,
@@ -526,6 +545,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             last_prospecting_activity = parse_datetime_string_with_timezone(
                 task.get("CreatedDate")
             ).date()
+
+            is_active_via_meeting_or_opportunity = len(active_contact_ids) == 0
+            active_contact_ids = (
+                list(valid_task_ids_by_who_id.keys())
+                if is_active_via_meeting_or_opportunity
+                else active_contact_ids
+            )
             activation = create_activation(
                 contact_by_id,
                 account_first_prospecting_activity,

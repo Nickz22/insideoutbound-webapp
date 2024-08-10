@@ -128,6 +128,26 @@ def response_based_on_query(url, **kwargs):
         raise Exception(f"An error occurred while processing the query: {str(e)}")
 
 
+def get_one_mock_task_per_contact_for_contains_content_criteria_query_x(contacts):
+    mock_tasks = []
+    for contact in contacts:
+        mock_task = copy.deepcopy(mock_tasks_for_criteria_with_contains_content[0])
+        mock_task["Id"] = f"mock_task_id_{contact['Id']}"
+        mock_task["WhoId"] = contact["Id"]
+        mock_task["OwnerId"] = "mock_user_id"
+        mock_tasks.append(mock_task)
+    return mock_tasks
+
+def get_one_mock_task_per_contact_for_unique_content_criteria_query_x(contacts):
+    mock_tasks = []
+    for contact in contacts:
+        mock_task = copy.deepcopy(mock_tasks_for_criteria_with_unique_values_content[0])
+        mock_task["Id"] = f"mock_task_id_{contact['Id']}"
+        mock_task["WhoId"] = contact["Id"]
+        mock_task["OwnerId"] = "mock_user_id"
+        mock_tasks.append(mock_task)
+    return mock_tasks
+
 # mock data
 def get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
     n, x, assignee_id
@@ -140,6 +160,7 @@ def get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
     for i in range(x):
         for j in range(n):
             task_copy = copy.deepcopy(mock_tasks_for_criteria_with_contains_content[j])
+            task_copy["Id"] = f"mock_task_id_{i}_{j}"
             task_copy["WhoId"] = MOCK_CONTACT_IDS[i]
             task_copy["OwnerId"] = assignee_id
             cloned_tasks.append(task_copy)
@@ -159,6 +180,7 @@ def get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(
             task_copy = copy.deepcopy(
                 mock_tasks_for_criteria_with_unique_values_content[j]
             )
+            task_copy["Id"] = f"mock_task_id_{i}_{j}"
             task_copy["WhoId"] = MOCK_CONTACT_IDS[i]
             task_copy["OwnerId"] = assignee_id
             cloned_tasks.append(task_copy)
@@ -224,7 +246,23 @@ def get_ten_mock_contacts_spread_across_five_accounts():
     return contacts
 
 
-def get_five_mock_accounts():
+def get_two_mock_contacts_per_account(accounts):
+    mock_contacts = []
+    for account in accounts:
+        for i in range(2):
+            contact = {
+                "Id": f"mock_contact_id_{account['Id']}_{i}",
+                "FirstName": f"MockFirstName_{account['Id']}_{i}",
+                "LastName": f"MockLastName_{account['Id']}_{i}",
+                "AccountId": account["Id"],
+                "Account": {"Id": account["Id"], "Name": account["Name"]},
+            }
+            mock_contacts.append(contact)
+
+    return mock_contacts
+
+
+def get_five_mock_accounts(owner_id="mock_owner_id"):
     accounts = []
     for i, account_id in enumerate(MOCK_ACCOUNT_IDS):
         account = {
@@ -240,7 +278,7 @@ def get_mock_opportunity_for_account(account_id):
         "Id": f"mock_opportunity_id_{random.randint(1000, 9999)}",
         "Name": "Mock Opportunity",
         "AccountId": account_id,
-        "Amount": round(random.uniform(1000, 100000), 2),
+        "Amount": 1733.42,
         "StageName": "Prospecting",
         "CreatedDate": today,
         "CloseDate": datetime.today().date().isoformat(),
