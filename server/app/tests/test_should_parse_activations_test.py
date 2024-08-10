@@ -47,6 +47,7 @@ from app.tests.mocks import (
     get_five_mock_accounts,
     get_two_mock_contacts_per_account,
     get_one_mock_task_per_contact_for_contains_content_criteria_query_x,
+    get_one_mock_task_per_contact_for_unique_content_criteria_query_x,
 )
 
 mock_user_id = "mock_user_id"
@@ -260,15 +261,15 @@ class TestActivationLogic(unittest.TestCase):
 
         self.assertEqual((last_date - first_date).days, 1)
 
-                ## the event will have 2 prospecting efforts because the Tasks under the same Activation
+        ## the event will have 2 prospecting efforts because the Tasks under the same Activation
         ## were created before the Event...if no Tasks are created while the Activation is in a certain Status
         ### the Activation won't get a Prospecting Effort created for that status
         meeting_set_activation_prospecting_effort: List[ProspectingEffort] = (
             meeting_set_activation["prospecting_effort"]
         )
-        
+
         self.assertEqual(len(meeting_set_activation_prospecting_effort), 2)
-        
+
         meeting_prospecting_effort_for_activated_status = [
             pe
             for pe in meeting_set_activation_prospecting_effort
@@ -279,42 +280,42 @@ class TestActivationLogic(unittest.TestCase):
             for pe in meeting_set_activation_prospecting_effort
             if pe["status"] == "Engaged"
         ]
-        
+
         exactly_one_activated_prospecting_effort_for_activated_status = (
             len(meeting_prospecting_effort_for_activated_status) == 1
         )
         self.assertTrue(exactly_one_activated_prospecting_effort_for_activated_status)
-        
+
         exactly_one_engaged_prospecting_effort_for_engaged_status = (
             len(meeting_prospecting_effort_for_engaged_status) == 1
         )
         self.assertTrue(exactly_one_engaged_prospecting_effort_for_engaged_status)
-        
+
         meeting_prospecting_effort_for_activated_status = (
             meeting_prospecting_effort_for_activated_status[0]
         )
-        
+
         ## Since the activating Task was "Inbound", the activation was immediately set to "Engaged" and no
         ### no Tasks were attributed to the "Activated" status
         self.assertEqual(
             len(meeting_prospecting_effort_for_activated_status["task_ids"]), 0
         )
-        
+
         meeting_prospecting_effort_for_engaged_status = (
             meeting_prospecting_effort_for_engaged_status[0]
         )
         self.assertEqual(
             len(meeting_prospecting_effort_for_engaged_status["task_ids"]), 2
         )
-        
+
         ## the opportunity will have 3 prospecting efforts because
         ### it has tasks spanning the "Engaged" and "Opportunity Created" statuses - "Activated" status automatically gets a prospecting effort
-        
+
         opportunity_created_activation_prospecting_effort: List[ProspectingEffort] = (
             opportunity_created_activation["prospecting_effort"]
         )
         self.assertEqual(len(opportunity_created_activation_prospecting_effort), 3)
-        
+
         opportunity_prospecting_effort_for_activated_status = [
             pe
             for pe in opportunity_created_activation_prospecting_effort
@@ -330,22 +331,24 @@ class TestActivationLogic(unittest.TestCase):
             for pe in opportunity_created_activation_prospecting_effort
             if pe["status"] == "Opportunity Created"
         ]
-        
+
         exactly_one_activated_prospecting_effort_for_opportunity = (
             len(opportunity_prospecting_effort_for_activated_status) == 1
         )
         self.assertTrue(exactly_one_activated_prospecting_effort_for_opportunity)
-        
+
         exactly_one_engaged_prospecting_effort_for_opportunity = (
             len(opportunity_prospecting_effort_for_engaged_status) == 1
         )
         self.assertTrue(exactly_one_engaged_prospecting_effort_for_opportunity)
-        
+
         exactly_one_opportunity_created_prospecting_effort_for_opportunity = (
             len(opportunity_prospecting_effort_for_opportunity_created_status) == 1
         )
-        self.assertTrue(exactly_one_opportunity_created_prospecting_effort_for_opportunity)
-        
+        self.assertTrue(
+            exactly_one_opportunity_created_prospecting_effort_for_opportunity
+        )
+
         opportunity_prospecting_effort_for_activated_status = (
             opportunity_prospecting_effort_for_activated_status[0]
         )
@@ -354,72 +357,125 @@ class TestActivationLogic(unittest.TestCase):
         self.assertEqual(
             len(opportunity_prospecting_effort_for_activated_status["task_ids"]), 0
         )
-        
+
         ## Since one of the activating Tasks was created before the Opportunity, it was attributed to the "Engaged" status
         opportunity_prospecting_effort_for_engaged_status = (
             opportunity_prospecting_effort_for_engaged_status[0]
         )
-        
+
         self.assertEqual(
             len(opportunity_prospecting_effort_for_engaged_status["task_ids"]), 1
         )
-        
+
         ## Since one of the activating Tasks was created after the Opportunity, it was attributed to the "Opportunity Created" status
         opportunity_prospecting_effort_for_opportunity_created_status = (
             opportunity_prospecting_effort_for_opportunity_created_status[0]
         )
         self.assertEqual(
-            len(opportunity_prospecting_effort_for_opportunity_created_status["task_ids"]), 1
+            len(
+                opportunity_prospecting_effort_for_opportunity_created_status[
+                    "task_ids"
+                ]
+            ),
+            1,
         )
-        
-        
-        
-        
 
-    # @patch("requests.get")
-    # def test_should_increment_existing_activation_to_opportunity_created_status_when_opportunity_is_created_under_previously_activated_account(
-    #     self, mock_sobject_fetch
-    # ):
-    #     # setup mock api responses for one account activated via meeting set and another via opportunity created
-    #     self.setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
-    #     mock_sobject_fetch.side_effect = response_based_on_query
+    @patch("requests.get")
+    def test_should_increment_existing_activation_to_opportunity_created_status_when_opportunity_is_created_under_previously_activated_account(
+        self, mock_sobject_fetch
+    ):
+        # setup mock api responses for one account activated via meeting set and another via opportunity created
+        self.setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
+        mock_sobject_fetch.side_effect = response_based_on_query
 
-    #     activations = self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )
+        activations = self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )[0].get("raw_data")
 
-    #     meeting_set_activation = next(
-    #         a for a in activations if a["status"] == "Meeting Set"
-    #     )
+        meeting_set_activation: Activation = next(
+            a for a in activations if a["status"] == "Meeting Set"
+        )
 
-    #     add_mock_response("fetch_contacts_by_account_ids", [])
-    #     add_mock_response(
-    #         "fetch_opportunities_by_account_ids_from_date",
-    #         [get_mock_opportunity_for_account(meeting_set_activation["account"]["id"])],
-    #     )
-    #     add_mock_response("fetch_contacts_by_account_ids", [])
-    #     add_mock_response(
-    #         "fetch_events_by_account_ids_from_date",
-    #         [],
-    #     )
-    #     add_mock_response("fetch_accounts_not_in_ids", [])
+        mock_contacts_for_more_tasks = [
+            {"Id": contact_id}
+            for contact_id in meeting_set_activation["active_contact_ids"]
+        ]
+        for contact in mock_contacts_for_more_tasks:
+            contact["AccountId"] = meeting_set_activation["account"]["id"]
+            contact["FirstName"] = "FirstName"
+            contact["LastName"] = "LastName"
+            contact["Account"] = {
+                "Id": meeting_set_activation["account"]["id"],
+                "Name": "Mock Account Name",
+            }
 
-    #     increment_activations_response = self.client.post(
-    #         "/fetch_prospecting_activity", headers=self.api_header
-    #     )
-    #     payload = json.loads(increment_activations_response.data)
-    #     self.assertEqual(
-    #         increment_activations_response.status_code, 200, payload["message"]
-    #     )
+        add_mock_response("fetch_contacts_by_account_ids", mock_contacts_for_more_tasks)
+        # setup mock api response to return an opportunity for the account activated via meeting set
+        mock_opportunity = get_mock_opportunity_for_account(
+            meeting_set_activation["account"]["id"]
+        )
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [mock_opportunity],
+        )
 
-    #     self.assertTrue(
-    #         any(
-    #             activation["status"] == "Opportunity Created"
-    #             and activation["event_ids"]
-    #             for activation in payload["data"]
-    #         ),
-    #         "No Activation with Status 'Opportunity Created' and non-empty 'event_ids' found",
-    #     )
+        mock_tasks = get_one_mock_task_per_contact_for_unique_content_criteria_query_x(
+            mock_contacts_for_more_tasks
+        )
+        for mock_task in mock_tasks:
+            mock_task["Id"] = f"new_mock_task_id_{mock_task['WhoId']}"
+        add_mock_response("contains_content_criteria_query", [])
+        add_mock_response("unique_values_content_criteria_query", mock_tasks)
+        add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response(
+            "fetch_events_by_account_ids_from_date",
+            [],
+        )
+        add_mock_response("fetch_accounts_not_in_ids", [])
+
+        increment_activations_response = self.client.post(
+            "/fetch_prospecting_activity", headers=self.api_header
+        )
+        payload = json.loads(increment_activations_response.data)
+        self.assertEqual(
+            increment_activations_response.status_code, 200, payload["message"]
+        )
+
+        # Isolate the activation which meets the criteria
+        activation_with_opportunity_created = [
+            activation
+            for activation in payload["data"][0].get("raw_data")
+            if activation["status"] == "Opportunity Created" and activation["event_ids"]
+        ]
+
+        # Assert that there is at least one activation meeting the criteria
+        self.assertTrue(
+            len(activation_with_opportunity_created) > 0,
+            "No Activation with Status 'Opportunity Created' and non-empty 'event_ids' found",
+        )
+
+        prospecting_effort: List[ProspectingEffort] = (
+            activation_with_opportunity_created[0]["prospecting_effort"]
+        )
+        self.assertEqual(len(prospecting_effort), 3)
+
+        activated_prospecting_effort = [
+            pe for pe in prospecting_effort if pe["status"] == "Activated"
+        ]
+        engaged_prospecting_effort = [
+            pe for pe in prospecting_effort if pe["status"] == "Engaged"
+        ]
+        opportunity_created_prospecting_effort = [
+            pe for pe in prospecting_effort if pe["status"] == "Opportunity Created"
+        ]
+
+        self.assertEqual(len(activated_prospecting_effort), 1)
+        self.assertEqual(len(engaged_prospecting_effort), 1)
+        self.assertEqual(len(opportunity_created_prospecting_effort), 1)
+
+        self.assertEqual(len(activated_prospecting_effort[0]["task_ids"]), 0)
+        self.assertEqual(len(engaged_prospecting_effort[0]["task_ids"]), 2)
+        self.assertEqual(len(opportunity_created_prospecting_effort[0]["task_ids"]), 2)
 
     # @patch("requests.get")
     # def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
@@ -624,7 +680,7 @@ class TestActivationLogic(unittest.TestCase):
         mock_accounts = get_five_mock_accounts()
         for account in mock_accounts:
             account["OwnerId"] = mock_user_id
-            
+
         ## This Opportunity must be created before the mock tasks are created
         mock_opportunity = get_mock_opportunity_for_account(mock_accounts[0]["Id"])
         mock_opportunity["OwnerId"] = mock_user_id

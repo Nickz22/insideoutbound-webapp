@@ -138,6 +138,15 @@ def get_one_mock_task_per_contact_for_contains_content_criteria_query_x(contacts
         mock_tasks.append(mock_task)
     return mock_tasks
 
+def get_one_mock_task_per_contact_for_unique_content_criteria_query_x(contacts):
+    mock_tasks = []
+    for contact in contacts:
+        mock_task = copy.deepcopy(mock_tasks_for_criteria_with_unique_values_content[0])
+        mock_task["Id"] = f"mock_task_id_{contact['Id']}"
+        mock_task["WhoId"] = contact["Id"]
+        mock_task["OwnerId"] = "mock_user_id"
+        mock_tasks.append(mock_task)
+    return mock_tasks
 
 # mock data
 def get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
