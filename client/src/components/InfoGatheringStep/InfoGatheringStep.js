@@ -16,6 +16,7 @@ import {
 import { generateCriteria } from "../Api/Api";
 import parse from "html-react-parser";
 import ProspectingCriteriaSelector from "../ProspectingCriteriaSelector/ProspectingCriteriaSelector";
+import CustomTable from "../CustomTable/CustomTable";
 
 /**
  * @typedef {import('types').OnboardWizardStepInput} OnboardWizardStepInput
@@ -57,30 +58,53 @@ const InfoGatheringStep = ({
 
   useEffect(() => {
     const fetchData = async () => {
-      const criteriaInput = stepData.inputs.find(
+      const criteriaOrTableInput = stepData.inputs.find(
         /** @param {OnboardWizardStepInput} input */
-        (input) => input.inputType === "prospectingCriteria"
+        (input) =>
+          input.inputType === "prospectingCriteria" ||
+          input.inputType === "table"
       );
-      if (criteriaInput && criteriaInput.renderEval(inputValues)) {
-        setLoadingState(criteriaInput.setting, true);
+      if (
+        criteriaOrTableInput &&
+        criteriaOrTableInput.renderEval(inputValues)
+      ) {
+        setLoadingState(criteriaOrTableInput.setting, true);
         try {
-          const data = await criteriaInput.dataFetcher({
+          const data = await criteriaOrTableInput.dataFetcher({
             ...settingsRef.current,
             ...inputValues,
           });
-          setTableData({ ...data.data });
+
+          const isProspectingCriteria =
+            criteriaOrTableInput.inputType === "prospectingCriteria";
+
+          const tableData = isProspectingCriteria
+            ? data.data
+            : {
+                availableColumns: criteriaOrTableInput.availableColumns,
+                columns: criteriaOrTableInput.columns,
+                data: data.data,
+                selectedIds: new Set(),
+              };
+
+          setTableData(tableData);
           onTableDisplay(true);
 
-          const fields = await criteriaInput.fetchFilterFields({
-            ...settingsRef.current,
-            ...inputValues,
-          });
-          setFilterFields(fields);
+          if (isProspectingCriteria) {
+            const fields = await criteriaOrTableInput.fetchFilterFields({
+              ...settingsRef.current,
+              ...inputValues,
+            });
+            setFilterFields(fields);
+          }
         } catch (error) {
           console.error("Error fetching data:", error);
         } finally {
-          setLoadingState(criteriaInput.setting, false);
+          setLoadingState(criteriaOrTableInput.setting, false);
         }
+      } else {
+        setTableData(null);
+        onTableDisplay(false);
       }
     };
 
@@ -108,6 +132,16 @@ const InfoGatheringStep = ({
       }))
     );
     onComplete(completedInputs);
+  };
+
+  const handleTableSelectionChange = (newSelectedIds) => {
+    setTableData((prev) =>
+      prev ? { ...prev, selectedIds: newSelectedIds } : null
+    );
+  };
+
+  const handleColumnsChange = (newColumns) => {
+    setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
   };
 
   const handleProspectingFilterChange = (updatedFilter, setting) => {
@@ -180,6 +214,28 @@ const InfoGatheringStep = ({
           </Tooltip>
         ) : (
           inputComponent
+        );
+      case "table":
+        return (
+          <Box sx={{ mt: 2, mb: 2 }}>
+            {isLoading ? (
+              <CircularProgress />
+            ) : (
+              tableData && (
+                <>
+                  <Typography variant="caption" gutterBottom>
+                    {input.inputLabel}
+                  </Typography>
+                  <CustomTable
+                    tableData={tableData}
+                    onSelectionChange={handleTableSelectionChange}
+                    onColumnsChange={handleColumnsChange}
+                    paginate={true}
+                  />
+                </>
+              )
+            )}
+          </Box>
         );
       case "prospectingCriteria":
         return (
