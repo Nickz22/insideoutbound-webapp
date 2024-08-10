@@ -229,15 +229,12 @@ const Settings = () => {
 
   const handleCriteriaChange = useCallback(
     (index, newContainer) => {
-      setCriteria((prevCriteria) => {
-        const newCriteria = [...prevCriteria];
+      setSettings((prev) => {
+        const newCriteria = [...prev.criteria];
         newCriteria[index] = newContainer;
-        setSettings((prev) => {
-          const updatedSettings = { ...prev, criteria: newCriteria };
-          debouncedSaveSettings(updatedSettings);
-          return updatedSettings;
-        });
-        return newCriteria;
+        const updatedSettings = { ...prev, criteria: newCriteria };
+        debouncedSaveSettings(updatedSettings);
+        return updatedSettings;
       });
     },
     [debouncedSaveSettings]

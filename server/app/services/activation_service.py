@@ -582,13 +582,10 @@ def create_activation(
     )
 
     engaged_date = (
-        parse_datetime_string_with_timezone(first_inbound_task["CreatedDate"]).date()
+        parse_datetime_string_with_timezone(first_inbound_task["CreatedDate"])
         if first_inbound_task
         else None
     )
-
-    if engaged_date != None and isinstance(engaged_date, datetime):
-        engaged_date = engaged_date.date()
 
     # Determine the activated_date based on the activation condition
     if qualifying_opportunity:
@@ -629,8 +626,8 @@ def create_activation(
         account=contact_by_id[active_contact_ids[0]].account,
         activated_date=activated_date,
         days_activated=(today - activated_date).days,
-        engaged_date=engaged_date,
-        days_engaged=(today - engaged_date).days if engaged_date else None,
+        engaged_date=engaged_date.date() if engaged_date else None,
+        days_engaged=(today - engaged_date.date()).days if engaged_date else None,
         active_contact_ids=active_contact_ids,
         activated_by_id=last_valid_task_creator_id,
         first_prospecting_activity=account_first_prospecting_activity,
