@@ -1,5 +1,8 @@
-import unittest, json, os
+import unittest, json, os, sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from unittest.mock import patch
+from typing import List
 
 from app.data_models import (
     SettingsModel,
@@ -57,7 +60,7 @@ class TestActivationLogic(unittest.TestCase):
 
         self.setup_mock_user()
         # save dummy access tokens because the OAuth flow is pretty hard to write a test for right now
-        mock_token_data: TokenData = TokenData(
+        mock_token_data = TokenData(
             access_token="mock_access_token",
             refresh_token="mock_refresh_token",
             instance_url="mock_instance_url",
@@ -149,26 +152,26 @@ class TestActivationLogic(unittest.TestCase):
         # clear any mock api responses setup by last test
         clear_mocks()
 
-    # @patch("requests.get")
-    # def test_should_create_new_activation_when_sufficient_prospecting_activities_are_in_salesforce(
-    #     self, mock_sobject_fetch
-    # ):
+    @patch("requests.get")
+    def test_should_create_new_activation_when_sufficient_prospecting_activities_are_in_salesforce(
+        self, mock_sobject_fetch
+    ):
 
-    #     self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
+        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
 
-    #     mock_sobject_fetch.side_effect = response_based_on_query
-    #     activations = self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )[0]["raw_data"]
+        mock_sobject_fetch.side_effect = response_based_on_query
+        activations = self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )[0]["raw_data"]
 
-    #     self.assertEqual(5, len(activations))
-    #     self.assertTrue(
-    #         any(
-    #             activation["status"] == "Opportunity Created"
-    #             for activation in activations
-    #         ),
-    #         "No Activation with Status 'Opportunity Created' found",
-    #     )
+        self.assertEqual(5, len(activations))
+        self.assertTrue(
+            any(
+                activation["status"] == "Opportunity Created"
+                for activation in activations
+            ),
+            "No Activation with Status 'Opportunity Created' found",
+        )
 
     # @patch("requests.get")
     # def test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce(
@@ -473,7 +476,7 @@ class TestActivationLogic(unittest.TestCase):
         """
         constructs a settings model and saves it via the save_settings API
         """
-        columns: list[TableColumn] = [
+        columns: List[TableColumn] = [
             {
                 "id": "Status",
                 "dataType": DataType.STRING,
