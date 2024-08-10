@@ -494,6 +494,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     last_prospecting_activity = parse_datetime_string_with_timezone(
                         task.get("CreatedDate")
                     ).date()
+
+                    is_active_via_meeting_or_opportunity = len(active_contact_ids) == 0
+                    active_contact_ids = (
+                        list(valid_task_ids_by_who_id.keys())
+                        if is_active_via_meeting_or_opportunity
+                        else active_contact_ids
+                    )
                     activation = create_activation(
                         contact_by_id,
                         account_first_prospecting_activity,
@@ -526,6 +533,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             last_prospecting_activity = parse_datetime_string_with_timezone(
                 task.get("CreatedDate")
             ).date()
+            
+            is_active_via_meeting_or_opportunity = len(active_contact_ids) == 0
+            active_contact_ids = (
+                list(valid_task_ids_by_who_id.keys())
+                if is_active_via_meeting_or_opportunity
+                else active_contact_ids
+            )
             activation = create_activation(
                 contact_by_id,
                 account_first_prospecting_activity,
