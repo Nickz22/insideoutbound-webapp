@@ -67,9 +67,11 @@ const DataFilter = ({ fields, onFilter, onClear }) => {
       <Button onClick={handleApplyFilter} variant="contained" size="small">
         Apply
       </Button>
-      <Button onClick={handleClearFilter} variant="outlined" size="small">
-        Clear
-      </Button>
+      {filterValue && (
+        <Button onClick={handleClearFilter} variant="outlined" size="small">
+          Clear
+        </Button>
+      )}
     </Box>
   );
 };

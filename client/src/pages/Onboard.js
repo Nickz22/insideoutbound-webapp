@@ -210,9 +210,11 @@ const Onboard = () => {
 
   /**
    * Formats the settings data from the form responses.
-   * @returns {Object} The formatted settings data matching the Supabase Settings table structure.
+   * @returns {Settings} The formatted settings data matching the Supabase Settings table structure.
    */
   const getSettingsFromResponses = () => {
+    const now = new Date();
+    const threeMonthsAgo = new Date(now.setMonth(now.getMonth() - 3));
     return {
       inactivityThreshold: parseInt(
         gatheringResponses["inactivityThreshold"]?.value,
@@ -240,6 +242,7 @@ const Onboard = () => {
         (salesforceUser) => salesforceUser.id
       ),
       salesforceUserId: gatheringResponses["salesforceUserId"]?.value,
+      latestDateQueried: threeMonthsAgo.toISOString(),
     };
   };
 
