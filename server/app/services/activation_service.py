@@ -110,11 +110,14 @@ def find_unresponsive_activations(
                     all_tasks.append(task)
 
             found_prospecting_activity = False
+            last_prospecting_activity_naive = datetime.combine(
+                activation.last_prospecting_activity, datetime.min.time()
+            )
             for task in all_tasks:
                 is_task_within_inactivity_threshold = is_model_date_field_within_window(
                     task,
-                    activation.last_prospecting_activity,
-                    settings["inactivity_threshold"],
+                    last_prospecting_activity_naive,
+                    settings.inactivity_threshold,
                 )
                 if is_task_within_inactivity_threshold:
                     found_prospecting_activity = True
@@ -265,9 +268,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     )
 
                 # Update engagement date if necessary
-                if not activation.engaged_date and is_inbound_task(
-                    task, settings.criteria
-                ):
+                if not activation.engaged_date and is_inbound_criteria(settings.criteria):
                     activation.engaged_date = task_created_datetime.date()
 
             # Update activation status and dates
@@ -307,12 +308,9 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
     return response
 
 
-def is_inbound_task(task, criteria):
+def is_inbound_criteria(task, criteria):
     for criterion in criteria:
-        if (
-            criterion.name == task["TaskSubtype"]
-            and criterion.direction.lower() == "inbound"
-        ):
+        if criterion.direction.lower() == "inbound":
             return True
     return False
 
@@ -338,7 +336,7 @@ def get_new_status(
         and activation.status != StatusEnum.opportunity_created
     ):
         return StatusEnum.meeting_set
-    elif activation.status == StatusEnum.activated and is_inbound_task(task, criteria):
+    elif activation.status == StatusEnum.activated and is_inbound_criteria(criteria):
         return StatusEnum.engaged
 
     return activation.status

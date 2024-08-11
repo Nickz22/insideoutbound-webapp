@@ -5,6 +5,7 @@ import React, {
   useCallback,
   useMemo,
 } from "react";
+import "./Prospecting.css";
 import { useNavigate } from "react-router-dom";
 import {
   Box,
@@ -16,7 +17,7 @@ import {
   MenuItem,
   Card,
   CardContent,
-  CircularProgress,
+  LinearProgress,
   IconButton,
   Tooltip,
   Link,
@@ -34,7 +35,7 @@ import {
   TimelineDot,
 } from "@mui/lab";
 import RefreshIcon from "@mui/icons-material/Refresh";
-import DataFilter from "./../components/DataFilter/DataFilter";
+import DataFilter from "../../components/DataFilter/DataFilter";
 import {
   fetchSalesforceUsers,
   fetchProspectingActivities,
@@ -42,8 +43,8 @@ import {
   getInstanceUrl,
   generateActivationSummary,
 } from "src/components/Api/Api";
-import MetricCard from "../components/MetricCard/MetricCard";
-import CustomTable from "../components/CustomTable/CustomTable";
+import MetricCard from "../../components/MetricCard/MetricCard";
+import CustomTable from "../../components/CustomTable/CustomTable";
 
 /**
  * @typedef {import('types').Activation} Activation
@@ -101,7 +102,7 @@ const Prospecting = () => {
             break;
           case 400:
           case 401:
-            if (response.message.toLowerCase().includes("session expired")) {
+            if (response.message.toLowerCase().includes("session")) {
               navigate("/");
             } else {
               setError(response.message);
@@ -302,6 +303,27 @@ const Prospecting = () => {
     return filterDataByPeriod(filtered, period);
   }, [rawData, selectedActivatedBy, dataFilter, filterDataByPeriod, period]);
 
+  const getLoadingComponent = (message) => {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+          width: "100%",
+        }}
+      >
+        <Box sx={{ width: "100%", maxWidth: 400, textAlign: "center" }}>
+          <Typography variant="h6" gutterBottom>
+            {message}
+          </Typography>
+          <LinearProgress />
+        </Box>
+      </Box>
+    );
+  };
+
   const tableColumns = [
     { id: "id", label: "ID", dataType: "text" },
     { id: "account.name", label: "Account Name", dataType: "component" },
@@ -371,18 +393,7 @@ const Prospecting = () => {
   }, [filteredData]);
 
   if (loading) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-        }}
-      >
-        <CircularProgress />
-      </Box>
-    );
+    return getLoadingComponent("Looking for prospecting activities...");
   }
 
   if (error) {
@@ -464,32 +475,12 @@ const Prospecting = () => {
         </Box>
       </Box>
 
-      {loading ? (
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-            height: "50vh",
-          }}
-        >
-          <CircularProgress />
-        </Box>
-      ) : error ? (
+      {error ? (
         <Alert severity="error">{error}</Alert>
       ) : view === "Summary" ? (
         <Grid container spacing={2}>
           {summaryLoading ? (
-            <Box
-              sx={{
-                display: "flex",
-                justifyContent: "center",
-                width: "100%",
-                mt: 4,
-              }}
-            >
-              <CircularProgress />
-            </Box>
+            getLoadingComponent("Generating summary...")
           ) : (
             <>
               <Grid item xs={12} sm={6} md={4} lg={4}>
