@@ -1,4 +1,3 @@
-// DataFilter.js
 import React, { useState } from "react";
 import {
   Box,
@@ -9,13 +8,20 @@ import {
   Tooltip,
 } from "@mui/material";
 
-const DataFilter = ({ fields, onFilter }) => {
+const DataFilter = ({ fields, onFilter, onClear }) => {
   const [selectedField, setSelectedField] = useState("");
   const [operator, setOperator] = useState("equals");
   const [filterValue, setFilterValue] = useState("");
 
   const handleApplyFilter = () => {
     onFilter({ field: selectedField, operator, value: filterValue });
+  };
+
+  const handleClearFilter = () => {
+    setSelectedField("");
+    setOperator("equals");
+    setFilterValue("");
+    onClear();
   };
 
   return (
@@ -60,6 +66,9 @@ const DataFilter = ({ fields, onFilter }) => {
       />
       <Button onClick={handleApplyFilter} variant="contained" size="small">
         Apply
+      </Button>
+      <Button onClick={handleClearFilter} variant="outlined" size="small">
+        Clear
       </Button>
     </Box>
   );

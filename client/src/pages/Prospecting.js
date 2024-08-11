@@ -45,6 +45,10 @@ import {
 import MetricCard from "../components/MetricCard/MetricCard";
 import CustomTable from "../components/CustomTable/CustomTable";
 
+/**
+ * @typedef {import('types').Activation} Activation
+ */
+
 const Prospecting = () => {
   const [period, setPeriod] = useState("All");
   const [view, setView] = useState("Summary");
@@ -60,6 +64,7 @@ const Prospecting = () => {
   const navigate = useNavigate();
 
   const [dataFilter, setDataFilter] = useState(null);
+  const [originalRawData, setOriginalRawData] = useState([]);
 
   const accountFields = useMemo(() => {
     if (rawData.length === 0) return [];
@@ -72,6 +77,11 @@ const Prospecting = () => {
   const handleDataFilter = useCallback((filter) => {
     setDataFilter(filter);
   }, []);
+
+  const handleClearFilter = useCallback(() => {
+    setDataFilter(null);
+    setRawData(originalRawData); // Reset to original data
+  }, [originalRawData]);
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
@@ -87,6 +97,7 @@ const Prospecting = () => {
           case 200:
             setSummaryData(response.data[0].summary);
             setRawData(response.data[0].raw_data || []);
+            setOriginalRawData(response.data[0].raw_data || []);
             break;
           case 400:
           case 401:
@@ -268,6 +279,7 @@ const Prospecting = () => {
   };
 
   const filteredData = useMemo(() => {
+    /** @type {Activation[]} */
     let filtered = rawData;
     if (selectedActivatedBy) {
       filtered = filtered.filter(
@@ -284,6 +296,8 @@ const Prospecting = () => {
         }
         return true;
       });
+    } else {
+      filtered = rawData;
     }
     return filterDataByPeriod(filtered, period);
   }, [rawData, selectedActivatedBy, dataFilter, filterDataByPeriod, period]);
@@ -385,7 +399,11 @@ const Prospecting = () => {
           marginBottom: "16px",
         }}
       >
-        <DataFilter fields={accountFields} onFilter={handleDataFilter} />
+        <DataFilter
+          fields={accountFields}
+          onFilter={handleDataFilter}
+          onClear={handleClearFilter}
+        />
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
             <InputLabel id="period-label">Period</InputLabel>

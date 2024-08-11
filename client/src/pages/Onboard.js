@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, Box, Paper } from "@mui/material";
+import { Dialog, DialogContent, Box, Paper, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import ProspectingCriteriaSelector from "../components/ProspectingCriteriaSelector/ProspectingCriteriaSelector";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
@@ -325,15 +325,21 @@ const Onboard = () => {
       );
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
       return (
-        <ProspectingCriteriaSelector
-          title="Prospecting Activity Criteria"
-          initialFilterContainers={filters}
-          filterFields={taskFilterFields.current}
-          tableData={categoryFormTableData}
-          onFilterChange={handleProspectingFilterChanged}
-          onTaskSelection={handleTaskSelection}
-          onSave={saveSettings}
-        />
+        <>
+          <Typography variant="h6" gutterBottom>
+            Define criteria by which we will recognize an Inbound Call, Outbound
+            Call, Inbound Email and Outbound Email.
+          </Typography>
+          <ProspectingCriteriaSelector
+            title="Prospecting Activity Criteria"
+            initialFilterContainers={filters}
+            filterFields={taskFilterFields.current}
+            tableData={categoryFormTableData}
+            onFilterChange={handleProspectingFilterChanged}
+            onTaskSelection={handleTaskSelection}
+            onSave={saveSettings}
+          />
+        </>
       );
     } else {
       return <div>Invalid step</div>;

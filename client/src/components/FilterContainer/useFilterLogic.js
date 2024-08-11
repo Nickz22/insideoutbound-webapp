@@ -131,6 +131,16 @@ export const useFilterLogic = (initialFilterContainer, initialFilterFields) => {
         { field: "", operator: "", value: "", dataType: "string" },
       ],
     }));
+
+    setLogicErrors(
+      /**
+       * @param {{[key: number]: any}} currentErrors
+       */
+      (currentErrors) => ({
+        ...currentErrors,
+        0: "Please add new logic for the new filter.",
+      })
+    );
   }, []);
 
   const handleDeleteFilter = useCallback(

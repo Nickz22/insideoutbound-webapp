@@ -12,3 +12,6 @@ export * from "./SObjectField";
 export * from "./TableData";
 export * from "./TableColumn";
 export * from "./Task";
+export * from "./Activation"
+export * from "./ProspectingEffort"
+export * from "./ProspectingMetadata"

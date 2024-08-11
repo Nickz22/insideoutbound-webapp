@@ -437,7 +437,7 @@ def get_salesforce_tasks_by_user_ids():
         if not user_ids:
             response.message = "No user IDs provided"
         else:
-            response.data = fetch_tasks_by_user_ids(user_ids).data
+            response.data = fetch_tasks_by_user_ids(user_ids, 1000).data
             response.success = True
     except Exception as e:
         log_error(e)
@@ -461,7 +461,7 @@ def get_salesforce_events_by_user_ids():
         if not user_ids:
             response.message = "No user IDs provided"
         else:
-            response.data = fetch_events_by_user_ids(user_ids).data
+            response.data = fetch_events_by_user_ids(user_ids, 1000).data
             response.success = True
     except Exception as e:
         log_error(e)
