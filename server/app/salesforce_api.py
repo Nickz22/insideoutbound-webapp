@@ -266,7 +266,7 @@ def fetch_tasks_by_account_ids_from_date_not_in_ids(
     return api_response
 
 
-def fetch_tasks_by_user_ids(user_ids):
+def fetch_tasks_by_user_ids(user_ids: List[str], limit: int = None):
     """
     Fetches tasks from Salesforce based on a list of user IDs.
 
@@ -286,7 +286,8 @@ def fetch_tasks_by_user_ids(user_ids):
         joined_user_ids = "','".join(user_ids)
         task_fields = pluck(fetch_task_fields().data, "name")
         soql_query = f"SELECT {','.join(task_fields)} FROM Task WHERE OwnerId IN ('{joined_user_ids}')"
-
+        if limit:
+            soql_query += f" LIMIT {limit}"
         api_response.data = [
             {key: value for key, value in entry.items() if key != "attributes"}
             for entry in _fetch_sobjects(soql_query, get_credentials()).data
@@ -377,7 +378,7 @@ def get_task_query_count(filter_container, salesforce_user_ids):
     return api_response
 
 
-def fetch_events_by_user_ids(user_ids):
+def fetch_events_by_user_ids(user_ids: List[str], limit: int = None):
     """
     Fetches events from Salesforce based on a list of user IDs.
 
@@ -397,6 +398,8 @@ def fetch_events_by_user_ids(user_ids):
         joined_user_ids = "','".join(user_ids)
         event_fields = pluck(fetch_event_fields().data, "name")
         soql_query = f"SELECT {','.join(event_fields)} FROM Event WHERE OwnerId IN ('{joined_user_ids}')"
+        if limit:
+            soql_query += f" LIMIT {limit}"
         api_response.data = [
             {key: value for key, value in entry.items() if key != "attributes"}
             for entry in _fetch_sobjects(soql_query, get_credentials()).data

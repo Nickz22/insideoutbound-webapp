@@ -15,6 +15,9 @@ import {
   MenuItem,
   IconButton,
   Tooltip,
+  Tabs,
+  Tab,
+  AppBar,
 } from "@mui/material";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import CloseIcon from "@mui/icons-material/Close";
@@ -56,6 +59,7 @@ const Settings = () => {
   const [criteria, setCriteria] = useState([]);
   const [tableData, setTableData] = useState(null);
   const [isTableLoading, setIsTableLoading] = useState(false);
+  const [currentTab, setCurrentTab] = useState(0);
 
   useEffect(() => {
     const fetchInitialData = async () => {
@@ -115,6 +119,18 @@ const Settings = () => {
 
     fetchInitialData();
   }, [navigate]);
+
+  const handleTabChange = (event, newValue) => {
+    setCurrentTab(newValue);
+    // Scroll to the corresponding section
+    const sectionId = ["general", "prospecting", "meeting", "user-role"][
+      newValue
+    ];
+    const element = document.getElementById(sectionId);
+    if (element) {
+      element.scrollIntoView({ behavior: "smooth" });
+    }
+  };
 
   const fetchTeamMembersData = async (selectedIds = []) => {
     setIsTableLoading(true);
@@ -304,7 +320,15 @@ const Settings = () => {
 
   return (
     <Box sx={{ width: "100%", mt: 2 }}>
-      <Card sx={{ mb: 2 }}>
+      <AppBar position="sticky" color="default" elevation={0}>
+        <Tabs value={currentTab} onChange={handleTabChange} variant="fullWidth">
+          <Tab label="General Settings" />
+          <Tab label="Prospecting Activity" />
+          <Tab label="Meeting Criteria" />
+          <Tab label="User Role" />
+        </Tabs>
+      </AppBar>
+      <Card id="general" sx={{ mb: 2 }}>
         <CardContent sx={{ p: 2 }}>
           <Typography variant="h6" gutterBottom marginBottom={2}>
             General Settings
@@ -420,7 +444,7 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      <Card sx={{ mb: 2 }}>
+      <Card id="prospecting" sx={{ mb: 2 }}>
         <CardContent sx={{ p: 2 }}>
           <Typography variant="h6" gutterBottom>
             Prospecting Activity Criteria
@@ -461,7 +485,7 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      <Card>
+      <Card id="meeting">
         <CardContent sx={{ p: 2 }}>
           <Typography variant="h6" gutterBottom>
             Meeting Criteria
@@ -500,7 +524,7 @@ const Settings = () => {
         </CardContent>
       </Card>
 
-      <Card sx={{ mb: 2 }}>
+      <Card id="user-role" sx={{ mb: 2 }}>
         <CardContent sx={{ p: 2 }}>
           <Typography variant="h6" gutterBottom marginBottom={2}>
             User Role and Team Members

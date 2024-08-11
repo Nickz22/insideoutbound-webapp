@@ -11,6 +11,7 @@ import {
   Step,
   StepLabel,
   Paper,
+  Tooltip,
 } from "@mui/material";
 import FilterContainer from "../FilterContainer/FilterContainer";
 import CustomTable from "../CustomTable/CustomTable";
@@ -53,14 +54,14 @@ const ProspectingCriteriaSelector = ({
   const debouncedOnFilterChange = useCallback(
     debounce((updatedFilter, onFilterChange) => {
       onFilterChange(updatedFilter);
-    }, 1000),
+    }, 200),
     []
   );
 
   const debouncedSetCurrentFilter = useCallback(
     debounce((updatedFilter) => {
       setCurrentFilter(updatedFilter);
-    }, 1000),
+    }, 200),
     []
   );
 
@@ -137,16 +138,17 @@ const ProspectingCriteriaSelector = ({
         <Typography variant="h6" gutterBottom>
           {filterContainers[activeStep]?.name} Criteria
         </Typography>
-
-        <FormControlLabel
-          control={
-            <Switch
-              checked={showTable}
-              onChange={(e) => setShowTable(e.target.checked)}
-            />
-          }
-          label="Show Table to Generate Criteria"
-        />
+        <Tooltip title="Select records and let the application create the criteria for you based on common field values.">
+          <FormControlLabel
+            control={
+              <Switch
+                checked={showTable}
+                onChange={(e) => setShowTable(e.target.checked)}
+              />
+            }
+            label="Show Table to Generate Criteria"
+          />
+        </Tooltip>
 
         {showTable && (
           <Box sx={{ my: 2 }}>

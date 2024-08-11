@@ -49,21 +49,20 @@ api.interceptors.response.use(
   async (response) => {
     // Check if the response contains authentication error information
     if (response.data && response.data.type === "AuthenticationError") {
-      const originalRequest = response.config;
-      if (!originalRequest._retry) {
-        originalRequest._retry = true;
-        const refreshed = await handleAuthError();
-        if (refreshed) {
-          return api(originalRequest);
-        } else {
-          // Redirect to login page if refresh failed
-          window.location.href = "/";
-          return Promise.reject(response.data);
-        }
+      if (response.data.error.toLowerCase() === "session not found") {
+        window.location.href = "/";
+        return Promise.reject(response.data);
       }
-      // If this is already a retry, redirect to login page
-      window.location.href = "/";
-      return Promise.reject(response.data);
+
+      const originalRequest = response.config;
+      const refreshed = await handleAuthError();
+      if (refreshed) {
+        return api(originalRequest);
+      } else {
+        // Redirect to login page if refresh failed
+        window.location.href = "/";
+        return Promise.reject(response.data);
+      }
     }
     return response;
   },
