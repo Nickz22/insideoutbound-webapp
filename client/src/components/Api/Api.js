@@ -324,3 +324,13 @@ export const deleteAllActivations = async () => {
   const response = await api.post("/delete_all_prospecting_activity");
   return { ...response.data, statusCode: response.status };
 };
+
+export const createPaymentIntent = async () => {
+  const response = await api.post("/create-payment-intent");
+  return { ...response.data, statusCode: response.status };
+};
+
+export const startStripePaymentSchedule = async () => {
+  const response = await api.post("/start_stripe_payment_schedule");
+  return { ...response.data, statusCode: response.status };
+};

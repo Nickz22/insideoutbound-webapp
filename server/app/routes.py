@@ -38,6 +38,9 @@ from app.database.supabase_connection import (
     get_session_state,
 )
 from app.database.session_selector import fetch_supabase_session
+import stripe
+
+stripe.api_key = Config.STRIPE_SECRET_KEY
 
 bp = Blueprint("main", __name__)
 
@@ -543,6 +546,54 @@ def task_query_count():
         )
 
     return jsonify(api_response.to_dict()), get_status_code(api_response)
+
+@bp.route("/create-payment-intent", methods=["POST"])
+@authenticate
+def create_payment_intent():
+    from app.data_models import ApiResponse
+    try:
+        api_response = ApiResponse(data=[], message="", success=False)
+        intent = stripe.PaymentIntent.create(
+            amount=2000,  # Amount in cents
+            currency="usd",
+            automatic_payment_methods={"enabled": True},
+        )
+        api_response.success = True
+        api_response.data = [{"clientSecret": intent.client_secret}]
+        return jsonify(api_response.to_dict()), 200
+    except Exception as e:
+        return jsonify({"error": str(e), "success": False}), 400
+
+@bp.route("/start_stripe_payment_schedule", methods=["POST"])
+@authenticate
+def start_stripe_payment_schedule():
+    from app.data_models import ApiResponse
+
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    try:
+        # Get the current user's email
+        user_response = fetch_logged_in_salesforce_user()
+        if not user_response.success:
+            api_response.message = "Failed to fetch user data"
+            return jsonify(api_response.to_dict()), 400
+
+        user_email = user_response.data.email
+
+        # In test mode, we'll just simulate a successful subscription
+        # You can add more complex logic here if needed for testing different scenarios
+
+        api_response.success = True
+        api_response.message = "Test subscription created successfully"
+        api_response.data = [
+            {"subscriptionId": "test_subscription_id", "testMode": True}
+        ]
+
+    except Exception as e:
+        log_error(e)
+        api_response.message = f"Unexpected error: {format_error_message(e)}"
+
+    return jsonify(api_response.to_dict()), 200 if api_response.success else 400
 
 
 @bp.app_errorhandler(Exception)
