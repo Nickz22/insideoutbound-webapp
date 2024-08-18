@@ -82,9 +82,7 @@ def oauth_callback():
             user: UserModel = fetch_logged_in_salesforce_user().data
             settings = load_settings()
             if not settings:
-                upsert_supabase_user(
-                    user=user, is_sandbox=is_sandbox
-                )
+                upsert_supabase_user(user=user, is_sandbox=is_sandbox)
                 return redirect(
                     f"{Config.REACT_APP_URL}/onboard?session_token={session_token}"
                 )
@@ -634,6 +632,28 @@ def start_stripe_payment_schedule():
         return jsonify(api_response.to_dict()), 500
 
     return jsonify(api_response.to_dict()), 200
+
+
+@bp.route("/set_supabase_user_status_to_paid", methods=["POST"])
+@authenticate
+def set_supabase_user_status_to_paid():
+    from app.data_models import ApiResponse, UserModel
+
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    try:
+        session_state = get_session_state()
+        user_id = request.get_json().get("userId")
+        user_model = UserModel(id=user_id, status="paid")
+        upsert_supabase_user(user=user_model, is_sandbox=session_state["is_sandbox"])
+        api_response.success = True
+    except Exception as e:
+        log_error(e)
+        api_response.message = (
+            f"Failed to set user status to paid: {format_error_message(e)}"
+        )
+
+    return jsonify(api_response.to_dict()), get_status_code(api_response)
 
 
 @bp.app_errorhandler(Exception)

@@ -347,7 +347,7 @@ def python_user_to_supabase_dict(user: UserModel) -> Dict:
         "org_id": user.orgId if user.orgId else "",
         "is_sandbox": None,  # This information is not present in UserModel
         "photo_url": user.photoUrl if user.photoUrl else "",
-        "status": "not paid"  # Default value as per Supabase schema
+        "status": user.status or "not paid"
     }
     
     # Remove None values

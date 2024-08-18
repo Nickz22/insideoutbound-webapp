@@ -337,9 +337,9 @@ export const startStripePaymentSchedule = async (userEmail) => {
   return { ...response.data, statusCode: response.status };
 };
 
-export const setSupabaseUserStatusToPaid = async (userEmail) => {
+export const setSupabaseUserStatusToPaid = async (userId) => {
   const response = await api.post("/set_supabase_user_status_to_paid", {
-    userEmail,
+    userId,
   });
   return { ...response.data, statusCode: response.status };
 };

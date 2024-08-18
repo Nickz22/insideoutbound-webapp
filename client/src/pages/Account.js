@@ -42,32 +42,31 @@ const CheckoutForm = ({ onSubscriptionComplete, userEmail }) => {
       return;
     }
     setProcessing(true);
-
+  
     try {
-      // First, submit the PaymentElement
       const { error: submitError } = await elements.submit();
       if (submitError) {
         setError(submitError.message);
         setProcessing(false);
         return;
       }
-
-      // Then, start the payment schedule
+  
       const response = await startStripePaymentSchedule(userEmail);
       if (response.success) {
         const { clientSecret } = response.data[0];
         const result = await stripe.confirmPayment({
           elements,
           clientSecret,
-          confirmParams: {
-            return_url: `${process.env.REACT_APP_BASE_URL}/app/account`,
-          },
+          redirect: 'if_required',
         });
-
+  
         if (result.error) {
           setError(result.error.message);
-        } else {
-          onSubscriptionComplete();
+        } else if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+          await onSubscriptionComplete();
+          // Handle successful payment here without redirecting
+          // For example, update UI, show a success message, etc.
+          setSuccess(true);
         }
       } else {
         setError(response.message);
@@ -163,7 +162,7 @@ const Account = () => {
   const handleSubscriptionComplete = () => {
     setSnackbarOpen(true);
     handleCloseUpgradeDialog();
-    setSupabaseUserStatusToPaid(user.email);
+    setSupabaseUserStatusToPaid(user.id);
   };
 
   if (loading) {

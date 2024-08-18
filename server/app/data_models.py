@@ -262,23 +262,24 @@ class TableColumn(SerializableModel):
 
 class UserSObject(SerializableModel):
     Id: str
-    Email: str
-    Username: str
-    LastName: str
-    FullPhotoUrl: str
+    Email: Optional[str] = None
+    Username: Optional[str] = None
+    LastName: Optional[str] = None
+    FullPhotoUrl: Optional[str] = None
     FirstName: Optional[str] = None
     Role: Optional[str] = None
 
 
 class UserModel(SerializableModel):
     id: str
-    email: str
-    username: str
-    lastName: str
-    photoUrl: str
+    email: Optional[str] = None
+    username: Optional[str] = None
+    lastName: Optional[str] = None
+    photoUrl: Optional[str] = None
     orgId: Optional[str] = None
     firstName: Optional[str] = None
     role: Optional[str] = None
+    status: Optional[str] = "not paid"
 
     @classmethod
     def from_sobject(cls, sobject: UserSObject):
