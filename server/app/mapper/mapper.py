@@ -10,6 +10,7 @@ from app.data_models import (
     Activation,
     ProspectingMetadata,
     ProspectingEffort,
+    UserModel
 )
 from typing import Dict
 from datetime import datetime, date
@@ -337,3 +338,17 @@ def convert_settings_to_settings_model(s: Settings) -> SettingsModel:
         salesforceUserId=s.salesforce_user_id,
         latestDateQueried=s.latest_date_queried,
     )
+
+def python_user_to_supabase_dict(user: UserModel) -> Dict:
+    supabase_user = {
+        "id": user.id,
+        "salesforce_id": user.id,  # Assuming the id in UserModel is the Salesforce ID
+        "email": user.email if user.email else "",
+        "org_id": user.orgId if user.orgId else "",
+        "is_sandbox": None,  # This information is not present in UserModel
+        "photo_url": user.photoUrl if user.photoUrl else "",
+        "status": "not paid"  # Default value as per Supabase schema
+    }
+    
+    # Remove None values
+    return {k: v for k, v in supabase_user.items() if v is not None}

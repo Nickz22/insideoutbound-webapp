@@ -1,0 +1,10 @@
+version: 2
+tunnels:
+  webapp1:
+    proto: http
+    addr: 3000
+  webapp2:
+    proto: http
+    addr: 8000
+    hostname: strongly-talented-troll.ngrok-free.app
+authtoken: 1aQHhya3sSfB001TmtG66cQSN6K_4ahpmL9A719aV8TiSPkn9

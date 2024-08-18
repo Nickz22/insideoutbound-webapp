@@ -16,6 +16,8 @@
     "@mui/lab": "^5.0.0-alpha.173",
     "@mui/material": "^5.15.20",
     "@sentry/react": "^8.24.0",
+    "@stripe/react-stripe-js": "^2.7.3",
+    "@stripe/stripe-js": "^4.2.0",
     "@supabase/supabase-js": "^2.44.4",
     "@testing-library/jest-dom": "^5.17.0",
     "@testing-library/react": "^13.4.0",
