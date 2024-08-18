@@ -330,7 +330,16 @@ export const createPaymentIntent = async () => {
   return { ...response.data, statusCode: response.status };
 };
 
-export const startStripePaymentSchedule = async () => {
-  const response = await api.post("/start_stripe_payment_schedule");
+export const startStripePaymentSchedule = async (userEmail) => {
+  const response = await api.post("/start_stripe_payment_schedule", {
+    userEmail,
+  });
+  return { ...response.data, statusCode: response.status };
+};
+
+export const setSupabaseUserStatusToPaid = async (userEmail) => {
+  const response = await api.post("/set_supabase_user_status_to_paid", {
+    userEmail,
+  });
   return { ...response.data, statusCode: response.status };
 };

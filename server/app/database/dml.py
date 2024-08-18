@@ -17,6 +17,7 @@ from app.data_models import (
 from app.mapper.mapper import (
     python_activation_to_supabase_dict,
     python_settings_to_supabase_dict,
+    python_user_to_supabase_dict
 )
 from app.utils import get_salesforce_team_ids, format_error_message
 from app.database.settings_selector import load_settings
@@ -25,13 +26,11 @@ SUPABASE_ALL_USERS_PASSWORD = environ.get("SUPABASE_ALL_USERS_PASSWORD")
 from datetime import datetime
 
 
-def upsert_supabase_user(user: UserModel, org_id: str, is_sandbox: bool):
-
+def upsert_supabase_user(user: UserModel, is_sandbox: bool):
     try:
         salesforce_id = user.id
         email = user.email
         supabase = get_supabase_admin_client()
-        user_id = str(uuid4())
         current_time = datetime.now().isoformat()
 
         # Query the User table to check if the row exists
@@ -42,21 +41,29 @@ def upsert_supabase_user(user: UserModel, org_id: str, is_sandbox: bool):
             .execute()
         )
 
+        user_data = python_user_to_supabase_dict(user)
+        user_data["is_sandbox"] = is_sandbox
+        user_data["updated_at"] = current_time
+
+        # user_data = {
+        #     "salesforce_id": salesforce_id,
+        #     "email": email,
+        #     "photo_url": user.photoUrl,
+        #     "org_id": org_id,
+        #     "is_sandbox": is_sandbox,
+        #     "updated_at": current_time,
+        # }
+
         if not existing_user.data:
             # If the row does not exist, insert the new record
-            supabase.table("User").insert(
-                {
-                    "id": user_id,
-                    "salesforce_id": salesforce_id,
-                    "email": email,
-                    "photo_url": user.photoUrl,
-                    "org_id": org_id,
-                    "is_sandbox": is_sandbox,
-                    "created_at": current_time,
-                }
-            ).execute()
+            user_id = str(uuid4())
+            user_data["id"] = user_id
+            user_data["created_at"] = current_time
+            supabase.table("User").insert(user_data).execute()
         else:
+            # If the row exists, update the existing record
             user_id = existing_user.data[0]["id"]
+            supabase.table("User").update(user_data).eq("id", user_id).execute()
 
         return user_id
 

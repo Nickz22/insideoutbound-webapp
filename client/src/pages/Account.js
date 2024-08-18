@@ -2,8 +2,9 @@ import React, { useState, useEffect } from "react";
 import {
   getInstanceUrl,
   getLoggedInUser,
-  startStripePaymentSchedule,
   createPaymentIntent,
+  startStripePaymentSchedule,
+  setSupabaseUserStatusToPaid,
 } from "./../components/Api/Api";
 import StripeWrapper from "./../components/StripeWrapper/StripeWrapper";
 import {
@@ -25,7 +26,11 @@ import {
   Snackbar,
 } from "@mui/material";
 
-const CheckoutForm = ({ onSubscriptionComplete }) => {
+/**
+ * @typedef {import('types').User} User
+ */
+
+const CheckoutForm = ({ onSubscriptionComplete, userEmail }) => {
   const stripe = useStripe();
   const elements = useElements();
   const [error, setError] = useState(null);
@@ -39,15 +44,24 @@ const CheckoutForm = ({ onSubscriptionComplete }) => {
     setProcessing(true);
 
     try {
-      const response = await startStripePaymentSchedule();
+      // First, submit the PaymentElement
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        setError(submitError.message);
+        setProcessing(false);
+        return;
+      }
+
+      // Then, start the payment schedule
+      const response = await startStripePaymentSchedule(userEmail);
       if (response.success) {
         const { clientSecret } = response.data[0];
         const result = await stripe.confirmPayment({
           elements,
-          confirmParams: {
-            return_url: "https://your-return-url.com",
-          },
           clientSecret,
+          confirmParams: {
+            return_url: `${process.env.REACT_APP_BASE_URL}/app/account`,
+          },
         });
 
         if (result.error) {
@@ -83,7 +97,15 @@ const CheckoutForm = ({ onSubscriptionComplete }) => {
 
 const Account = () => {
   const [clientSecret, setClientSecret] = useState(null);
-  const [user, setUser] = useState(null);
+  /** @type {[User, Function]} */
+  const [user, setUser] = useState({
+    id: 0,
+    firstName: "",
+    lastName: "",
+    email: "",
+    username: "",
+    photoUrl: "",
+  });
   const [instanceUrl, setInstanceUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -141,6 +163,7 @@ const Account = () => {
   const handleSubscriptionComplete = () => {
     setSnackbarOpen(true);
     handleCloseUpgradeDialog();
+    setSupabaseUserStatusToPaid(user.email);
   };
 
   if (loading) {
@@ -193,6 +216,7 @@ const Account = () => {
             <StripeWrapper options={{ clientSecret }}>
               <CheckoutForm
                 onSubscriptionComplete={handleSubscriptionComplete}
+                userEmail={user.email}
               />
             </StripeWrapper>
           )}

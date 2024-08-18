@@ -83,7 +83,7 @@ def oauth_callback():
             settings = load_settings()
             if not settings:
                 upsert_supabase_user(
-                    user=user, org_id=token_data["id"], is_sandbox=is_sandbox
+                    user=user, is_sandbox=is_sandbox
                 )
                 return redirect(
                     f"{Config.REACT_APP_URL}/onboard?session_token={session_token}"
@@ -547,10 +547,12 @@ def task_query_count():
 
     return jsonify(api_response.to_dict()), get_status_code(api_response)
 
+
 @bp.route("/create-payment-intent", methods=["POST"])
 @authenticate
 def create_payment_intent():
     from app.data_models import ApiResponse
+
     try:
         api_response = ApiResponse(data=[], message="", success=False)
         intent = stripe.PaymentIntent.create(
@@ -564,6 +566,7 @@ def create_payment_intent():
     except Exception as e:
         return jsonify({"error": str(e), "success": False}), 400
 
+
 @bp.route("/start_stripe_payment_schedule", methods=["POST"])
 @authenticate
 def start_stripe_payment_schedule():
@@ -573,27 +576,64 @@ def start_stripe_payment_schedule():
 
     try:
         # Get the current user's email
-        user_response = fetch_logged_in_salesforce_user()
-        if not user_response.success:
-            api_response.message = "Failed to fetch user data"
-            return jsonify(api_response.to_dict()), 400
+        user_email = request.get_json().get("email")
 
-        user_email = user_response.data.email
+        # Check if customer already exists
+        existing_customers = stripe.Customer.list(email=user_email, limit=1)
 
-        # In test mode, we'll just simulate a successful subscription
-        # You can add more complex logic here if needed for testing different scenarios
+        if existing_customers.data:
+            # Use existing customer
+            customer = existing_customers.data[0]
+        else:
+            # Create a new customer in Stripe
+            customer = stripe.Customer.create(email=user_email)
 
-        api_response.success = True
-        api_response.message = "Test subscription created successfully"
-        api_response.data = [
-            {"subscriptionId": "test_subscription_id", "testMode": True}
-        ]
+        # Check if customer already has an active subscription
+        existing_subscriptions = stripe.Subscription.list(
+            customer=customer.id, status="active", limit=1
+        )
+
+        if existing_subscriptions.data:
+            api_response.message = "Customer already has an active subscription"
+            api_response.success = True
+            api_response.data = [
+                {
+                    "subscriptionId": existing_subscriptions.data[0].id,
+                    "alreadySubscribed": True,
+                }
+            ]
+        else:
+            # Create a subscription
+            subscription = stripe.Subscription.create(
+                customer=customer.id,
+                items=[
+                    {"price": Config.STRIPE_PRICE_ID},
+                ],
+                payment_behavior="default_incomplete",
+                expand=["latest_invoice.payment_intent"],
+            )
+
+            api_response.success = True
+            api_response.message = "Subscription created successfully"
+            api_response.data = [
+                {
+                    "subscriptionId": subscription.id,
+                    "clientSecret": subscription.latest_invoice.payment_intent.client_secret,
+                    "alreadySubscribed": False,
+                }
+            ]
+
+    except stripe.error.StripeError as e:
+        log_error(e)
+        api_response.message = f"Stripe error: {str(e)}"
+        return jsonify(api_response.to_dict()), 400
 
     except Exception as e:
         log_error(e)
         api_response.message = f"Unexpected error: {format_error_message(e)}"
+        return jsonify(api_response.to_dict()), 500
 
-    return jsonify(api_response.to_dict()), 200 if api_response.success else 400
+    return jsonify(api_response.to_dict()), 200
 
 
 @bp.app_errorhandler(Exception)
