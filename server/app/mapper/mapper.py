@@ -352,3 +352,12 @@ def python_user_to_supabase_dict(user: UserModel) -> Dict:
     
     # Remove None values
     return {k: v for k, v in supabase_user.items() if v is not None}
+
+def supabase_user_to_python_user(row: Dict) -> UserModel:
+    return UserModel(
+        id=row["salesforce_id"],
+        email=row["email"],
+        orgId=row["org_id"],
+        photoUrl=row["photo_url"],
+        status=row["status"]
+    )

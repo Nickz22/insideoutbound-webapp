@@ -49,7 +49,7 @@ api.interceptors.response.use(
   async (response) => {
     // Check if the response contains authentication error information
     if (response.data && response.data.type === "AuthenticationError") {
-      if (response.data.error.toLowerCase() === "session not found") {
+      if (response.data.error.toLowerCase().includes("session")) {
         window.location.href = "/";
         return Promise.reject(response.data);
       }
@@ -325,11 +325,18 @@ export const deleteAllActivations = async () => {
   return { ...response.data, statusCode: response.status };
 };
 
+/**
+ * @returns {Promise<ApiResponse>}
+ */
 export const createPaymentIntent = async () => {
   const response = await api.post("/create-payment-intent");
   return { ...response.data, statusCode: response.status };
 };
 
+/**
+ * @param {string} userEmail
+ * @returns {Promise<ApiResponse>}
+ */
 export const startStripePaymentSchedule = async (userEmail) => {
   const response = await api.post("/start_stripe_payment_schedule", {
     userEmail,
@@ -337,9 +344,26 @@ export const startStripePaymentSchedule = async (userEmail) => {
   return { ...response.data, statusCode: response.status };
 };
 
+/**
+ * @param {string} userId
+ * @returns {Promise<ApiResponse>}
+ */
 export const setSupabaseUserStatusToPaid = async (userId) => {
   const response = await api.post("/set_supabase_user_status_to_paid", {
     userId,
+  });
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * @param {string} userId
+ * @param {string} email
+ * @returns {Promise<ApiResponse>}
+ */
+export const pauseStripePaymentSchedule = async (userId, email) => {
+  const response = await api.post("/pause_stripe_payment_schedule", {
+    userId,
+    email,
   });
   return { ...response.data, statusCode: response.status };
 };

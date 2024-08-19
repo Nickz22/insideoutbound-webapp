@@ -3,6 +3,7 @@ import {
   getInstanceUrl,
   getLoggedInUser,
   createPaymentIntent,
+  pauseStripePaymentSchedule,
   startStripePaymentSchedule,
   setSupabaseUserStatusToPaid,
 } from "./../components/Api/Api";
@@ -42,7 +43,7 @@ const CheckoutForm = ({ onSubscriptionComplete, userEmail }) => {
       return;
     }
     setProcessing(true);
-  
+
     try {
       const { error: submitError } = await elements.submit();
       if (submitError) {
@@ -50,19 +51,22 @@ const CheckoutForm = ({ onSubscriptionComplete, userEmail }) => {
         setProcessing(false);
         return;
       }
-  
+
       const response = await startStripePaymentSchedule(userEmail);
       if (response.success) {
         const { clientSecret } = response.data[0];
         const result = await stripe.confirmPayment({
           elements,
           clientSecret,
-          redirect: 'if_required',
+          redirect: "if_required",
         });
-  
+
         if (result.error) {
           setError(result.error.message);
-        } else if (result.paymentIntent && result.paymentIntent.status === 'succeeded') {
+        } else if (
+          result.paymentIntent &&
+          result.paymentIntent.status === "succeeded"
+        ) {
           await onSubscriptionComplete();
           // Handle successful payment here without redirecting
           // For example, update UI, show a success message, etc.
@@ -105,6 +109,7 @@ const Account = () => {
     username: "",
     photoUrl: "",
   });
+  const [userStatus, setUserStatus] = useState("not paid");
   const [instanceUrl, setInstanceUrl] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -122,6 +127,7 @@ const Account = () => {
         if (userResponse.success && instanceUrlResponse.success) {
           setUser(userResponse.data[0]);
           setInstanceUrl(instanceUrlResponse.data[0]);
+          setUserStatus(userResponse.data[0].status);
         } else {
           setError("Failed to fetch user data or instance URL");
         }
@@ -150,6 +156,24 @@ const Account = () => {
     fetchClientSecret();
     fetchData();
   }, []);
+
+  /**
+   * @returns {Promise<void>}
+   */
+  const handlePauseMembership = async () => {
+    try {
+      const response = await pauseStripePaymentSchedule(user.id, user.email);
+      if (response.success) {
+        setSnackbarOpen(true);
+        setUserStatus("paused");
+      } else {
+        setError("Failed to pause membership");
+      }
+    } catch (error) {
+      setError("An error occurred while pausing membership");
+      console.error("Error pausing membership:", error);
+    }
+  };
 
   const handleUpgradeClick = () => {
     setOpenUpgradeDialog(true);
@@ -196,14 +220,25 @@ const Account = () => {
       <Typography variant="body1">Email: {user.email}</Typography>
       <Typography variant="body1">Username: {user.username}</Typography>
 
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={handleUpgradeClick}
-        sx={{ marginTop: 2 }}
-      >
-        Upgrade to Paid
-      </Button>
+      {userStatus === "paid" ? (
+        <Button
+          variant="contained"
+          color="info"
+          onClick={handlePauseMembership}
+          sx={{ marginTop: 2, backgroundColor: "grey.500", color: "white" }}
+        >
+          Pause Membership
+        </Button>
+      ) : (
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleUpgradeClick}
+          sx={{ marginTop: 2 }}
+        >
+          Upgrade to Paid
+        </Button>
+      )}
 
       <Dialog open={openUpgradeDialog} onClose={handleCloseUpgradeDialog}>
         <DialogTitle>Upgrade to Paid Plan</DialogTitle>
@@ -211,7 +246,7 @@ const Account = () => {
           <Typography variant="body1" gutterBottom>
             Subscribe to our premium plan for $20/month
           </Typography>
-          {clientSecret && (
+          {clientSecret && user.email && (
             <StripeWrapper options={{ clientSecret }}>
               <CheckoutForm
                 onSubscriptionComplete={handleSubscriptionComplete}

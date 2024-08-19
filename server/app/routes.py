@@ -7,6 +7,7 @@ from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
 from app.database.settings_selector import load_settings
+from app.database.supabase_user_selector import fetch_supabase_user
 from app.database.dml import (
     save_settings,
     save_session,
@@ -474,11 +475,14 @@ def get_salesforce_events_by_user_ids():
 @bp.route("/get_salesforce_user", methods=["GET"])
 @authenticate
 def get_salesforce_user():
-    from app.data_models import ApiResponse
+    from app.data_models import ApiResponse, UserModel
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        response.data = [fetch_logged_in_salesforce_user().data]
+        user: UserModel = fetch_logged_in_salesforce_user().data
+        supabase_user: UserModel = fetch_supabase_user(user.id)
+        user.status = supabase_user.status
+        response.data = [user.to_dict()]
         response.success = True
     except Exception as e:
         log_error(e)
@@ -487,6 +491,67 @@ def get_salesforce_user():
         )
 
     return jsonify(response.to_dict()), get_status_code(response)
+
+
+@bp.route("/pause_stripe_payment_schedule", methods=["POST"])
+@authenticate
+def pause_stripe_payment_schedule():
+    from app.data_models import ApiResponse, UserModel
+
+    api_response = ApiResponse(data=[], message="", success=False)
+
+    try:
+        user_email = request.json.get("email")
+        user_id = request.json.get("userId")
+
+        if not user_email:
+            api_response.message = "User email is required"
+            return jsonify(api_response.to_dict()), 400
+
+        # Find the Stripe customer by email
+        customers = stripe.Customer.list(email=user_email, limit=1)
+
+        if not customers.data:
+            api_response.message = "Stripe customer not found"
+            return jsonify(api_response.to_dict()), 404
+
+        stripe_customer = customers.data[0]
+
+        # Fetch the customer's subscriptions
+        subscriptions = stripe.Subscription.list(customer=stripe_customer.id)
+
+        if not subscriptions.data:
+            api_response.message = "No active subscriptions found"
+            return jsonify(api_response.to_dict()), 404
+
+        # Pause the first active subscription
+        subscription = subscriptions.data[0]
+        updated_subscription = stripe.Subscription.modify(
+            subscription.id,
+            pause_collection={
+                "behavior": "void",
+            },
+        )
+
+        # Update the user's status in your database
+        upsert_supabase_user(
+            UserModel(id=user_id, status="paused"),
+            is_sandbox=get_session_state()["is_sandbox"],
+        )
+
+        api_response.success = True
+        api_response.message = "Subscription paused successfully"
+        api_response.data = [{"subscription_id": updated_subscription.id}]
+        return jsonify(api_response.to_dict()), 200
+
+    except stripe.error.StripeError as e:
+        log_error(e)
+        api_response.message = f"Stripe error: {str(e)}"
+        return jsonify(api_response.to_dict()), 400
+    except Exception as e:
+        log_error(e)
+        api_response.message = f"An error occurred: {format_error_message(e)}"
+        return jsonify(api_response.to_dict()), 500
 
 
 @bp.route("/get_task_fields", methods=["GET"])
@@ -574,7 +639,7 @@ def start_stripe_payment_schedule():
 
     try:
         # Get the current user's email
-        user_email = request.get_json().get("email")
+        user_email = request.get_json().get("userEmail")
 
         # Check if customer already exists
         existing_customers = stripe.Customer.list(email=user_email, limit=1)
