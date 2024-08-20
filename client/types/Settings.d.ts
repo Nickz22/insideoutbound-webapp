@@ -48,4 +48,6 @@ export interface SettingsContextValue {
   criteria: Settings["criteria"];
   setCriteria?: Dispatch<SetStateAction<Settings["criteria"]>>;
   fetchTeamMembersData?: (selectedIds: string[]) => Promise<void>;
+  handleChange?: (field: string, value: string | number | boolean) => void;
+  formatDateForInput?: (date: Date) => void;
 }

@@ -102,6 +102,7 @@ export const SettingsProvider = ({
         []
     );
 
+    /** @type {(field: string, value: string | number | boolean) => void} */
     const handleChange = useCallback(
         (field, value) => {
             setSettings((prev) => {
@@ -246,6 +247,7 @@ export const SettingsProvider = ({
         [debouncedSaveSettings]
     );
 
+    /** @param {Date} date */
     const formatDateForInput = (date) => {
         if (!date) return "";
 
@@ -253,6 +255,8 @@ export const SettingsProvider = ({
         const d = new Date(date);
 
         // Format the date components with leading zeros if necessary
+
+        /** @param {number} num */
         const pad = (num) => (num < 10 ? "0" : "") + num;
         const year = d.getUTCFullYear();
         const month = pad(d.getUTCMonth() + 1);
@@ -296,6 +300,8 @@ export const SettingsProvider = ({
                 handleTabChange,
                 criteria,
                 setCriteria,
+                handleChange,
+                formatDateForInput,
                 tableData,
                 setTableData,
                 fetchTeamMembersData

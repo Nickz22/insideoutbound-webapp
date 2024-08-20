@@ -1,7 +1,8 @@
-import { Card, CardContent, Grid, TextField, Tooltip, Typography } from '@mui/material'
-import React from 'react'
+import { Card, CardContent, FormControlLabel, Grid, Switch, TextField, Tooltip, Typography } from '@mui/material'
+import { useSettings } from './SettingProvider'
 
 const TabGeneral = () => {
+    const { settings, handleChange, formatDateForInput } = useSettings();
     return (
         <Card id="general" sx={{ mb: 2 }}>
             <CardContent sx={{ p: 2 }}>
@@ -16,12 +17,15 @@ const TabGeneral = () => {
                                 label="Inactivity Threshold (days)"
                                 type="number"
                                 value={settings.inactivityThreshold}
-                                onChange={(e) =>
-                                    handleChange(
-                                        "inactivityThreshold",
-                                        parseInt(e.target.value)
-                                    )
-                                }
+                                onChange={(e) => {
+                                    if (handleChange) {
+                                        handleChange(
+                                            "inactivityThreshold",
+                                            parseInt(e.target.value)
+                                        )
+                                    }
+
+                                }}
                             />
                         </Tooltip>
                     </Grid>
@@ -32,12 +36,14 @@ const TabGeneral = () => {
                                 label="Activities per Contact"
                                 type="number"
                                 value={settings.activitiesPerContact}
-                                onChange={(e) =>
-                                    handleChange(
-                                        "activitiesPerContact",
-                                        parseInt(e.target.value)
-                                    )
-                                }
+                                onChange={(e) => {
+                                    if (handleChange) {
+                                        handleChange(
+                                            "activitiesPerContact",
+                                            parseInt(e.target.value)
+                                        )
+                                    }
+                                }}
                             />
                         </Tooltip>
                     </Grid>
@@ -48,9 +54,11 @@ const TabGeneral = () => {
                                 label="Contacts per Account"
                                 type="number"
                                 value={settings.contactsPerAccount}
-                                onChange={(e) =>
-                                    handleChange("contactsPerAccount", parseInt(e.target.value))
-                                }
+                                onChange={(e) => {
+                                    if (handleChange) {
+                                        handleChange("contactsPerAccount", parseInt(e.target.value))
+                                    }
+                                }}
                             />
                         </Tooltip>
                     </Grid>
@@ -61,9 +69,11 @@ const TabGeneral = () => {
                                 label="Tracking Period (days)"
                                 type="number"
                                 value={settings.trackingPeriod}
-                                onChange={(e) =>
-                                    handleChange("trackingPeriod", parseInt(e.target.value))
-                                }
+                                onChange={(e) => {
+                                    if (handleChange) {
+                                        handleChange("trackingPeriod", parseInt(e.target.value))
+                                    }
+                                }}
                             />
                         </Tooltip>
                     </Grid>
@@ -73,10 +83,13 @@ const TabGeneral = () => {
                                 fullWidth
                                 label="Query activities created after"
                                 type="datetime-local"
-                                value={formatDateForInput(settings.latestDateQueried)}
-                                onChange={(e) =>
-                                    handleChange("latestDateQueried", e.target.value)
-                                }
+                                value={formatDateForInput ? formatDateForInput(settings.latestDateQueried) : ""}
+                                onChange={(e) => {
+                                    if (handleChange) {
+                                        handleChange("latestDateQueried", e.target.value)
+
+                                    }
+                                }}
                                 InputLabelProps={{
                                     shrink: true,
                                 }}
@@ -91,9 +104,11 @@ const TabGeneral = () => {
                                 control={
                                     <Switch
                                         checked={settings.activateByOpportunity}
-                                        onChange={(e) =>
-                                            handleChange("activateByOpportunity", e.target.checked)
-                                        }
+                                        onChange={(e) => {
+                                            if (handleChange) {
+                                                handleChange("activateByOpportunity", e.target.checked)
+                                            }
+                                        }}
                                     />
                                 }
                                 label="Activate by Opportunity"
@@ -106,9 +121,11 @@ const TabGeneral = () => {
                                 control={
                                     <Switch
                                         checked={settings.activateByMeeting}
-                                        onChange={(e) =>
-                                            handleChange("activateByMeeting", e.target.checked)
-                                        }
+                                        onChange={(e) => {
+                                            if (handleChange) {
+                                                handleChange("activateByMeeting", e.target.checked)
+                                            }
+                                        }}
                                     />
                                 }
                                 label="Activate by Meeting"
