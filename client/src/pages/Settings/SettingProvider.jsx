@@ -28,23 +28,9 @@ const initEventFilterFields = []
 /** @type {any[]} */
 const initTaskFilterFields = []
 
-/** @type {TableColumn[]} */
-const initAvailableColumns = [];
-
-/** @type {TableColumn[]} */
-const initColumns = []
-
-/** @type{Record<string, any>[]} */
-const initData = []
-
-const initSelectedIds = new Set([])
-
-/** @type {TableData} */
-const initTableData = {
-    availableColumns: initAvailableColumns,
-    columns: initColumns,
-    data: initData,
-    selectedIds: initSelectedIds
+/** @returns {TableData | null}  */
+const initTableData = () => {
+    return null;
 }
 
 /** @type {import("react").Context<SettingsContextValue>} */
@@ -92,7 +78,9 @@ const SettingsContext = createContext({
     fetchTeamMembersData: async (selectedIds) => { selectedIds; return; },
     handleDeleteFilter: (index) => { index; return; },
     handleAddCriteria: () => { return; },
-    tableData: initTableData,
+    tableData: initTableData(),
+    handleTableSelectionChange: (selectedIds) => { selectedIds; return; },
+    handleColumnsChange: (newColumns) => { newColumns; return; }
 });
 
 /**
@@ -125,8 +113,13 @@ export const SettingsProvider = ({
     /** @type {[FilterContainer[], React.Dispatch<React.SetStateAction<FilterContainer[]>>]} */
     const [criteria, setCriteria] = useState(initCriteria);
 
-    /** @type {[TableData, React.Dispatch<React.SetStateAction<TableData>>]} */
-    const [tableData, setTableData] = useState(initTableData);
+    /** @type {[TableData|null, React.Dispatch<React.SetStateAction<(TableData|null)>>]} */
+    const [tableData, setTableData] = useState(
+        /** @returns {TableData | null}  */
+        () => {
+            return null;
+        }
+    );
     const [isTableLoading, setIsTableLoading] = useState(false);
     const [currentTab, setCurrentTab] = useState(0);
 
@@ -274,6 +267,7 @@ export const SettingsProvider = ({
         [debouncedSaveSettings]
     );
 
+    /** @type {(selectedIds: Set<string>) => void} */
     const handleTableSelectionChange = useCallback(
         (selectedIds) => {
             const teamMemberIds = Array.from(selectedIds);
@@ -289,10 +283,16 @@ export const SettingsProvider = ({
                 debouncedSaveSettings(updatedSettings);
                 return updatedSettings;
             });
-            setTableData((prev) => ({
-                ...prev,
-                selectedIds,
-            }));
+            setTableData((prev) => {
+                if (prev === null) {
+                    return null;
+                }
+
+                return {
+                    ...prev,
+                    selectedIds,
+                };
+            });
         },
         [debouncedSaveSettings]
     );
@@ -317,11 +317,18 @@ export const SettingsProvider = ({
         return `${year}-${month}-${day}T${hours}:${minutes}`;
     };
 
+    /** @type {(newColumns: TableColumn[]) => void} */
     const handleColumnsChange = useCallback((newColumns) => {
-        setTableData((prev) => ({
-            ...prev,
-            columns: newColumns,
-        }));
+        setTableData((prev) => {
+            if (prev === null) {
+                return null;
+            }
+
+            return {
+                ...prev,
+                columns: newColumns,
+            };
+        });
     }, []);
 
     return (
@@ -357,7 +364,9 @@ export const SettingsProvider = ({
                 fetchTeamMembersData,
                 handleCriteriaChange,
                 handleDeleteFilter,
-                handleAddCriteria
+                handleAddCriteria,
+                handleTableSelectionChange,
+                handleColumnsChange
             }}
         >
             {children}

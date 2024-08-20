@@ -18,13 +18,10 @@ const TabGeneral = () => {
                                 type="number"
                                 value={settings.inactivityThreshold}
                                 onChange={(e) => {
-                                    if (handleChange) {
-                                        handleChange(
-                                            "inactivityThreshold",
-                                            parseInt(e.target.value)
-                                        )
-                                    }
-
+                                    handleChange(
+                                        "inactivityThreshold",
+                                        parseInt(e.target.value)
+                                    )
                                 }}
                             />
                         </Tooltip>
@@ -37,12 +34,10 @@ const TabGeneral = () => {
                                 type="number"
                                 value={settings.activitiesPerContact}
                                 onChange={(e) => {
-                                    if (handleChange) {
-                                        handleChange(
-                                            "activitiesPerContact",
-                                            parseInt(e.target.value)
-                                        )
-                                    }
+                                    handleChange(
+                                        "activitiesPerContact",
+                                        parseInt(e.target.value)
+                                    )
                                 }}
                             />
                         </Tooltip>
@@ -55,9 +50,7 @@ const TabGeneral = () => {
                                 type="number"
                                 value={settings.contactsPerAccount}
                                 onChange={(e) => {
-                                    if (handleChange) {
-                                        handleChange("contactsPerAccount", parseInt(e.target.value))
-                                    }
+                                    handleChange("contactsPerAccount", parseInt(e.target.value))
                                 }}
                             />
                         </Tooltip>
@@ -70,9 +63,7 @@ const TabGeneral = () => {
                                 type="number"
                                 value={settings.trackingPeriod}
                                 onChange={(e) => {
-                                    if (handleChange) {
-                                        handleChange("trackingPeriod", parseInt(e.target.value))
-                                    }
+                                    handleChange("trackingPeriod", parseInt(e.target.value))
                                 }}
                             />
                         </Tooltip>
@@ -85,10 +76,7 @@ const TabGeneral = () => {
                                 type="datetime-local"
                                 value={formatDateForInput ? formatDateForInput(settings.latestDateQueried) : ""}
                                 onChange={(e) => {
-                                    if (handleChange) {
-                                        handleChange("latestDateQueried", e.target.value)
-
-                                    }
+                                    handleChange("latestDateQueried", e.target.value)
                                 }}
                                 InputLabelProps={{
                                     shrink: true,
@@ -105,9 +93,7 @@ const TabGeneral = () => {
                                     <Switch
                                         checked={settings.activateByOpportunity}
                                         onChange={(e) => {
-                                            if (handleChange) {
-                                                handleChange("activateByOpportunity", e.target.checked)
-                                            }
+                                            handleChange("activateByOpportunity", e.target.checked)
                                         }}
                                     />
                                 }
@@ -122,9 +108,7 @@ const TabGeneral = () => {
                                     <Switch
                                         checked={settings.activateByMeeting}
                                         onChange={(e) => {
-                                            if (handleChange) {
-                                                handleChange("activateByMeeting", e.target.checked)
-                                            }
+                                            handleChange("activateByMeeting", e.target.checked)
                                         }}
                                     />
                                 }

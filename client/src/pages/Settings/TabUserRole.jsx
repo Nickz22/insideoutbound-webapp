@@ -8,7 +8,11 @@ const TabUserRole = () => {
         settings,
         status: {
             isTableLoading,
-        }
+        },
+        handleChange,
+        tableData,
+        handleTableSelectionChange,
+        handleColumnsChange
     } = useSettings();
 
     return (
