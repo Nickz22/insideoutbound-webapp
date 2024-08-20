@@ -4,7 +4,7 @@ import { FILTER_OPERATOR_MAPPING } from 'src/utils/c'
 import { useSettings } from './SettingProvider'
 
 const TabMeeting = () => {
-    const { settings } = useSettings();
+    const { settings, handleChange, filter: { eventFilterFields, taskFilterFields } } = useSettings();
 
     return (
         <Card id="meeting">
@@ -30,11 +30,15 @@ const TabMeeting = () => {
                         hasNameField={false}
                         isNameReadOnly={false}
                         initialFilterContainer={settings.meetingsCriteria}
-                        onLogicChange={(newContainer) =>
-                            handleChange("meetingsCriteria", newContainer)
+                        onLogicChange={
+                            /** @param {import('types/FilterContainer').FilterContainer} newContainer */
+                            (newContainer) =>
+                                handleChange("meetingsCriteria", newContainer)
                         }
-                        onValueChange={(newContainer) =>
-                            handleChange("meetingsCriteria", newContainer)
+                        onValueChange={
+                            /** @param {import('types/FilterContainer').FilterContainer} newContainer */
+                            (newContainer) =>
+                                handleChange("meetingsCriteria", newContainer)
                         }
                         filterFields={
                             settings.meetingObject === "Event"

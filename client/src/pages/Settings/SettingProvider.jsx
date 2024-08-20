@@ -6,10 +6,12 @@ import {
     useMemo,
     useState,
 } from "react";
-import { deleteAllActivations, saveSettings } from "src/components/Api/Api";
+import { deleteAllActivations, fetchSalesforceUsers, saveSettings } from "src/components/Api/Api";
 
 /** @typedef {import("types/Settings").SettingsContextValue} SettingsContextValue */
 /** @typedef {import("types/FilterContainer").FilterContainer} FilterContainer */
+/** @typedef {import("types/TableData").TableData} TableData */
+/** @typedef {import("types/TableColumn").TableColumn} TableColumn */
 
 /** @type {FilterContainer} */
 const initMeetingsCriteria = { filters: [], filterLogic: "", name: "" }
@@ -25,6 +27,25 @@ const initEventFilterFields = []
 
 /** @type {any[]} */
 const initTaskFilterFields = []
+
+/** @type {TableColumn[]} */
+const initAvailableColumns = [];
+
+/** @type {TableColumn[]} */
+const initColumns = []
+
+/** @type{Record<string, any>[]} */
+const initData = []
+
+const initSelectedIds = new Set([])
+
+/** @type {TableData} */
+const initTableData = {
+    availableColumns: initAvailableColumns,
+    columns: initColumns,
+    data: initData,
+    selectedIds: initSelectedIds
+}
 
 /** @type {import("react").Context<SettingsContextValue>} */
 const SettingsContext = createContext({
@@ -53,7 +74,25 @@ const SettingsContext = createContext({
     filter: {
         eventFilterFields: initEventFilterFields,
         taskFilterFields: initTaskFilterFields
-    }
+    },
+    handleChange: (field, value) => {
+        field;
+        value;
+        return;
+    },
+    formatDateForInput: (date) => {
+        date;
+        return;
+    },
+    handleCriteriaChange: (index, value) => {
+        index;
+        value;
+        return;
+    },
+    fetchTeamMembersData: async (selectedIds) => { selectedIds; return; },
+    handleDeleteFilter: (index) => { index; return; },
+    handleAddCriteria: () => { return; },
+    tableData: initTableData,
 });
 
 /**
@@ -85,7 +124,9 @@ export const SettingsProvider = ({
 
     /** @type {[FilterContainer[], React.Dispatch<React.SetStateAction<FilterContainer[]>>]} */
     const [criteria, setCriteria] = useState(initCriteria);
-    const [tableData, setTableData] = useState(null);
+
+    /** @type {[TableData, React.Dispatch<React.SetStateAction<TableData>>]} */
+    const [tableData, setTableData] = useState(initTableData);
     const [isTableLoading, setIsTableLoading] = useState(false);
     const [currentTab, setCurrentTab] = useState(0);
 
@@ -106,7 +147,7 @@ export const SettingsProvider = ({
         []
     );
 
-    /** @type {(field: string, value: string | number | boolean) => void} */
+    /** @type {(field: string, value: string | number | boolean | FilterContainer) => void} */
     const handleChange = useCallback(
         (field, value) => {
             setSettings((prev) => {
@@ -138,6 +179,7 @@ export const SettingsProvider = ({
                 return updatedSettings;
             });
         },
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         [debouncedSaveSettings]
     );
 
@@ -160,6 +202,7 @@ export const SettingsProvider = ({
         try {
             const response = await fetchSalesforceUsers();
             if (response.success) {
+                /** @type {TableColumn[]} */
                 const columns = [
                     { id: "select", label: "Select", dataType: "select" },
                     { id: "photoUrl", label: "", dataType: "image" },

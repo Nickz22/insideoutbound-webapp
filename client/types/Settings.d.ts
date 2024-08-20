@@ -1,5 +1,6 @@
 import { TabsOwnProps } from "@mui/material";
 import { FilterContainer } from "./FilterContainer";
+import { TableData } from "./TableData";
 
 export interface Settings {
   inactivityThreshold: number;
@@ -43,14 +44,19 @@ export interface SettingsContextValue {
   status: SettingStatus;
   currentTab: number;
   setCurrentTab?: Dispatch<SetStateAction<number | null>>;
-  handleTabChange?: TabsOwnProps["onChange"];
   filter: SettingFilter;
   criteria: Settings["criteria"];
   setCriteria?: Dispatch<SetStateAction<Settings["criteria"]>>;
-  fetchTeamMembersData?: (selectedIds: string[]) => Promise<void>;
-  handleChange?: (field: string, value: string | number | boolean) => void;
-  formatDateForInput?: (date: Date) => void;
-  handleCriteriaChange?: (index: number, value: FilterContainer) => void;
+  tableData: TableData;
+  setTableData?: Dispatch<SetStateAction<TableData>>;
+  handleTabChange?: TabsOwnProps["onChange"];
+  fetchTeamMembersData: (selectedIds: string[]) => Promise<void>;
+  handleChange: (
+    field: string,
+    value: string | number | boolean | FilterContainer
+  ) => void;
+  formatDateForInput: (date: Date) => void;
+  handleCriteriaChange: (index: number, value: FilterContainer) => void;
   handleDeleteFilter: (index: number) => void;
   handleAddCriteria: () => void;
 }
