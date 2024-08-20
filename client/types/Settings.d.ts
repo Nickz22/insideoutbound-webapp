@@ -47,8 +47,8 @@ export interface SettingsContextValue {
   filter: SettingFilter;
   criteria: Settings["criteria"];
   setCriteria?: Dispatch<SetStateAction<Settings["criteria"]>>;
-  tableData: TableData;
-  setTableData?: Dispatch<SetStateAction<TableData>>;
+  tableData: TableData | null;
+  setTableData?: Dispatch<SetStateAction<TableData | null>>;
   handleTabChange?: TabsOwnProps["onChange"];
   fetchTeamMembersData: (selectedIds: string[]) => Promise<void>;
   handleChange: (
@@ -59,4 +59,6 @@ export interface SettingsContextValue {
   handleCriteriaChange: (index: number, value: FilterContainer) => void;
   handleDeleteFilter: (index: number) => void;
   handleAddCriteria: () => void;
+  handleTableSelectionChange: (selectedIds: Set<string>) => void;
+  handleColumnsChange: (newColumns: TableColumn[]) => void;
 }
