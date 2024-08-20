@@ -1,10 +1,19 @@
 import { Box, Button, Card, CardContent, Grid, IconButton, Typography } from '@mui/material'
-import React from 'react'
 import FilterContainer from 'src/components/FilterContainer/FilterContainer'
 import { FILTER_OPERATOR_MAPPING } from 'src/utils/c'
 import CloseIcon from "@mui/icons-material/Close";
+import { useSettings } from './SettingProvider';
 
 const TabProspecting = () => {
+    const {
+        criteria,
+        handleCriteriaChange,
+        handleDeleteFilter,
+        handleAddCriteria,
+        filter: {
+            taskFilterFields
+        }
+    } = useSettings()
     return (
         <Card id="prospecting" sx={{ mb: 2 }}>
             <CardContent sx={{ p: 2 }}>
@@ -19,11 +28,21 @@ const TabProspecting = () => {
                                     isNameReadOnly={false}
                                     key={`filter-${index}`}
                                     initialFilterContainer={criteriaContainer}
-                                    onLogicChange={(newContainer) =>
-                                        handleCriteriaChange(index, newContainer)
+                                    onLogicChange={
+                                        /** @param {import('types/FilterContainer').FilterContainer} newContainer */
+                                        (newContainer) => {
+                                            if (handleCriteriaChange) {
+                                                handleCriteriaChange(index, newContainer)
+                                            }
+                                        }
                                     }
-                                    onValueChange={(newContainer) =>
-                                        handleCriteriaChange(index, newContainer)
+                                    onValueChange={
+                                        /** @param {import('types/FilterContainer').FilterContainer} newContainer */
+                                        (newContainer) => {
+                                            if (handleCriteriaChange) {
+                                                handleCriteriaChange(index, newContainer)
+                                            }
+                                        }
                                     }
                                     filterFields={taskFilterFields}
                                     filterOperatorMapping={FILTER_OPERATOR_MAPPING}

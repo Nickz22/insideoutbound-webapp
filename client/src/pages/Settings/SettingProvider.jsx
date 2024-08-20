@@ -6,14 +6,15 @@ import {
     useMemo,
     useState,
 } from "react";
-import { saveSettings } from "src/components/Api/Api";
+import { deleteAllActivations, saveSettings } from "src/components/Api/Api";
 
 /** @typedef {import("types/Settings").SettingsContextValue} SettingsContextValue */
+/** @typedef {import("types/FilterContainer").FilterContainer} FilterContainer */
 
-/** @type {import("types/FilterContainer").FilterContainer} */
+/** @type {FilterContainer} */
 const initMeetingsCriteria = { filters: [], filterLogic: "", name: "" }
 
-/** @type {import("types/FilterContainer").FilterContainer[]} */
+/** @type {FilterContainer[]} */
 const initCriteria = []
 
 /** @type {string[]} */
@@ -41,6 +42,7 @@ const SettingsContext = createContext({
         teamMemberIds: initTeamMemberIds,
         latestDateQueried: null,
     },
+    criteria: initCriteria,
     status: {
         isLoading: Boolean(false),
         isTableLoading: Boolean(false),
@@ -62,7 +64,7 @@ export const SettingsProvider = ({
 }) => {
     const [settings, setSettings] = useState({
         inactivityThreshold: 0,
-        criteria: [],
+        criteria: initCriteria,
         meetingObject: "",
         meetingsCriteria: { filters: [], filterLogic: "", name: "" },
         activitiesPerContact: 0,
@@ -71,7 +73,7 @@ export const SettingsProvider = ({
         activateByMeeting: false,
         activateByOpportunity: false,
         userRole: "",
-        teamMemberIds: [],
+        teamMemberIds: initTeamMemberIds,
         latestDateQueried: null,
     });
 
@@ -80,7 +82,9 @@ export const SettingsProvider = ({
     const [taskFilterFields, setTaskFilterFields] = useState([]);
     const [eventFilterFields, setEventFilterFields] = useState([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [criteria, setCriteria] = useState([]);
+
+    /** @type {[FilterContainer[], React.Dispatch<React.SetStateAction<FilterContainer[]>>]} */
+    const [criteria, setCriteria] = useState(initCriteria);
     const [tableData, setTableData] = useState(null);
     const [isTableLoading, setIsTableLoading] = useState(false);
     const [currentTab, setCurrentTab] = useState(0);
@@ -181,6 +185,7 @@ export const SettingsProvider = ({
         }
     };
 
+    /** @type {(index: number) => void} */
     const handleDeleteFilter = useCallback(
         (index) => {
             setCriteria((prevCriteria) => {
@@ -196,6 +201,7 @@ export const SettingsProvider = ({
         [debouncedSaveSettings]
     );
 
+    /** @type {() => void} */
     const handleAddCriteria = useCallback(() => {
         setCriteria((prevCriteria) => {
             const newCriteria = [
@@ -211,6 +217,7 @@ export const SettingsProvider = ({
         });
     }, [debouncedSaveSettings]);
 
+    /** @type {(index: number, value: FilterContainer) => void} */
     const handleCriteriaChange = useCallback(
         (index, newContainer) => {
             setSettings((prev) => {
@@ -304,7 +311,10 @@ export const SettingsProvider = ({
                 formatDateForInput,
                 tableData,
                 setTableData,
-                fetchTeamMembersData
+                fetchTeamMembersData,
+                handleCriteriaChange,
+                handleDeleteFilter,
+                handleAddCriteria
             }}
         >
             {children}

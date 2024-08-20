@@ -50,4 +50,7 @@ export interface SettingsContextValue {
   fetchTeamMembersData?: (selectedIds: string[]) => Promise<void>;
   handleChange?: (field: string, value: string | number | boolean) => void;
   formatDateForInput?: (date: Date) => void;
+  handleCriteriaChange?: (index: number, value: FilterContainer) => void;
+  handleDeleteFilter: (index: number) => void;
+  handleAddCriteria: () => void;
 }
