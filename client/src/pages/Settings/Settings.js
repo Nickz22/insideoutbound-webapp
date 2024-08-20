@@ -101,6 +101,7 @@ const Settings = () => {
     };
 
     fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
 
 
@@ -135,9 +136,6 @@ const Settings = () => {
       <TabProspecting />
       <TabMeeting />
       <TabUserRole />
-
-
-
 
       <Snackbar
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}

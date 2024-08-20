@@ -13,7 +13,8 @@ const TabProspecting = () => {
         filter: {
             taskFilterFields
         }
-    } = useSettings()
+    } = useSettings();
+
     return (
         <Card id="prospecting" sx={{ mb: 2 }}>
             <CardContent sx={{ p: 2 }}>

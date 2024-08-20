@@ -1,12 +1,10 @@
-import { debounce } from "lodash";
 import {
     createContext,
     useCallback,
     useContext,
-    useMemo,
     useState,
 } from "react";
-import { deleteAllActivations, fetchSalesforceUsers, saveSettings } from "src/components/Api/Api";
+import { useSettingUtil } from "./useSettingUtil";
 
 /** @typedef {import("types/Settings").SettingsContextValue} SettingsContextValue */
 /** @typedef {import("types/FilterContainer").FilterContainer} FilterContainer */
@@ -33,22 +31,25 @@ const initTableData = () => {
     return null;
 }
 
+/** @type {import("types/Settings").Settings} */
+const initSettings = {
+    inactivityThreshold: 0,
+    criteria: initCriteria,
+    meetingObject: "",
+    meetingsCriteria: initMeetingsCriteria,
+    activitiesPerContact: 0,
+    contactsPerAccount: 0,
+    trackingPeriod: 0,
+    activateByMeeting: Boolean(false),
+    activateByOpportunity: Boolean(false),
+    userRole: "",
+    teamMemberIds: initTeamMemberIds,
+    latestDateQueried: null,
+};
+
 /** @type {import("react").Context<SettingsContextValue>} */
 const SettingsContext = createContext({
-    settings: {
-        inactivityThreshold: 0,
-        criteria: initCriteria,
-        meetingObject: "",
-        meetingsCriteria: initMeetingsCriteria,
-        activitiesPerContact: 0,
-        contactsPerAccount: 0,
-        trackingPeriod: 0,
-        activateByMeeting: Boolean(false),
-        activateByOpportunity: Boolean(false),
-        userRole: "",
-        teamMemberIds: initTeamMemberIds,
-        latestDateQueried: null,
-    },
+    settings: initSettings,
     criteria: initCriteria,
     status: {
         isLoading: Boolean(false),
@@ -89,20 +90,7 @@ const SettingsContext = createContext({
 export const SettingsProvider = ({
     children,
 }) => {
-    const [settings, setSettings] = useState({
-        inactivityThreshold: 0,
-        criteria: initCriteria,
-        meetingObject: "",
-        meetingsCriteria: { filters: [], filterLogic: "", name: "" },
-        activitiesPerContact: 0,
-        contactsPerAccount: 0,
-        trackingPeriod: 0,
-        activateByMeeting: false,
-        activateByOpportunity: false,
-        userRole: "",
-        teamMemberIds: initTeamMemberIds,
-        latestDateQueried: null,
-    });
+    const [settings, setSettings] = useState(initSettings);
 
     const [saving, setSaving] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
@@ -123,119 +111,22 @@ export const SettingsProvider = ({
     const [isTableLoading, setIsTableLoading] = useState(false);
     const [currentTab, setCurrentTab] = useState(0);
 
-    const debouncedSaveSettings = useMemo(
-        () =>
-            debounce(async (settings) => {
-                const { userRole, ...settingsToSave } = settings;
-                setSaving(true);
-                try {
-                    saveSettings(settingsToSave);
-                    setSaveSuccess(true);
-                } catch (error) {
-                    console.error("Error saving settings:", error);
-                } finally {
-                    setSaving(false);
-                }
-            }, 500),
-        []
-    );
-
-    /** @type {(field: string, value: string | number | boolean | FilterContainer) => void} */
-    const handleChange = useCallback(
-        (field, value) => {
-            setSettings((prev) => {
-                const updatedSettings = { ...prev, [field]: value };
-
-                switch (field) {
-                    case "userRole":
-                        if (value === "I manage a team") {
-                            fetchTeamMembersData(prev.teamMemberIds);
-                        } else {
-                            setTableData(null);
-                            updatedSettings.teamMemberIds = [];
-                        }
-                        break;
-                    case "meetingObject":
-                        if (value !== settings.meetingObject) {
-                            updatedSettings.meetingsCriteria = {
-                                filters: [],
-                                filterLogic: "",
-                                name: "",
-                            };
-                        }
-                        break;
-                    case "latestDateQueried":
-                        deleteAllActivations();
-                }
-
-                debouncedSaveSettings(updatedSettings);
-                return updatedSettings;
-            });
-        },
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [debouncedSaveSettings]
-    );
-
-    /** @type {import("@mui/material").TabsOwnProps["onChange"]} */
-    const handleTabChange = (event, newValue) => {
-        setCurrentTab(newValue);
-        // Scroll to the corresponding section
-        const sectionId = ["general", "prospecting", "meeting", "user-role"][
-            newValue
-        ];
-        const element = document.getElementById(sectionId);
-        if (element) {
-            element.scrollIntoView({ behavior: "smooth" });
-        }
-    };
-
-    /** @param {string[]} selectedIds */
-    const fetchTeamMembersData = async (selectedIds = []) => {
-        setIsTableLoading(true);
-        try {
-            const response = await fetchSalesforceUsers();
-            if (response.success) {
-                /** @type {TableColumn[]} */
-                const columns = [
-                    { id: "select", label: "Select", dataType: "select" },
-                    { id: "photoUrl", label: "", dataType: "image" },
-                    { id: "firstName", label: "First Name", dataType: "string" },
-                    { id: "lastName", label: "Last Name", dataType: "string" },
-                    { id: "email", label: "Email", dataType: "string" },
-                    { id: "role", label: "Role", dataType: "string" },
-                    { id: "username", label: "Username", dataType: "string" },
-                ];
-                setTableData({
-                    columns,
-                    data: response.data,
-                    selectedIds: new Set(selectedIds),
-                    availableColumns: columns,
-                });
-            } else {
-                console.error("Error fetching Salesforce users:", response.message);
-            }
-        } catch (error) {
-            console.error("Error fetching Salesforce users:", error);
-        } finally {
-            setIsTableLoading(false);
-        }
-    };
-
-    /** @type {(index: number) => void} */
-    const handleDeleteFilter = useCallback(
-        (index) => {
-            setCriteria((prevCriteria) => {
-                const newCriteria = prevCriteria.filter((_, i) => i !== index);
-                setSettings((prev) => {
-                    const updatedSettings = { ...prev, criteria: newCriteria };
-                    debouncedSaveSettings(updatedSettings);
-                    return updatedSettings;
-                });
-                return newCriteria;
-            });
-        },
-        [debouncedSaveSettings]
-    );
+    const {
+        debouncedSaveSettings,
+        fetchTeamMembersData,
+        handleChange,
+        handleTabChange,
+        handleDeleteFilter
+    } = useSettingUtil({
+        settings: settings,
+        setSettings: setSettings,
+        setSaveSuccess: setSaveSuccess,
+        setSaving: setSaving,
+        setTableData: setTableData,
+        setIsTableLoading: setIsTableLoading,
+        setCurrentTab: setCurrentTab,
+        setCriteria: setCriteria
+    })
 
     /** @type {() => void} */
     const handleAddCriteria = useCallback(() => {

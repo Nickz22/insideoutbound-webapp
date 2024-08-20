@@ -40,10 +40,10 @@ export interface SettingFilter {
 
 export interface SettingsContextValue {
   settings: Settings;
-  setSettings?: Dispatch<SetStateAction<string | null>>;
+  setSettings?: Dispatch<SetStateAction<Settings>>;
   status: SettingStatus;
   currentTab: number;
-  setCurrentTab?: Dispatch<SetStateAction<number | null>>;
+  setCurrentTab?: Dispatch<SetStateAction<number>>;
   filter: SettingFilter;
   criteria: Settings["criteria"];
   setCriteria?: Dispatch<SetStateAction<Settings["criteria"]>>;

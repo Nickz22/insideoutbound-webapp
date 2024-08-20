@@ -1,6 +1,5 @@
-import { Box, Card, CardContent, CircularProgress, Grid, MenuItem, Select, Typography } from '@mui/material'
-import React from 'react'
-import { useSettings } from './SettingProvider'
+import { Box, Card, CardContent, CircularProgress, Grid, MenuItem, Select, Typography } from '@mui/material';
+import { useSettings } from './SettingProvider';
 import CustomTable from 'src/components/CustomTable/CustomTable';
 
 const TabUserRole = () => {
@@ -61,4 +60,4 @@ const TabUserRole = () => {
     )
 }
 
-export default TabUserRole
+export default TabUserRole;
