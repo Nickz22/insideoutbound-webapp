@@ -8,3 +8,4 @@ supabase
 logger
 colorlog
 sentry-sdk[flask]
+stripe

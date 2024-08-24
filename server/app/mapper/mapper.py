@@ -347,8 +347,17 @@ def python_user_to_supabase_dict(user: UserModel) -> Dict:
         "org_id": user.orgId if user.orgId else "",
         "is_sandbox": None,  # This information is not present in UserModel
         "photo_url": user.photoUrl if user.photoUrl else "",
-        "status": "not paid"  # Default value as per Supabase schema
+        "status": user.status or "not paid"
     }
     
     # Remove None values
     return {k: v for k, v in supabase_user.items() if v is not None}
+
+def supabase_user_to_python_user(row: Dict) -> UserModel:
+    return UserModel(
+        id=row["salesforce_id"],
+        email=row["email"],
+        orgId=row["org_id"],
+        photoUrl=row["photo_url"],
+        status=row["status"]
+    )

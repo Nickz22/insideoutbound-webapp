@@ -17,7 +17,7 @@ from app.data_models import (
 from app.mapper.mapper import (
     python_activation_to_supabase_dict,
     python_settings_to_supabase_dict,
-    python_user_to_supabase_dict
+    python_user_to_supabase_dict,
 )
 from app.utils import get_salesforce_team_ids, format_error_message
 from app.database.settings_selector import load_settings
@@ -26,17 +26,16 @@ SUPABASE_ALL_USERS_PASSWORD = environ.get("SUPABASE_ALL_USERS_PASSWORD")
 from datetime import datetime
 
 
-def upsert_supabase_user(user: UserModel, is_sandbox: bool):
+def upsert_supabase_user(user: UserModel, is_sandbox: bool) -> str:
     try:
         salesforce_id = user.id
-        email = user.email
         supabase = get_supabase_admin_client()
         current_time = datetime.now().isoformat()
 
         # Query the User table to check if the row exists
         existing_user = (
             supabase.table("User")
-            .select("id")
+            .select("*")  # Select all columns to get existing data
             .eq("salesforce_id", salesforce_id)
             .execute()
         )
@@ -45,15 +44,6 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool):
         user_data["is_sandbox"] = is_sandbox
         user_data["updated_at"] = current_time
 
-        # user_data = {
-        #     "salesforce_id": salesforce_id,
-        #     "email": email,
-        #     "photo_url": user.photoUrl,
-        #     "org_id": org_id,
-        #     "is_sandbox": is_sandbox,
-        #     "updated_at": current_time,
-        # }
-
         if not existing_user.data:
             # If the row does not exist, insert the new record
             user_id = str(uuid4())
@@ -61,9 +51,22 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool):
             user_data["created_at"] = current_time
             supabase.table("User").insert(user_data).execute()
         else:
-            # If the row exists, update the existing record
+            # If the row exists, update only non-null fields
             user_id = existing_user.data[0]["id"]
-            supabase.table("User").update(user_data).eq("id", user_id).execute()
+            existing_data = existing_user.data[0]
+
+            # Merge existing data with new data, preferring non-null new values
+            merged_data = {
+                **existing_data,
+                **{k: v for k, v in user_data.items() if v is not None and v is not ""},
+            }
+
+            # Ensure these fields are always updated
+            merged_data["id"] = user_id
+            merged_data["is_sandbox"] = is_sandbox
+            merged_data["updated_at"] = current_time
+
+            supabase.table("User").update(merged_data).eq("id", user_id).execute()
 
         return user_id
 
