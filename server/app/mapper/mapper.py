@@ -25,7 +25,7 @@ from app.utils import (
 def convert_dict_to_opportunity(opportunity_dict: Dict) -> Opportunity:
     id = opportunity_dict.get("Id")
     name = opportunity_dict.get("Name")
-    amount = float(opportunity_dict.get("Amount", 0.0))
+    amount = float(opportunity_dict.get("Amount") or 0.0)
     close_date_str = opportunity_dict.get("CloseDate")
     close_date = date.fromisoformat(close_date_str) if close_date_str else None
     stage = opportunity_dict.get("StageName")

@@ -217,7 +217,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
 
                 # Determine new status
                 new_status = get_new_status(
-                    activation, settings.criteria, task, opportunities, meetings
+                    activation=activation, criteria=settings.criteria, task=task, opportunities=opportunities, events=meetings
                 )
 
                 if new_status != current_pe.status:
@@ -268,7 +268,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     )
 
                 # Update engagement date if necessary
-                if not activation.engaged_date and is_inbound_criteria(settings.criteria):
+                if not activation.engaged_date and is_inbound_criteria(task, settings.criteria):
                     activation.engaged_date = task_created_datetime.date()
 
             # Update activation status and dates
@@ -279,7 +279,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
 
             # Update opportunity if necessary
             activation.opportunity = (
-                convert_dict_to_opportunity(opportunities[0]) if opportunities else None
+                convert_dict_to_opportunity(opportunities[0]) if opportunities and len(opportunities) > 0 else None
             )
             if (
                 activation.opportunity
@@ -336,7 +336,7 @@ def get_new_status(
         and activation.status != StatusEnum.opportunity_created
     ):
         return StatusEnum.meeting_set
-    elif activation.status == StatusEnum.activated and is_inbound_criteria(criteria):
+    elif activation.status == StatusEnum.activated and is_inbound_criteria(task, criteria):
         return StatusEnum.engaged
 
     return activation.status

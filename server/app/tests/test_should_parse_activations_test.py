@@ -18,27 +18,19 @@ from app.data_models import (
 )
 from app.database.supabase_connection import get_supabase_admin_client
 from app.database.dml import save_session, delete_session
-from server import app
-from server.app import create_app
-from app.database.activation_selector import (
-    load_active_activations_order_by_first_prospecting_activity_asc,
-    load_inactive_activations,
-)
-from app.database.dml import upsert_activations
-from app.utils import add_days, group_by
+from app import create_app
+
 from app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,
     mock_tasks_for_criteria_with_unique_values_content,
 )
 from app.tests.mocks import (
-    MOCK_CONTACT_IDS,
     MOCK_ACCOUNT_IDS,
     add_mock_response,
     clear_mocks,
     response_based_on_query,
     get_n_mock_contacts_for_account,
     get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query,
-    get_one_mock_task_per_contact_for_contains_content_criteria_query,
     get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query,
     get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query,
     get_ten_mock_contacts_spread_across_five_accounts,
@@ -568,6 +560,62 @@ class TestActivationLogic(unittest.TestCase):
     #     )
 
     #     self.assertTrue(is_inactive_account_reactivated)
+    
+    @patch("requests.get")
+    def test_should_update_activation_status_to_opportunity_created_without_additional_task(
+        self, mock_sobject_fetch
+    ):
+        # Set up the initial activation
+        self.setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
+        mock_sobject_fetch.side_effect = response_based_on_query
+        
+        initial_activations = self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )[0].get("raw_data")
+        
+        meeting_set_activation = next(a for a in initial_activations if a["status"] == "Meeting Set")
+        
+        # Create a new opportunity for the account with "Meeting Set" status
+        mock_opportunity = get_mock_opportunity_for_account(meeting_set_activation["account"]["id"])
+        mock_opportunity["Amount"] = 6969.42 
+        
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [mock_opportunity],
+        )
+        
+        # No new tasks
+        mock_contacts = get_n_mock_contacts_for_account(1, meeting_set_activation["account"]["id"])
+        # mock twice since two different queries are being made against same endpoint
+        add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
+        add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
+        add_mock_response("contains_content_criteria_query", [])
+        add_mock_response("unique_values_content_criteria_query", [])
+        add_mock_response("fetch_events_by_account_ids_from_date", [])
+        add_mock_response("fetch_accounts_not_in_ids", [])
+        
+        # Fetch updated activations
+        updated_activations = self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )[0].get("raw_data")
+        
+        # Find the activation that should have been updated
+        updated_activation = next(
+            (a for a in updated_activations if a["account"]["id"] == meeting_set_activation["account"]["id"]),
+            None
+        )
+        
+        # Assert that the activation exists and has been updated
+        self.assertIsNotNone(updated_activation, "The activation should still exist")
+        self.assertEqual(updated_activation["status"], "Opportunity Created", "Status should be 'Opportunity Created'")
+        self.assertEqual(updated_activation["opportunity"]["amount"], 6969.42, "Opportunity amount should be updated")
+        
+        # Check that no new prospecting effort was added
+        self.assertEqual(
+            len(updated_activation["prospecting_effort"]),
+            len(meeting_set_activation["prospecting_effort"]),
+            "No new prospecting effort should be added"
+        )
 
     # helpers
 
