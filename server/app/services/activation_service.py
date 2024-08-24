@@ -291,7 +291,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
             if meetings:
                 if activation.event_ids is None:
                     activation.event_ids = []
-                activation.event_ids.extend([meeting["Id"] for meeting in meetings])
+                activation.event_ids.update(meeting["Id"] for meeting in meetings)
 
             if (
                 activation.event_ids
