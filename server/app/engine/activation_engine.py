@@ -30,74 +30,70 @@ from app.utils import (
 def update_activation_states():
     api_response = ApiResponse(data=[], message="", success=False)
 
-    try:
+    settings = load_settings()
+    salesforce_user_ids = get_team_member_salesforce_ids(settings)
 
-        settings = load_settings()
-        salesforce_user_ids = get_team_member_salesforce_ids(settings)
+    active_activations = (
+        load_active_activations_order_by_first_prospecting_activity_asc().data
+    )
 
-        active_activations = (
-            load_active_activations_order_by_first_prospecting_activity_asc().data
-        )
-
-        unresponsive_activations = None
-        if len(active_activations) > 0:
-            unresponsive_activations = find_unresponsive_activations(
-                active_activations, settings
-            ).data
-
-        if unresponsive_activations and len(unresponsive_activations) > 0:
-            result: ApiResponse = upsert_activations(unresponsive_activations)
-            if not result.success:
-                raise Exception(result.message)
-
-        active_activations = [
-            a for a in active_activations if a.id not in unresponsive_activations
-        ]
-
-        if len(active_activations) > 0:
-            incremented_activations = increment_existing_activations(
-                active_activations, settings
-            ).data
-            upsert_activations(incremented_activations)
-
-        active_account_ids = list(pluck(active_activations, "account.id"))
-        activatable_account_ids = list(
-            pluck(fetch_accounts_not_in_ids(active_account_ids).data, "id")
-        )
-
-        tasks_by_filter_name = fetch_criteria_tasks_by_account_ids_from_date(
-            activatable_account_ids,
-            f"{get_threshold_date_for_activatable_tasks(settings)}T00:00:00Z",
-            settings.criteria,
-            salesforce_user_ids,
+    unresponsive_activations = None
+    if len(active_activations) > 0:
+        unresponsive_activations = find_unresponsive_activations(
+            active_activations, settings
         ).data
 
-        contact_ids = set()
-        for criteria_name in tasks_by_filter_name:
-            contact_ids.update(pluck(tasks_by_filter_name[criteria_name], WHO_ID))
+    if unresponsive_activations and len(unresponsive_activations) > 0:
+        result: ApiResponse = upsert_activations(unresponsive_activations)
+        if not result.success:
+            raise Exception(result.message)
 
-        contacts = (
-            fetch_contacts_by_ids_and_non_null_accounts(list(contact_ids)).data
-            if len(contact_ids) > 0
-            else []
-        )
+    active_activations = [
+        a for a in active_activations if a.id not in unresponsive_activations
+    ]
 
-        new_activations = compute_activated_accounts(
-            tasks_by_filter_name, contacts, settings
+    if len(active_activations) > 0:
+        incremented_activations = increment_existing_activations(
+            active_activations, settings
         ).data
+        upsert_activations(incremented_activations)
 
-        if len(new_activations) > 0:
-            upsert_activations(new_activations)
+    active_account_ids = list(pluck(active_activations, "account.id"))
+    activatable_account_ids = list(
+        pluck(fetch_accounts_not_in_ids(active_account_ids).data, "id")
+    )
 
-        settings.latest_date_queried = get_utc_now_for_supabase()
-        save_settings(settings)
+    tasks_by_filter_name = fetch_criteria_tasks_by_account_ids_from_date(
+        activatable_account_ids,
+        f"{get_threshold_date_for_activatable_tasks(settings)}T00:00:00Z",
+        settings.criteria,
+        salesforce_user_ids,
+    ).data
 
-        api_response.data = (
-            load_active_activations_order_by_first_prospecting_activity_asc().data
-        )
-        api_response.success = True
-    except Exception as e:
-        raise Exception(format_error_message(e))
+    contact_ids = set()
+    for criteria_name in tasks_by_filter_name:
+        contact_ids.update(pluck(tasks_by_filter_name[criteria_name], WHO_ID))
+
+    contacts = (
+        fetch_contacts_by_ids_and_non_null_accounts(list(contact_ids)).data
+        if len(contact_ids) > 0
+        else []
+    )
+
+    new_activations = compute_activated_accounts(
+        tasks_by_filter_name, contacts, settings
+    ).data
+
+    if len(new_activations) > 0:
+        upsert_activations(new_activations)
+
+    settings.latest_date_queried = get_utc_now_for_supabase()
+    save_settings(settings)
+
+    api_response.data = (
+        load_active_activations_order_by_first_prospecting_activity_asc().data
+    )
+    api_response.success = True
 
     return api_response
 
