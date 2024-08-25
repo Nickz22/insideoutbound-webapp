@@ -17,9 +17,9 @@ from app.data_models import (
     DataType,
 )
 from app.database.supabase_connection import get_supabase_admin_client
-from app.database.dml import save_session, delete_session
+from app.database.dml import save_session, delete_session, upsert_activations
+from app.database.activation_selector import load_active_activations_order_by_first_prospecting_activity_asc,load_inactive_activations
 from app import create_app
-
 from app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,
     mock_tasks_for_criteria_with_unique_values_content,
@@ -469,98 +469,97 @@ class TestActivationLogic(unittest.TestCase):
         self.assertEqual(len(engaged_prospecting_effort[0]["task_ids"]), 2)
         self.assertEqual(len(opportunity_created_prospecting_effort[0]["task_ids"]), 2)
 
-    # @patch("requests.get")
-    # def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
-    #     self, mock_sobject_fetch
-    # ):
-    #     # setup mock api responses
-    #     self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
+    @patch("requests.get")
+    def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
+        self, mock_sobject_fetch
+    ):
+        # setup mock api responses
+        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
 
-    #     mock_sobject_fetch.side_effect = response_based_on_query
-    #     self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )
+        mock_sobject_fetch.side_effect = response_based_on_query
+        initial_activations = self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )[0].get("raw_data")
 
-    #     activations = (
-    #         load_active_activations_order_by_first_prospecting_activity_asc().data
-    #     )
-    #     self.assertEqual(5, len(activations))
+        self.assertEqual(5, len(initial_activations))
 
-    #     activation = activations[0]
-    #     activation.last_prospecting_activity = add_days(
-    #         activation.last_prospecting_activity, -11
-    #     )
-    #     upsert_activations([activation])
+        # Set the last_prospecting_activity of the first activation to 11 days ago
+        activation_to_inactivate = load_active_activations_order_by_first_prospecting_activity_asc().data[0]
+        activation_to_inactivate.last_prospecting_activity = (
+            datetime.now() - timedelta(days=11)
+        ).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+        
+        response = upsert_activations([activation_to_inactivate])
+        
+        if not response.success:
+            raise Exception(response.message)
 
-    #     self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
+        self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
 
-    #     self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )
+        self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )[0].get("raw_data")
 
-    #     inactive_activations = load_inactive_activations().data
+        unresponsive_activations = load_inactive_activations().data
+        self.assertEqual(len(unresponsive_activations), 1)
+        self.assertEqual(unresponsive_activations[0].id, activation_to_inactivate.id)
 
-    #     self.assertEqual(1, len(inactive_activations))
+    @patch("requests.get")
+    def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
+        self, mock_sobject_fetch
+    ):
+        # setup mock api responses
+        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
+        mock_sobject_fetch.side_effect = response_based_on_query
+        
+        # initial account activation
+        initial_activations = self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )[0].get("raw_data")
 
-    # @patch("requests.get")
-    # def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
-    #     self, mock_sobject_fetch
-    # ):
-    #     # setup mock api responses
-    #     self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
-    #     mock_sobject_fetch.side_effect = response_based_on_query
-    #     # initial account activation
-    #     self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )
+        self.assertEqual(5, len(initial_activations))
 
-    #     activations = (
-    #         load_active_activations_order_by_first_prospecting_activity_asc().data
-    #     )
+        # set last_prospecting_activity of first activation to 1 day over threshold
+        activation_to_inactivate = load_active_activations_order_by_first_prospecting_activity_asc().data[0]
+        activation_to_inactivate.last_prospecting_activity = (
+            datetime.now() - timedelta(days=11)
+        ).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+        
+        response = upsert_activations([activation_to_inactivate])
+        
+        if not response.success:
+            raise Exception(response.message)
 
-    #     self.assertEqual(5, len(activations))
+        # setup no prospecting activity to come back from Salesforce to force inactivation of Activation
+        self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
 
-    #     # set last_prospecting_activity of first activation to 1 day over threshold
-    #     activation = activations[0]
-    #     activation.last_prospecting_activity = add_days(
-    #         activation.last_prospecting_activity, -11
-    #     )
-    #     upsert_activations([activation])
+        # inactivate the Accounts
+        self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )
 
-    #     # setup no prospecting activity to come back from Salesforce to force inactivation of Activation
-    #     self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
+        inactive_activations = load_inactive_activations().data
 
-    #     # inactivate the Accounts
-    #     self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )
+        self.assertEqual(1, len(inactive_activations))
+        self.assertEqual(inactive_activations[0].id, activation_to_inactivate.id)
 
-    #     inactive_activations = load_inactive_activations().data
+        # setup prospecting activities to come back from Salesforce on the new attempt
+        self.setup_six_tasks_across_two_contacts_and_one_account(
+            inactive_activations[0].account.id
+        )
 
-    #     self.assertEqual(1, len(inactive_activations))
-    #     self.assertEqual(inactive_activations[0].id, activation.id)
+        # assert that new activations are created for the previously activated accounts
+        updated_activations = self.assert_and_return_payload(
+            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
+        )[0].get("raw_data")
 
-    #     # setup prospecting activities to come back from Salesforce on the new attempt
-    #     self.setup_six_tasks_across_two_contacts_and_one_account(
-    #         inactive_activations[0].account.id
-    #     )
+        is_inactive_account_reactivated = any(
+            activation["account"]["id"] == inactive_activations[0].account.id
+            for activation in updated_activations
+        )
 
-    #     # assert that new activations are created for the previously activated accounts
-    #     self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )
+        self.assertTrue(is_inactive_account_reactivated)
 
-    #     active_activations = (
-    #         load_active_activations_order_by_first_prospecting_activity_asc().data
-    #     )
-
-    #     is_inactive_account_reactivated = any(
-    #         activation.account.id == inactive_activations[0].account.id
-    #         for activation in active_activations
-    #     )
-
-    #     self.assertTrue(is_inactive_account_reactivated)
-    
     @patch("requests.get")
     def test_should_update_activation_status_to_opportunity_created_without_additional_task(
         self, mock_sobject_fetch
@@ -568,24 +567,30 @@ class TestActivationLogic(unittest.TestCase):
         # Set up the initial activation
         self.setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
         mock_sobject_fetch.side_effect = response_based_on_query
-        
+
         initial_activations = self.assert_and_return_payload(
             self.client.post("/fetch_prospecting_activity", headers=self.api_header)
         )[0].get("raw_data")
-        
-        meeting_set_activation = next(a for a in initial_activations if a["status"] == "Meeting Set")
-        
+
+        meeting_set_activation = next(
+            a for a in initial_activations if a["status"] == "Meeting Set"
+        )
+
         # Create a new opportunity for the account with "Meeting Set" status
-        mock_opportunity = get_mock_opportunity_for_account(meeting_set_activation["account"]["id"])
-        mock_opportunity["Amount"] = 6969.42 
-        
+        mock_opportunity = get_mock_opportunity_for_account(
+            meeting_set_activation["account"]["id"]
+        )
+        mock_opportunity["Amount"] = 6969.42
+
         add_mock_response(
             "fetch_opportunities_by_account_ids_from_date",
             [mock_opportunity],
         )
-        
+
         # No new tasks
-        mock_contacts = get_n_mock_contacts_for_account(1, meeting_set_activation["account"]["id"])
+        mock_contacts = get_n_mock_contacts_for_account(
+            1, meeting_set_activation["account"]["id"]
+        )
         # mock twice since two different queries are being made against same endpoint
         add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
         add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
@@ -593,28 +598,40 @@ class TestActivationLogic(unittest.TestCase):
         add_mock_response("unique_values_content_criteria_query", [])
         add_mock_response("fetch_events_by_account_ids_from_date", [])
         add_mock_response("fetch_accounts_not_in_ids", [])
-        
+
         # Fetch updated activations
         updated_activations = self.assert_and_return_payload(
             self.client.post("/fetch_prospecting_activity", headers=self.api_header)
         )[0].get("raw_data")
-        
+
         # Find the activation that should have been updated
         updated_activation = next(
-            (a for a in updated_activations if a["account"]["id"] == meeting_set_activation["account"]["id"]),
-            None
+            (
+                a
+                for a in updated_activations
+                if a["account"]["id"] == meeting_set_activation["account"]["id"]
+            ),
+            None,
         )
-        
+
         # Assert that the activation exists and has been updated
         self.assertIsNotNone(updated_activation, "The activation should still exist")
-        self.assertEqual(updated_activation["status"], "Opportunity Created", "Status should be 'Opportunity Created'")
-        self.assertEqual(updated_activation["opportunity"]["amount"], 6969.42, "Opportunity amount should be updated")
-        
+        self.assertEqual(
+            updated_activation["status"],
+            "Opportunity Created",
+            "Status should be 'Opportunity Created'",
+        )
+        self.assertEqual(
+            updated_activation["opportunity"]["amount"],
+            6969.42,
+            "Opportunity amount should be updated",
+        )
+
         # Check that no new prospecting effort was added
         self.assertEqual(
             len(updated_activation["prospecting_effort"]),
             len(meeting_set_activation["prospecting_effort"]),
-            "No new prospecting effort should be added"
+            "No new prospecting effort should be added",
         )
 
     # helpers

@@ -49,7 +49,7 @@ def update_activation_states():
             raise Exception(result.message)
 
     active_activations = [
-        a for a in active_activations if a.id not in unresponsive_activations
+        a for a in active_activations if a.id not in [u.id for u in unresponsive_activations]
     ]
 
     if len(active_activations) > 0:
