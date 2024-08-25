@@ -14,6 +14,7 @@ def generate_summary(activations: list[Activation]) -> dict:
         "total_accounts": 0,
         "total_deals": 0,
         "total_pipeline_value": 0,
+        "engaged_activations": 0,
     }
 
     account_contacts = defaultdict(set)
@@ -32,6 +33,8 @@ def generate_summary(activations: list[Activation]) -> dict:
         if activation.opportunity:
             summary["total_deals"] += 1
             summary["total_pipeline_value"] += activation.opportunity.amount
+        if activation.status == "Engaged":
+            summary["engaged_activations"] += 1
 
     summary["total_contacts"] = sum(
         len(contacts) for contacts in account_contacts.values()
@@ -47,5 +50,6 @@ def generate_summary(activations: list[Activation]) -> dict:
         if summary["total_accounts"] > 0
         else 0
     )
+
 
     return summary

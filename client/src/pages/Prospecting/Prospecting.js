@@ -388,6 +388,7 @@ const Prospecting = () => {
         total_accounts: 0,
         total_deals: 0,
         total_pipeline_value: 0,
+        engaged_activations: 0,
       });
     }
   }, [filteredData]);
@@ -448,7 +449,7 @@ const Prospecting = () => {
           </FormControl>
           {activatedByUsers.length > 0 && (
             <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="activated-by-label">User</InputLabel>
+              <InputLabel id="activated-by-label">Activated By</InputLabel>
               <Select
                 labelId="activated-by-label"
                 id="activated-by-select"
@@ -536,6 +537,13 @@ const Prospecting = () => {
                 <MetricCard
                   title="Total Pipeline Value"
                   value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Engaged Activations"
+                  value={summaryData.engaged_activations.toString()}
                   subText=""
                 />
               </Grid>
