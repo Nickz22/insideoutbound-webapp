@@ -9,7 +9,7 @@ from app.data_models import (
     StatusEnum,
 )
 from typing import List, Dict
-from datetime import timedelta
+from flask import current_app as app
 
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
@@ -843,15 +843,14 @@ def get_meetings_by_account_id(
             settings.meetings_criteria,
         ).data
     elif settings.meeting_object == "Task":
-        meetings_by_criteria_name_by_account_id = (
-            fetch_tasks_by_account_ids_from_date_not_in_ids(
-                list(account_ids),
-                first_prospecting_activity,
-                [settings.meetings_criteria],
-                [],
-                salesforce_user_ids,
-            ).data
+        task_meetings = app.async_fetch_tasks_by_account_ids_from_date_not_in_ids(
+            list(account_ids),
+            first_prospecting_activity,
+            [settings.meetings_criteria],
+            [],
+            salesforce_user_ids,
         )
+        meetings_by_criteria_name_by_account_id = task_meetings.data
 
         for (
             account_id,

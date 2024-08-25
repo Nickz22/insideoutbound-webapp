@@ -3,8 +3,9 @@ from flask_cors import CORS
 from config import Config
 import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
-
+import asyncio
 import os
+from app.salesforce_api import fetch_tasks_by_account_ids_from_date_not_in_ids
 
 SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8000")
 REACT_APP_URL = os.getenv("REACT_APP_URL", "http://localhost:3000")
@@ -53,5 +54,23 @@ def create_app():
             f"style-src 'self' 'unsafe-inline' {SERVER_URL} {REACT_APP_URL}"
         )
         return response
+
+    async def async_fetch_tasks_by_account_ids_from_date_not_in_ids(
+        account_ids, start, criteria, already_counted_task_ids, salesforce_user_ids
+    ):
+        return await fetch_tasks_by_account_ids_from_date_not_in_ids(
+            account_ids, start, criteria, already_counted_task_ids, salesforce_user_ids
+        )
+
+    def run_async_task_fetcher(*args):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(
+            async_fetch_tasks_by_account_ids_from_date_not_in_ids(*args)
+        )
+        loop.close()
+        return result
+
+    app.async_fetch_tasks_by_account_ids_from_date_not_in_ids = run_async_task_fetcher
 
     return app
