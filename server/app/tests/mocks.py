@@ -1,4 +1,5 @@
-import random, copy
+import random, copy, re
+from aiohttp import web
 from app.tests.utils import is_valid_salesforce_query
 from unittest.mock import MagicMock
 from app.tests.c import (
@@ -59,6 +60,8 @@ def clear_mocks():
     for key in sobject_api_mock_response_by_request_key.keys():
         sobject_api_mock_response_by_request_key[key] = []
 
+import re
+from aiohttp import web
 
 def response_based_on_query(url, **kwargs):
     """

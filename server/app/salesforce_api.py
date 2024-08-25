@@ -193,65 +193,62 @@ async def fetch_tasks_by_account_ids_from_date_not_in_ids(
 ) -> ApiResponse:
     api_response = ApiResponse(data=[], message="", success=False)
 
-    try:
-        contacts = fetch_contacts_by_account_ids(account_ids)
-        contact_by_id = {contact.id: contact for contact in contacts.data}
-        contact_ids = list(pluck(contacts.data, "id"))
+    contacts = fetch_contacts_by_account_ids(account_ids)
+    contact_by_id = {contact.id: contact for contact in contacts.data}
+    contact_ids = list(pluck(contacts.data, "id"))
 
-        batch_size = 150
-        tasks_by_criteria_name = {}
+    batch_size = 150
+    tasks_by_criteria_name = {}
 
-        async def process_batch(batch_contact_ids, session):
-            additional_filter = "WhoId IN ({})".format(
-                ", ".join(map(lambda id: f"'{id}'", batch_contact_ids))
-            )
-            batch_tasks = await fetch_contact_tasks_by_criteria_from_date_async(
-                criteria, start, additional_filter, salesforce_user_ids, session
-            )
-            return batch_tasks
+    async def process_batch(batch_contact_ids, session):
+        additional_filter = "WhoId IN ({})".format(
+            ", ".join(map(lambda id: f"'{id}'", batch_contact_ids))
+        )
+        batch_tasks = await fetch_contact_tasks_by_criteria_from_date_async(
+            criteria, start, additional_filter, salesforce_user_ids, session
+        )
+        return batch_tasks
 
-        async with aiohttp.ClientSession() as session:
-            batches = [
-                contact_ids[i : i + batch_size]
-                for i in range(0, len(contact_ids), batch_size)
-            ]
-            batch_results = await asyncio.gather(
-                *[process_batch(batch, session) for batch in batches]
-            )
+    async with aiohttp.ClientSession() as session:
+        batches = [
+            contact_ids[i : i + batch_size]
+            for i in range(0, len(contact_ids), batch_size)
+        ]
+        batch_results = await asyncio.gather(
+            *[process_batch(batch, session) for batch in batches]
+        )
 
-        for batch_result in batch_results:
-            for criteria_name, tasks in batch_result.items():
-                if criteria_name not in tasks_by_criteria_name:
-                    tasks_by_criteria_name[criteria_name] = []
-                tasks_by_criteria_name[criteria_name].extend(tasks)
+    for batch_result in batch_results:
+        for criteria_name, tasks in batch_result.items():
+            if criteria_name not in tasks_by_criteria_name:
+                tasks_by_criteria_name[criteria_name] = []
+            tasks_by_criteria_name[criteria_name].extend(tasks)
 
-        criteria_group_tasks_by_account_id = {
-            account_id: {} for account_id in account_ids
-        }
+    criteria_group_tasks_by_account_id = {
+        account_id: {} for account_id in account_ids
+    }
 
-        for criteria_name, tasks in tasks_by_criteria_name.items():
-            for task in tasks:
-                if task.get("Id") in already_counted_task_ids:
-                    continue
-                contact = contact_by_id.get(task.get("WhoId"))
-                if contact:
-                    account_id = contact.account_id
-                    if (
-                        criteria_name
-                        not in criteria_group_tasks_by_account_id[account_id]
-                    ):
-                        criteria_group_tasks_by_account_id[account_id][
-                            criteria_name
-                        ] = []
+    for criteria_name, tasks in tasks_by_criteria_name.items():
+        for task in tasks:
+            if task.get("Id") in already_counted_task_ids:
+                continue
+            contact = contact_by_id.get(task.get("WhoId"))
+            if contact:
+                account_id = contact.account_id
+                if (
+                    criteria_name
+                    not in criteria_group_tasks_by_account_id[account_id]
+                ):
                     criteria_group_tasks_by_account_id[account_id][
                         criteria_name
-                    ].append(task)
+                    ] = []
+                criteria_group_tasks_by_account_id[account_id][
+                    criteria_name
+                ].append(task)
 
         api_response.data = criteria_group_tasks_by_account_id
         api_response.success = True
         api_response.message = "Tasks fetched and organized successfully."
-    except Exception as e:
-        raise Exception(format_error_message(e))
 
     return api_response
 
@@ -269,24 +266,21 @@ async def fetch_contact_tasks_by_criteria_from_date_async(
         soql_query += f"{additional_filter} AND "
     tasks_by_filter_name = {}
 
-    try:
-        for filter_container in criteria:
-            combined_conditions = _construct_where_clause_from_filter(filter_container)
-            full_query = f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC"
+    for filter_container in criteria:
+        combined_conditions = _construct_where_clause_from_filter(filter_container)
+        full_query = f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC"
 
-            contact_task_models = await _fetch_sobjects_async(
-                full_query, get_credentials(), session
-            )
+        contact_task_models = await _fetch_sobjects_async(
+            full_query, get_credentials(), session
+        )
 
-            tasks_by_filter_name[filter_container.name] = [
-                task
-                for task in contact_task_models
-                if task.get("WhoId", "")
-                and not task.get("WhoId", "").upper().startswith("00Q")
-            ]
+        tasks_by_filter_name[filter_container.name] = [
+            task
+            for task in contact_task_models
+            if task.get("WhoId", "")
+            and not task.get("WhoId", "").upper().startswith("00Q")
+        ]
 
-    except Exception as e:
-        raise Exception(format_error_message(e))
 
     return tasks_by_filter_name
 
