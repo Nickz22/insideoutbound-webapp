@@ -127,7 +127,7 @@ def find_unresponsive_activations(
                 activation.status = "Unresponsive"
                 activations_by_account_id[account_id] = activation
 
-        response.data = activations_by_account_id.values()
+        response.data = list(activations_by_account_id.values())
         response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))
