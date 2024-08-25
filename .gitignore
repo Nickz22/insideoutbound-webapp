@@ -32,3 +32,9 @@ client/src/.DS_Store
 client/.env
 server/.env
 flask_session
+.vscode/launch.json
+server/.vscode/launch.json
+server/.vscode/settings.json
+supabase/.gitignore
+supabase/config.toml
+.vscode/launch.json
