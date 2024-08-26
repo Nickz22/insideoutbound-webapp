@@ -39,6 +39,7 @@ from app.tests.mocks import (
     get_mock_opportunity_for_account,
     get_one_mock_task_per_contact_for_unique_content_criteria_query_x,
     add_mock_response,
+    get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query
 )
 
 mock_user_id = "mock_user_id"
@@ -554,3 +555,118 @@ class TestActivationLogic:
         ]
 
         return FilterContainerModel(**response_json)
+
+    @pytest.mark.asyncio
+    @patch(
+        "app.salesforce_api._fetch_sobjects_async",
+        side_effect=mock_fetch_sobjects_async,
+    )
+    @patch("requests.get", side_effect=response_based_on_query)
+    async def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
+        self, mock_sobject_fetch, async_mock_sobject_fetch
+    ):
+        with self.app.app_context():
+            # setup mock api responses
+            self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
+
+            # initial account activation
+            response = await asyncio.to_thread(
+                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+            )
+            initial_activations = self.assert_and_return_payload(response)
+
+            assert len(initial_activations) == 5
+
+            # set last_prospecting_activity of first activation to 1 day over threshold
+            activation_to_inactivate = (
+                load_active_activations_order_by_first_prospecting_activity_asc().data[0]
+            )
+            activation_to_inactivate.last_prospecting_activity = (
+                datetime.now() - timedelta(days=11)
+            ).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+
+            response = upsert_activations([activation_to_inactivate])
+
+            if not response.success:
+                raise Exception(response.message)
+
+            # setup no prospecting activity to come back from Salesforce to force inactivation of Activation
+            self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
+
+            # inactivate the Accounts
+            response = await asyncio.to_thread(
+                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+            )
+            self.assert_and_return_payload(response)
+
+            inactive_activations = load_inactive_activations().data
+
+            assert len(inactive_activations) == 1
+            assert inactive_activations[0].id == activation_to_inactivate.id
+
+            # setup prospecting activities to come back from Salesforce on the new attempt
+            self.setup_six_tasks_across_two_contacts_and_one_account(
+                inactive_activations[0].account.id
+            )
+
+            # assert that new activations are created for the previously activated accounts
+            response = await asyncio.to_thread(
+                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+            )
+            updated_activations = self.assert_and_return_payload(response)
+
+            is_inactive_account_reactivated = any(
+                activation["account"]["id"] == inactive_activations[0].account.id
+                for activation in updated_activations
+            )
+
+            assert is_inactive_account_reactivated
+
+    def setup_six_tasks_across_two_contacts_and_one_account(self, account_id):
+        add_mock_response(
+            "contains_content_criteria_query",
+            get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query(
+                mock_user_id
+            ),
+        )
+        add_mock_response("unique_values_content_criteria_query", [])
+        add_mock_response(
+            "fetch_accounts_not_in_ids",
+            get_five_mock_accounts(),
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
+        add_mock_response(
+            "contains_content_criteria_query",
+            get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query(
+                mock_user_id
+            ),
+        )
+        add_mock_response("unique_values_content_criteria_query", [])
+        add_mock_response(
+            "fetch_contacts_by_ids_and_non_null_accounts",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [],
+        )
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [],
+        )
+        add_mock_response("fetch_events_by_account_ids_from_date", [])
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_n_mock_contacts_for_account(2, account_id),
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            get_n_mock_contacts_for_account(2, account_id),
+        )

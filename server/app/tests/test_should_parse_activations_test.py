@@ -3,7 +3,7 @@ import unittest, json, os, sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from unittest.mock import patch
 from typing import List
-from datetime import datetime, timedelta
+from datetime import datetime
 from app.data_models import (
     Activation,
     ProspectingMetadata,
@@ -16,11 +16,7 @@ from app.data_models import (
     DataType,
 )
 from app.database.supabase_connection import get_supabase_admin_client
-from app.database.dml import save_session, delete_session, upsert_activations
-from app.database.activation_selector import (
-    load_active_activations_order_by_first_prospecting_activity_asc,
-    load_inactive_activations,
-)
+from app.database.dml import save_session, delete_session
 from app import create_app
 from app.tests.c import (
     mock_tasks_for_criteria_with_contains_content,
@@ -345,65 +341,7 @@ class TestActivationLogic(unittest.TestCase):
             ),
             1,
         )
-
-    @patch("requests.get")
-    def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
-        self, mock_sobject_fetch
-    ):
-        # setup mock api responses
-        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
-        mock_sobject_fetch.side_effect = response_based_on_query
-
-        # initial account activation
-        initial_activations = self.assert_and_return_payload(
-            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-        )[0].get("raw_data")
-
-        self.assertEqual(5, len(initial_activations))
-
-        # set last_prospecting_activity of first activation to 1 day over threshold
-        activation_to_inactivate = (
-            load_active_activations_order_by_first_prospecting_activity_asc().data[0]
-        )
-        activation_to_inactivate.last_prospecting_activity = (
-            datetime.now() - timedelta(days=11)
-        ).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
-
-        response = upsert_activations([activation_to_inactivate])
-
-        if not response.success:
-            raise Exception(response.message)
-
-        # setup no prospecting activity to come back from Salesforce to force inactivation of Activation
-        self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
-
-        # inactivate the Accounts
-        self.assert_and_return_payload(
-            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-        )
-
-        inactive_activations = load_inactive_activations().data
-
-        self.assertEqual(1, len(inactive_activations))
-        self.assertEqual(inactive_activations[0].id, activation_to_inactivate.id)
-
-        # setup prospecting activities to come back from Salesforce on the new attempt
-        self.setup_six_tasks_across_two_contacts_and_one_account(
-            inactive_activations[0].account.id
-        )
-
-        # assert that new activations are created for the previously activated accounts
-        updated_activations = self.assert_and_return_payload(
-            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-        )[0].get("raw_data")
-
-        is_inactive_account_reactivated = any(
-            activation["account"]["id"] == inactive_activations[0].account.id
-            for activation in updated_activations
-        )
-
-        self.assertTrue(is_inactive_account_reactivated)
-
+        
     @patch("requests.get")
     def test_should_update_activation_status_to_opportunity_created_without_additional_task(
         self, mock_sobject_fetch
