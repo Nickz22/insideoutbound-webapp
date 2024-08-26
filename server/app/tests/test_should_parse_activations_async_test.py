@@ -28,7 +28,12 @@ from app.tests.mocks import (
     MOCK_ACCOUNT_IDS,
     response_based_on_query,
     mock_fetch_sobjects_async,
-    clear_mocks
+    clear_mocks,
+    get_n_mock_contacts_for_account,
+    get_mock_opportunity_for_account,
+    get_mock_event_for_contact,
+    get_two_mock_contacts_per_account,
+    get_one_mock_task_per_contact_for_contains_content_criteria_query_x,
 )
 
 mock_user_id = "mock_user_id"
@@ -69,7 +74,6 @@ class TestActivationLogic:
 
             # Setup mock responses
             self.setup_mock_user()
-            self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
 
             yield  # This will run the test
 
@@ -97,6 +101,7 @@ class TestActivationLogic:
         self, mock_sobject_fetch, async_mock_sobject_fetch
     ):
         with self.app.app_context():
+            self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
             response = await asyncio.to_thread(self.client.post, "/fetch_prospecting_activity", headers=self.api_header)
             initial_activations = self.assert_and_return_payload(response)
 
@@ -123,10 +128,70 @@ class TestActivationLogic:
             assert len(unresponsive_activations) == 1
             assert unresponsive_activations[0].id == activation_to_inactivate.id
 
+    @pytest.mark.asyncio
+    @patch(
+        "app.salesforce_api._fetch_sobjects_async",
+        side_effect=mock_fetch_sobjects_async,
+    )
+    @patch("requests.get", side_effect=response_based_on_query)
+    async def test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce(
+        self, mock_sobject_fetch, async_mock_sobject_fetch
+    ):
+        with self.app.app_context():
+            self.setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
+
+            activations = await self.assert_and_return_payload_async(
+                asyncio.to_thread(self.client.post, "/fetch_prospecting_activity", headers=self.api_header)
+            )
+            assert len(activations) == 2
+
+            meeting_set_activation = next(a for a in activations if a["status"] == "Meeting Set")
+            opportunity_created_activation = next(a for a in activations if a["status"] == "Opportunity Created")
+
+            assert len(meeting_set_activation["event_ids"]) == 1
+            assert opportunity_created_activation["opportunity"]["amount"] == 1733.42
+
+            self._validate_prospecting_metadata(meeting_set_activation)
+            self._validate_prospecting_metadata(opportunity_created_activation)
+
+            self._validate_prospecting_effort(meeting_set_activation, expected_efforts=2)
+            self._validate_prospecting_effort(opportunity_created_activation, expected_efforts=3)
+
+    def _validate_prospecting_metadata(self, activation):
+        metadata = activation["prospecting_metadata"]
+        assert len(metadata) == 1
+        assert metadata[0]["name"] == "Contains Content"
+        assert metadata[0]["total"] == 2
+
+        first_date = datetime.strptime(metadata[0]["first_occurrence"], "%Y-%m-%d")
+        last_date = datetime.strptime(metadata[0]["last_occurrence"], "%Y-%m-%d")
+        assert (last_date - first_date).days == 1
+
+    def _validate_prospecting_effort(self, activation, expected_efforts):
+        efforts = activation["prospecting_effort"]
+        assert len(efforts) == expected_efforts
+
+        effort_by_status = {e["status"]: e for e in efforts}
+
+        if "Activated" in effort_by_status:
+            assert len(effort_by_status["Activated"]["task_ids"]) == 0
+
+        if "Engaged" in effort_by_status:
+            assert len(effort_by_status["Engaged"]["task_ids"]) > 0
+
+        if "Opportunity Created" in effort_by_status:
+            assert len(effort_by_status["Opportunity Created"]["task_ids"]) > 0
+
     @staticmethod
     def assert_and_return_payload(response):
         assert response.status_code == 200
         data = response.get_json()  # Remove the 'await' here, dumbass!
+        return data["data"][0]["raw_data"]
+
+    async def assert_and_return_payload_async(self, response_future):
+        response = await response_future
+        assert response.status_code == 200
+        data = response.get_json()
         return data["data"][0]["raw_data"]
 
     def do_onboarding_flow(self):
@@ -271,6 +336,106 @@ class TestActivationLogic:
         add_mock_response("fetch_accounts_not_in_ids", [])
         add_mock_response("fetch_contacts_by_account_ids", [])
         add_mock_response("fetch_contacts_by_account_ids", [])
+
+    def setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account(
+        self,
+    ):
+
+        mock_accounts = get_five_mock_accounts()
+        for account in mock_accounts:
+            account["OwnerId"] = mock_user_id
+
+        ## This Opportunity must be created before the mock tasks are created
+        mock_opportunity = get_mock_opportunity_for_account(mock_accounts[0]["Id"])
+        mock_opportunity["OwnerId"] = mock_user_id
+        mock_contacts = get_two_mock_contacts_per_account(mock_accounts)
+        for contact in mock_contacts:
+            contact["OwnerId"] = mock_user_id
+        mock_event = get_mock_event_for_contact(mock_contacts[3]["Id"])
+        mock_event["OwnerId"] = mock_user_id
+        mock_tasks = (
+            get_one_mock_task_per_contact_for_contains_content_criteria_query_x(
+                mock_contacts
+            )
+        )
+        for task in mock_tasks:
+            task["OwnerId"] = mock_user_id
+
+        # Create a mapping from contact IDs to account IDs
+        contact_to_account_id = {
+            contact["Id"]: contact["AccountId"] for contact in mock_contacts
+        }
+
+        # Group tasks by account ID via the tasks' "WhoId" column
+        tasks_by_account_id = {}
+        for task in mock_tasks:
+            contact_id = task["WhoId"]
+            account_id = contact_to_account_id.get(contact_id)
+            if account_id:
+                if account_id not in tasks_by_account_id:
+                    tasks_by_account_id[account_id] = []
+                tasks_by_account_id[account_id].append(task)
+
+        # Identify the account related to the event and the account related to the opportunity
+        event_related_account_id = contact_to_account_id[mock_event["WhoId"]]
+        opportunity_related_account_id = mock_opportunity["AccountId"]
+
+        # Setting CreatedDate on Tasks
+        today = datetime.now()
+
+        # Set dates for tasks under the account related to the event
+        if event_related_account_id in tasks_by_account_id:
+            tasks = tasks_by_account_id[event_related_account_id]
+            if len(tasks) >= 2:
+                tasks[0]["CreatedDate"] = (today - timedelta(days=3)).strftime(
+                    "%Y-%m-%dT%H:%M:%S.000+0000"
+                )
+                tasks[1]["CreatedDate"] = (today - timedelta(days=2)).strftime(
+                    "%Y-%m-%dT%H:%M:%S.000+0000"
+                )
+
+        # Set dates for tasks under the account related to the opportunity
+        if opportunity_related_account_id in tasks_by_account_id:
+            tasks = tasks_by_account_id[opportunity_related_account_id]
+            if len(tasks) >= 2:
+                tasks[0]["CreatedDate"] = (today - timedelta(days=1)).strftime(
+                    "%Y-%m-%dT%H:%M:%S.000+0000"
+                )
+                tasks[1]["CreatedDate"] = today.strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+
+        mock_tasks = [task for tasks in tasks_by_account_id.values() for task in tasks]
+
+        add_mock_response(
+            "contains_content_criteria_query",
+            mock_tasks,
+        )
+        add_mock_response("unique_values_content_criteria_query", [])
+
+        add_mock_response(
+            "fetch_contacts_by_ids_and_non_null_accounts",
+            mock_contacts,
+        )
+
+        add_mock_response("fetch_accounts_not_in_ids", mock_accounts)
+
+        add_mock_response(
+            "fetch_opportunities_by_account_ids_from_date",
+            [mock_opportunity],
+        )
+
+        add_mock_response(
+            "fetch_events_by_account_ids_from_date",
+            [mock_event],
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            mock_contacts,
+        )
+        add_mock_response(
+            "fetch_contacts_by_account_ids",
+            mock_contacts,
+        )
+
 
     def get_filter_container_via_tasks_from_generate_filters_api(
         self, tasks, columns

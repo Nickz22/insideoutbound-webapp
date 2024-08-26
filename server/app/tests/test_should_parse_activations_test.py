@@ -1,7 +1,7 @@
 import unittest, json, os, sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from unittest.mock import patch, AsyncMock, MagicMock
+from unittest.mock import patch
 from typing import List
 from datetime import datetime, timedelta
 from app.data_models import (
@@ -37,10 +37,7 @@ from app.tests.mocks import (
     get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query,
     get_ten_mock_contacts_spread_across_five_accounts,
     get_mock_opportunity_for_account,
-    get_mock_event_for_contact,
     get_five_mock_accounts,
-    get_two_mock_contacts_per_account,
-    get_one_mock_task_per_contact_for_contains_content_criteria_query_x,
     get_one_mock_task_per_contact_for_unique_content_criteria_query_x,
 )
 
@@ -155,66 +152,6 @@ class TestActivationLogic(unittest.TestCase):
         self.app_context.pop()
         # clear any mock api responses setup by last test
         clear_mocks()
-
-    async def mock_fetch_sobjects_async(soql_query, credentials, session):
-        print(f"Mock _fetch_sobjects_async called with query: {soql_query}")
-
-        # Define your mock responses here based on the query
-        if "FROM Task" in soql_query:
-            return []  # or whatever mock data you want for tasks
-        elif "FROM Contact" in soql_query:
-            return [
-                {"Id": f"mock_contact_{i}", "AccountId": f"mock_account_{i}"}
-                for i in range(5)
-            ]
-        elif "FROM Account" in soql_query:
-            return [
-                {"Id": f"mock_account_{i}", "Name": f"Mock Account {i}"}
-                for i in range(5)
-            ]
-        elif "FROM Opportunity" in soql_query:
-            return []  # or whatever mock data you want for opportunities
-        elif "FROM Event" in soql_query:
-            return []  # or whatever mock data you want for events
-        else:
-            return []  # Default empty response
-        
-    async def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
-        self
-    ):
-        self.mock_fetch_sobjects.side_effect = self.mock_fetch_sobjects_async
-
-        # setup mock api responses
-        self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
-
-        initial_activations = await self.assert_and_return_payload_async(
-            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-        )
-
-        self.assertEqual(5, len(initial_activations))
-
-        # Set the last_prospecting_activity of the first activation to 11 days ago
-        activation_to_inactivate = (
-            await load_active_activations_order_by_first_prospecting_activity_asc()
-        ).data[0]
-        activation_to_inactivate.last_prospecting_activity = (
-            datetime.now() - timedelta(days=11)
-        ).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
-
-        response = await upsert_activations([activation_to_inactivate])
-
-        if not response.success:
-            raise Exception(response.message)
-
-        self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
-
-        await self.assert_and_return_payload_async(
-            self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-        )
-
-        unresponsive_activations = (await load_inactive_activations()).data
-        self.assertEqual(len(unresponsive_activations), 1)
-        self.assertEqual(unresponsive_activations[0].id, activation_to_inactivate.id)
 
     @patch("requests.get")
     def test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce(
@@ -512,43 +449,6 @@ class TestActivationLogic(unittest.TestCase):
         self.assertEqual(len(engaged_prospecting_effort[0]["task_ids"]), 2)
         self.assertEqual(len(opportunity_created_prospecting_effort[0]["task_ids"]), 2)
 
-    # @patch("requests.get")
-    # def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
-    #     self, mock_sobject_fetch
-    # ):
-    #     # setup mock api responses
-    #     self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
-
-    #     mock_sobject_fetch.side_effect = response_based_on_query
-    #     initial_activations = self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )[0].get("raw_data")
-
-    #     self.assertEqual(5, len(initial_activations))
-
-    #     # Set the last_prospecting_activity of the first activation to 11 days ago
-    #     activation_to_inactivate = (
-    #         load_active_activations_order_by_first_prospecting_activity_asc().data[0]
-    #     )
-    #     activation_to_inactivate.last_prospecting_activity = (
-    #         datetime.now() - timedelta(days=11)
-    #     ).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
-
-    #     response = upsert_activations([activation_to_inactivate])
-
-    #     if not response.success:
-    #         raise Exception(response.message)
-
-    #     self.setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events()
-
-    #     self.assert_and_return_payload(
-    #         self.client.post("/fetch_prospecting_activity", headers=self.api_header)
-    #     )[0].get("raw_data")
-
-    #     unresponsive_activations = load_inactive_activations().data
-    #     self.assertEqual(len(unresponsive_activations), 1)
-    #     self.assertEqual(unresponsive_activations[0].id, activation_to_inactivate.id)
-
     @patch("requests.get")
     def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
         self, mock_sobject_fetch
@@ -791,104 +691,6 @@ class TestActivationLogic(unittest.TestCase):
     def setup_mock_user(self):
         add_mock_response("fetch_logged_in_salesforce_user", {"Id": mock_user_id})
 
-    def setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account(
-        self,
-    ):
-
-        mock_accounts = get_five_mock_accounts()
-        for account in mock_accounts:
-            account["OwnerId"] = mock_user_id
-
-        ## This Opportunity must be created before the mock tasks are created
-        mock_opportunity = get_mock_opportunity_for_account(mock_accounts[0]["Id"])
-        mock_opportunity["OwnerId"] = mock_user_id
-        mock_contacts = get_two_mock_contacts_per_account(mock_accounts)
-        for contact in mock_contacts:
-            contact["OwnerId"] = mock_user_id
-        mock_event = get_mock_event_for_contact(mock_contacts[3]["Id"])
-        mock_event["OwnerId"] = mock_user_id
-        mock_tasks = (
-            get_one_mock_task_per_contact_for_contains_content_criteria_query_x(
-                mock_contacts
-            )
-        )
-        for task in mock_tasks:
-            task["OwnerId"] = mock_user_id
-
-        # Create a mapping from contact IDs to account IDs
-        contact_to_account_id = {
-            contact["Id"]: contact["AccountId"] for contact in mock_contacts
-        }
-
-        # Group tasks by account ID via the tasks' "WhoId" column
-        tasks_by_account_id = {}
-        for task in mock_tasks:
-            contact_id = task["WhoId"]
-            account_id = contact_to_account_id.get(contact_id)
-            if account_id:
-                if account_id not in tasks_by_account_id:
-                    tasks_by_account_id[account_id] = []
-                tasks_by_account_id[account_id].append(task)
-
-        # Identify the account related to the event and the account related to the opportunity
-        event_related_account_id = contact_to_account_id[mock_event["WhoId"]]
-        opportunity_related_account_id = mock_opportunity["AccountId"]
-
-        # Setting CreatedDate on Tasks
-        today = datetime.now()
-
-        # Set dates for tasks under the account related to the event
-        if event_related_account_id in tasks_by_account_id:
-            tasks = tasks_by_account_id[event_related_account_id]
-            if len(tasks) >= 2:
-                tasks[0]["CreatedDate"] = (today - timedelta(days=3)).strftime(
-                    "%Y-%m-%dT%H:%M:%S.000+0000"
-                )
-                tasks[1]["CreatedDate"] = (today - timedelta(days=2)).strftime(
-                    "%Y-%m-%dT%H:%M:%S.000+0000"
-                )
-
-        # Set dates for tasks under the account related to the opportunity
-        if opportunity_related_account_id in tasks_by_account_id:
-            tasks = tasks_by_account_id[opportunity_related_account_id]
-            if len(tasks) >= 2:
-                tasks[0]["CreatedDate"] = (today - timedelta(days=1)).strftime(
-                    "%Y-%m-%dT%H:%M:%S.000+0000"
-                )
-                tasks[1]["CreatedDate"] = today.strftime("%Y-%m-%dT%H:%M:%S.000+0000")
-
-        mock_tasks = [task for tasks in tasks_by_account_id.values() for task in tasks]
-
-        add_mock_response(
-            "contains_content_criteria_query",
-            mock_tasks,
-        )
-        add_mock_response("unique_values_content_criteria_query", [])
-
-        add_mock_response(
-            "fetch_contacts_by_ids_and_non_null_accounts",
-            mock_contacts,
-        )
-
-        add_mock_response("fetch_accounts_not_in_ids", mock_accounts)
-
-        add_mock_response(
-            "fetch_opportunities_by_account_ids_from_date",
-            [mock_opportunity],
-        )
-
-        add_mock_response(
-            "fetch_events_by_account_ids_from_date",
-            [mock_event],
-        )
-        add_mock_response(
-            "fetch_contacts_by_account_ids",
-            mock_contacts,
-        )
-        add_mock_response(
-            "fetch_contacts_by_account_ids",
-            mock_contacts,
-        )
 
     def do_onboarding_flow(self):
         """
