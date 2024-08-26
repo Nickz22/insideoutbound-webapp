@@ -14,14 +14,12 @@ from app.constants import WHO_ID
 from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
-from app.middleware import authenticate
 from app.database.settings_selector import load_settings
 from app.database.dml import upsert_activations, save_settings
 from app.data_models import ApiResponse, Settings
 from app.utils import (
     add_days,
     pluck,
-    format_error_message,
     get_team_member_salesforce_ids,
     get_utc_now_for_supabase,
 )
@@ -44,9 +42,7 @@ def update_activation_states():
         ).data
 
     if unresponsive_activations and len(unresponsive_activations) > 0:
-        result: ApiResponse = upsert_activations(unresponsive_activations)
-        if not result.success:
-            raise Exception(result.message)
+        upsert_activations(unresponsive_activations)
 
     active_activations = [
         a for a in active_activations if a.id not in [u.id for u in unresponsive_activations]

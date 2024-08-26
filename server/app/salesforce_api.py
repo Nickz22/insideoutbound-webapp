@@ -118,9 +118,7 @@ def fetch_criteria_tasks_by_account_ids_from_date(
         )
         tasks_by_criteria = {}
 
-        if isinstance(tasks_by_criteria_by_account_id, dict):
-            items_to_iterate = tasks_by_criteria_by_account_id.items()
-        elif hasattr(tasks_by_criteria_by_account_id, "data") and isinstance(
+        if hasattr(tasks_by_criteria_by_account_id, "data") and isinstance(
             tasks_by_criteria_by_account_id.data, dict
         ):
             items_to_iterate = tasks_by_criteria_by_account_id.data.items()
@@ -224,9 +222,7 @@ async def fetch_tasks_by_account_ids_from_date_not_in_ids(
                 tasks_by_criteria_name[criteria_name] = []
             tasks_by_criteria_name[criteria_name].extend(tasks)
 
-    criteria_group_tasks_by_account_id = {
-        account_id: {} for account_id in account_ids
-    }
+    criteria_group_tasks_by_account_id = {account_id: {} for account_id in account_ids}
 
     for criteria_name, tasks in tasks_by_criteria_name.items():
         for task in tasks:
@@ -235,20 +231,15 @@ async def fetch_tasks_by_account_ids_from_date_not_in_ids(
             contact = contact_by_id.get(task.get("WhoId"))
             if contact:
                 account_id = contact.account_id
-                if (
-                    criteria_name
-                    not in criteria_group_tasks_by_account_id[account_id]
-                ):
-                    criteria_group_tasks_by_account_id[account_id][
-                        criteria_name
-                    ] = []
-                criteria_group_tasks_by_account_id[account_id][
-                    criteria_name
-                ].append(task)
+                if criteria_name not in criteria_group_tasks_by_account_id[account_id]:
+                    criteria_group_tasks_by_account_id[account_id][criteria_name] = []
+                criteria_group_tasks_by_account_id[account_id][criteria_name].append(
+                    task
+                )
 
-        api_response.data = criteria_group_tasks_by_account_id
-        api_response.success = True
-        api_response.message = "Tasks fetched and organized successfully."
+    api_response.data = criteria_group_tasks_by_account_id
+    api_response.success = True
+    api_response.message = "Tasks fetched and organized successfully."
 
     return api_response
 
@@ -281,12 +272,12 @@ async def fetch_contact_tasks_by_criteria_from_date_async(
             and not task.get("WhoId", "").upper().startswith("00Q")
         ]
 
-
     return tasks_by_filter_name
 
 
 async def _fetch_sobjects_async(soql_query, credentials, session):
     try:
+        print(f"Debug: session in _fetch_sobjects_async: {session}")
         access_token, instance_url = credentials
         if not access_token or not instance_url:
             raise Exception(SESSION_EXPIRED)
