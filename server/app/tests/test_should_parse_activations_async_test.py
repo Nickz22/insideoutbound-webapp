@@ -49,6 +49,33 @@ import json
 
 pytest_plugins = ("pytest_asyncio",)
 
+from flask import has_app_context
+import logging
+from contextlib import contextmanager
+
+logging.basicConfig(level=logging.WARNING)
+logger = logging.getLogger(__name__)
+
+@contextmanager
+def context_tracker(app):
+    logger.debug("Entering context_tracker")
+    ctx = app.app_context()
+    try:
+        logger.debug("Pushing app context")
+        ctx.push()
+        logger.debug(f"App context pushed. Has app context: {has_app_context()}")
+        yield ctx
+    except Exception as e:
+        logger.exception(f"Exception in context_tracker: {e}")
+        raise
+    finally:
+        logger.debug(f"Exiting context_tracker. Has app context before pop: {has_app_context()}")
+        try:
+            ctx.pop()
+            logger.debug("App context popped successfully")
+        except Exception as e:
+            logger.exception(f"Exception while popping context: {e}")
+        logger.debug(f"Has app context after pop attempt: {has_app_context()}")
 
 @pytest.mark.asyncio
 class TestActivationLogic:
@@ -70,28 +97,34 @@ class TestActivationLogic:
             issued_at="mock_issued_at",
         )
 
-        # Use a context manager to ensure the app context is maintained
-        with self.app.app_context():
+        logger.debug("About to enter context_tracker")
+        with context_tracker(self.app):
+            logger.debug("Inside context_tracker")
             token = save_session(mock_token_data, True)
             self.api_header = {"X-Session-Token": token}
-            
+
             # Run the onboarding flow
             self.do_onboarding_flow()
 
             # Setup mock responses
             self.setup_mock_user()
 
-            yield  # This will run the test
+            try:
+                logger.debug("About to yield in setup_method")
+                yield
+                logger.debug("After yield in setup_method")
+            finally:
+                logger.debug("In finally block of setup_method")
+                delete_session(self.api_header["X-Session-Token"])
+                supabase = get_supabase_admin_client()
+                supabase.table("Activations").delete().in_(
+                    "activated_by_id", [mock_user_id]
+                ).execute()
+        
+        logger.debug("Exited context_tracker in setup_method")
 
-            # Cleanup after the test
-            delete_session(self.api_header["X-Session-Token"])
-            supabase = get_supabase_admin_client()
-            supabase.table("Activations").delete().in_(
-                "activated_by_id", [mock_user_id]
-            ).execute()
-            self.app_context.pop()
-            # clear any mock api responses setup by last test
-            clear_mocks()
+        # clear any mock api responses setup by last test
+        clear_mocks()
 
     @staticmethod
     def setup_mock_user():
@@ -106,6 +139,7 @@ class TestActivationLogic:
     async def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
         self, mock_sobject_fetch, async_mock_sobject_fetch
     ):
+        logger.debug("Entering test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive")
         with self.app.app_context():
             self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
             response = await asyncio.to_thread(self.client.post, "/fetch_prospecting_activity", headers=self.api_header)
@@ -143,6 +177,7 @@ class TestActivationLogic:
     async def test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce(
         self, mock_sobject_fetch, async_mock_sobject_fetch
     ):
+        logger.debug("Entering test_should_create_new_activation_when_one_activity_per_contact_and_one_meeting_or_one_opportunity_is_in_salesforce")
         with self.app.app_context():
             self.setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
 
@@ -451,6 +486,7 @@ class TestActivationLogic:
     async def test_should_increment_existing_activation_to_opportunity_created_status_when_opportunity_is_created_under_previously_activated_account(
         self, mock_sobject_fetch, async_mock_sobject_fetch
     ):
+        logger.debug("Entering test_should_increment_existing_activation_to_opportunity_created_status_when_opportunity_is_created_under_previously_activated_account")
         with self.app.app_context():
             # setup mock api responses for one account activated via meeting set and another via opportunity created
             self.setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
@@ -565,6 +601,7 @@ class TestActivationLogic:
     async def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
         self, mock_sobject_fetch, async_mock_sobject_fetch
     ):
+        logger.debug("Entering test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached")
         with self.app.app_context():
             # setup mock api responses
             self.setup_thirty_tasks_across_ten_contacts_and_five_accounts()
@@ -670,3 +707,71 @@ class TestActivationLogic:
             "fetch_contacts_by_account_ids",
             get_n_mock_contacts_for_account(2, account_id),
         )
+
+    @pytest.mark.asyncio
+    @patch(
+        "app.salesforce_api._fetch_sobjects_async",
+        side_effect=mock_fetch_sobjects_async,
+    )
+    @patch("requests.get", side_effect=response_based_on_query)
+    async def test_should_update_activation_status_to_opportunity_created_without_additional_task(
+        self, mock_sobject_fetch, async_mock_sobject_fetch
+    ):
+        logger.debug("Entering test_should_update_activation_status_to_opportunity_created_without_additional_task")
+        with self.app.app_context():
+            # Set up the initial activation
+            self.setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account()
+
+            initial_activations = await self.assert_and_return_payload_async(
+                asyncio.to_thread(self.client.post, "/fetch_prospecting_activity", headers=self.api_header)
+            )
+
+            meeting_set_activation = next(
+                a for a in initial_activations if a["status"] == "Meeting Set"
+            )
+
+            # Create a new opportunity for the account with "Meeting Set" status
+            mock_opportunity = get_mock_opportunity_for_account(
+                meeting_set_activation["account"]["id"]
+            )
+            mock_opportunity["Amount"] = 6969.42
+
+            add_mock_response(
+                "fetch_opportunities_by_account_ids_from_date",
+                [mock_opportunity],
+            )
+
+            # No new tasks
+            mock_contacts = get_n_mock_contacts_for_account(
+                1, meeting_set_activation["account"]["id"]
+            )
+            # mock twice since two different queries are being made against same endpoint
+            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
+            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
+            add_mock_response("contains_content_criteria_query", [])
+            add_mock_response("unique_values_content_criteria_query", [])
+            add_mock_response("fetch_events_by_account_ids_from_date", [])
+            add_mock_response("fetch_accounts_not_in_ids", [])
+
+            # Fetch updated activations
+            updated_activations = await self.assert_and_return_payload_async(
+                asyncio.to_thread(self.client.post, "/fetch_prospecting_activity", headers=self.api_header)
+            )
+
+            # Find the activation that should have been updated
+            updated_activation = next(
+                (
+                    a
+                    for a in updated_activations
+                    if a["account"]["id"] == meeting_set_activation["account"]["id"]
+                ),
+                None,
+            )
+
+            # Assert that the activation exists and has been updated
+            assert updated_activation is not None, "The activation should still exist"
+            assert updated_activation["status"] == "Opportunity Created", "Status should be 'Opportunity Created'"
+            assert updated_activation["opportunity"]["amount"] == 6969.42, "Opportunity amount should be updated"
+
+            # Check that no new prospecting effort was added
+            assert len(updated_activation["prospecting_effort"]) == len(meeting_set_activation["prospecting_effort"]), "No new prospecting effort should be added"

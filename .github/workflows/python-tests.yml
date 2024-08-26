@@ -39,8 +39,10 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r server/requirements.txt
-    
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio
+      working-directory: ./server
+
     - name: Debug Environment Variables
       run: |
         echo "Printing environment variables:"
@@ -48,4 +50,8 @@ jobs:
     
     - name: Run tests
       run: |
-        python -m unittest discover server/app/tests
+        pytest -v -s --asyncio-mode=auto app/tests/test_should_parse_activations_async_test.py
+      working-directory: ./server
+      env:
+        PYTHONPATH: ${{ github.workspace }}/server
+        PYTEST_ADDOPTS: "--asyncio-mode=auto"

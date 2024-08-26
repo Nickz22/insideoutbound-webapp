@@ -12,3 +12,4 @@ stripe
 asyncio
 aiohttp
 aioresponses
+pytest
