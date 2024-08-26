@@ -220,7 +220,7 @@ const Account = () => {
       <Typography variant="body1">Email: {user.email}</Typography>
       <Typography variant="body1">Username: {user.username}</Typography>
 
-      {userStatus === "paid" ? (
+      {userStatus === "paid" && (
         <Button
           variant="contained"
           color="info"
@@ -229,7 +229,20 @@ const Account = () => {
         >
           Pause Membership
         </Button>
-      ) : (
+      )}
+
+      {userStatus === "paused" && (
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleUpgradeClick}
+          sx={{ marginTop: 2 }}
+        >
+          Resume Membership
+        </Button>
+      )}
+
+      {userStatus === "not paid" || !userStatus && (
         <Button
           variant="contained"
           color="primary"
