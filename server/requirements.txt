@@ -9,3 +9,7 @@ logger
 colorlog
 sentry-sdk[flask]
 stripe
+asyncio
+aiohttp
+aioresponses
+pytest

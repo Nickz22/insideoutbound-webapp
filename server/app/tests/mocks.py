@@ -1,4 +1,5 @@
-import random, copy
+import random, copy, re
+from aiohttp import web
 from app.tests.utils import is_valid_salesforce_query
 from unittest.mock import MagicMock
 from app.tests.c import (
@@ -59,6 +60,10 @@ def clear_mocks():
     for key in sobject_api_mock_response_by_request_key.keys():
         sobject_api_mock_response_by_request_key[key] = []
 
+import re
+
+def mock_fetch_sobjects_async(soql_query, credentials, session):
+    return response_based_on_query(soql_query, return_raw_data=True)
 
 def response_based_on_query(url, **kwargs):
     """
@@ -66,10 +71,11 @@ def response_based_on_query(url, **kwargs):
     """
     print(f"URL: {url}")
     print(f"Parameters: {kwargs}")
+    print(f"Return raw data: {kwargs.get('return_raw_data', False)}")
     try:
-        query_param = kwargs.get("params", {}).get("q", "")
+        query_param = kwargs.get("params", {}).get("q", "") or url
         is_valid_query = "/describe" or is_valid_salesforce_query(query_param) in url
-
+        return_raw_data = kwargs.get('return_raw_data', False)
         if not is_valid_query:
             return MagicMock(
                 status_code=400, json=lambda: {"error": f"Invalid query {query_param}"}
@@ -113,8 +119,10 @@ def response_based_on_query(url, **kwargs):
             if condition:
                 mock_responses = sobject_api_mock_response_by_request_key.get(key)
                 mock_response = mock_responses.pop(0) if mock_responses else None
-                if mock_response:
+                if mock_response and not return_raw_data:
                     return MagicMock(status_code=200, json=lambda: mock_response)
+                elif mock_response and return_raw_data:
+                    return mock_response["records"]
                 else:
                     return MagicMock(
                         status_code=404,

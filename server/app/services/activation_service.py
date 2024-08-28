@@ -9,12 +9,11 @@ from app.data_models import (
     StatusEnum,
 )
 from typing import List, Dict
-from datetime import timedelta
+from flask import current_app as app
 
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from app.salesforce_api import (
-    fetch_tasks_by_account_ids_from_date_not_in_ids,
     fetch_opportunities_by_account_ids_from_date,
     fetch_events_by_account_ids_from_date,
 )
@@ -84,15 +83,15 @@ def find_unresponsive_activations(
             for activation in unresponsive_activation_candidates
             for task_id in activation.task_ids
         ]
-        criteria_group_tasks_by_account_id = (
-            fetch_tasks_by_account_ids_from_date_not_in_ids(
-                list(account_ids),
-                first_prospecting_activity,
-                settings.criteria,
-                already_counted_task_ids,
-                get_team_member_salesforce_ids(settings),
-            ).data
+        async_response = app.async_fetch_tasks_by_account_ids_from_date_not_in_ids(
+            list(account_ids),
+            first_prospecting_activity,
+            settings.criteria,
+            already_counted_task_ids,
+            get_team_member_salesforce_ids(settings),
         )
+
+        criteria_group_tasks_by_account_id = async_response.data
 
         activations_by_account_id = {
             activation.account.id: activation
@@ -150,15 +149,15 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
             task_id for activation in activations for task_id in activation.task_ids
         )
 
-        criteria_group_tasks_by_account_id = (
-            fetch_tasks_by_account_ids_from_date_not_in_ids(
-                account_ids,
-                first_prospecting_activity,
-                settings.criteria,
-                already_counted_task_ids,
-                salesforce_user_ids,
-            ).data
+        response = app.async_fetch_tasks_by_account_ids_from_date_not_in_ids(
+            account_ids,
+            first_prospecting_activity,
+            settings.criteria,
+            already_counted_task_ids,
+            salesforce_user_ids,
         )
+
+        criteria_group_tasks_by_account_id = response.data
 
         opportunities_by_account_id: List[Dict] = group_by(
             fetch_opportunities_by_account_ids_from_date(
@@ -217,7 +216,11 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
 
                 # Determine new status
                 new_status = get_new_status(
-                    activation=activation, criteria=settings.criteria, task=task, opportunities=opportunities, events=meetings
+                    activation=activation,
+                    criteria=settings.criteria,
+                    task=task,
+                    opportunities=opportunities,
+                    events=meetings,
                 )
 
                 if new_status != current_pe.status:
@@ -268,7 +271,9 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     )
 
                 # Update engagement date if necessary
-                if not activation.engaged_date and is_inbound_criteria(task, settings.criteria):
+                if not activation.engaged_date and is_inbound_criteria(
+                    task, settings.criteria
+                ):
                     activation.engaged_date = task_created_datetime.date()
 
             # Update activation status and dates
@@ -279,7 +284,9 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
 
             # Update opportunity if necessary
             activation.opportunity = (
-                convert_dict_to_opportunity(opportunities[0]) if opportunities and len(opportunities) > 0 else None
+                convert_dict_to_opportunity(opportunities[0])
+                if opportunities and len(opportunities) > 0
+                else None
             )
             if (
                 activation.opportunity
@@ -336,7 +343,9 @@ def get_new_status(
         and activation.status != StatusEnum.opportunity_created
     ):
         return StatusEnum.meeting_set
-    elif activation.status == StatusEnum.activated and is_inbound_criteria(task, criteria):
+    elif activation.status == StatusEnum.activated and is_inbound_criteria(
+        task, criteria
+    ):
         return StatusEnum.engaged
 
     return activation.status
@@ -843,15 +852,14 @@ def get_meetings_by_account_id(
             settings.meetings_criteria,
         ).data
     elif settings.meeting_object == "Task":
-        meetings_by_criteria_name_by_account_id = (
-            fetch_tasks_by_account_ids_from_date_not_in_ids(
-                list(account_ids),
-                first_prospecting_activity,
-                [settings.meetings_criteria],
-                [],
-                salesforce_user_ids,
-            ).data
+        task_meetings = app.async_fetch_tasks_by_account_ids_from_date_not_in_ids(
+            list(account_ids),
+            first_prospecting_activity,
+            [settings.meetings_criteria],
+            [],
+            salesforce_user_ids,
         )
+        meetings_by_criteria_name_by_account_id = task_meetings.data
 
         for (
             account_id,

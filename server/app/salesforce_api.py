@@ -1,4 +1,7 @@
 import requests
+import asyncio
+import aiohttp
+from flask import current_app as app
 from typing import List, Dict
 from app.utils import pluck, format_error_message
 from app.data_models import (
@@ -104,29 +107,27 @@ def fetch_criteria_tasks_by_account_ids_from_date(
 ):
     """
     Takes response from fetch_tasks_by_account_ids_from_date_not_in_ids and organizes the tasks by criteria name.
-
-    Parameters:
-    - account_ids (list[str]): A list of account IDs to fetch tasks for.
-    - start (str): The start date to fetch tasks from.
-    - criteria (list[FilterContainer]): A list of FilterContainer objects.
-
-    Returns:
-    - ApiResponse: An ApiResponse object containing the fetched tasks organized by criteria name.
     """
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
         tasks_by_criteria_by_account_id = (
-            fetch_tasks_by_account_ids_from_date_not_in_ids(
+            app.async_fetch_tasks_by_account_ids_from_date_not_in_ids(
                 account_ids, start, criteria, [], salesforce_user_ids
-            ).data
+            )
         )
         tasks_by_criteria = {}
 
-        for (
-            account_id,
-            tasks_by_criteria_name,
-        ) in tasks_by_criteria_by_account_id.items():
+        if hasattr(tasks_by_criteria_by_account_id, "data") and isinstance(
+            tasks_by_criteria_by_account_id.data, dict
+        ):
+            items_to_iterate = tasks_by_criteria_by_account_id.data.items()
+        else:
+            raise TypeError(
+                "Unexpected type returned from async_fetch_tasks_by_account_ids_from_date_not_in_ids"
+            )
+
+        for account_id, tasks_by_criteria_name in items_to_iterate:
             for criteria_name, tasks in tasks_by_criteria_name.items():
                 if criteria_name not in tasks_by_criteria:
                     tasks_by_criteria[criteria_name] = []
@@ -181,89 +182,136 @@ def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
     return api_response
 
 
-def fetch_tasks_by_account_ids_from_date_not_in_ids(
-    account_ids: list[str],
+async def fetch_tasks_by_account_ids_from_date_not_in_ids(
+    account_ids: List[str],
     start: str,
-    criteria: list[FilterContainer],
-    already_counted_task_ids: list[str],
-    salesforce_user_ids: list[str],
+    criteria: List[FilterContainer],
+    already_counted_task_ids: List[str],
+    salesforce_user_ids: List[str],
 ) -> ApiResponse:
-    """
-    Fetches tasks from Salesforce based on a list of account IDs, starting from a specific date,
-    organized by criteria names for tasks related to contacts belonging to the specified accounts.
-    This version batches queries by contact IDs to handle large datasets.
-
-    Parameters:
-    - account_ids (list[str]): A list of account IDs to fetch tasks for.
-    - start (datetime): The start date to fetch tasks from.
-    - criteria (list[FilterContainer]): A list of FilterContainer objects.
-    - already_counted_task_ids (list[str]): A list of task IDs that have already been counted.
-
-    Returns:
-    - ApiResponse: Response whose `data` is a dictionary where each key is an account ID and each value is another dictionary with
-            keys as criteria names and values as lists of tasks fetched from Salesforce.
-
-    Throws:
-    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
-    """
     api_response = ApiResponse(data=[], message="", success=False)
 
-    try:
-        contacts = fetch_contacts_by_account_ids(account_ids)
-        contact_by_id = {contact.id: contact for contact in contacts.data}
-        contact_ids = list(pluck(contacts.data, "id"))
+    contacts = fetch_contacts_by_account_ids(account_ids)
+    contact_by_id = {contact.id: contact for contact in contacts.data}
+    contact_ids = list(pluck(contacts.data, "id"))
 
-        batch_size = 150
-        tasks_by_criteria_name = {}  # To accumulate tasks across batches
+    batch_size = 150
+    tasks_by_criteria_name = {}
 
-        # Process in batches
-        for i in range(0, len(contact_ids), batch_size):
-            batch_contact_ids = contact_ids[i : i + batch_size]
-            additional_filter = "WhoId IN ({})".format(
-                ", ".join(map(lambda id: f"'{id}'", batch_contact_ids))
-            )
+    async def process_batch(batch_contact_ids, session):
+        additional_filter = "WhoId IN ({})".format(
+            ", ".join(map(lambda id: f"'{id}'", batch_contact_ids))
+        )
+        batch_tasks = await fetch_contact_tasks_by_criteria_from_date_async(
+            criteria, start, additional_filter, salesforce_user_ids, session
+        )
+        return batch_tasks
 
-            # Fetch tasks by criteria for the current batch
-            batch_tasks = fetch_contact_tasks_by_criteria_from_date(
-                criteria, start, additional_filter, salesforce_user_ids
-            )
+    async with aiohttp.ClientSession() as session:
+        batches = [
+            contact_ids[i : i + batch_size]
+            for i in range(0, len(contact_ids), batch_size)
+        ]
+        batch_results = await asyncio.gather(
+            *[process_batch(batch, session) for batch in batches]
+        )
 
-            # Merge batch_tasks into tasks_by_criteria_name
-            for criteria_name, tasks in batch_tasks.data.items():
-                if criteria_name not in tasks_by_criteria_name:
-                    tasks_by_criteria_name[criteria_name] = []
-                tasks_by_criteria_name[criteria_name].extend(tasks)
+    for batch_result in batch_results:
+        for criteria_name, tasks in batch_result.items():
+            if criteria_name not in tasks_by_criteria_name:
+                tasks_by_criteria_name[criteria_name] = []
+            tasks_by_criteria_name[criteria_name].extend(tasks)
 
-        # Organize tasks_by_criteria_name by account and criteria
-        criteria_group_tasks_by_account_id = {
-            account_id: {} for account_id in account_ids
-        }
+    criteria_group_tasks_by_account_id = {account_id: {} for account_id in account_ids}
 
-        for criteria_name, tasks in tasks_by_criteria_name.items():
-            for task in tasks:
-                if task.get("Id") in already_counted_task_ids:
-                    continue
-                contact = contact_by_id.get(task.get("WhoId"))
-                if contact:
-                    account_id = contact.account_id
-                    if (
-                        criteria_name
-                        not in criteria_group_tasks_by_account_id[account_id]
-                    ):
-                        criteria_group_tasks_by_account_id[account_id][
-                            criteria_name
-                        ] = []
-                    criteria_group_tasks_by_account_id[account_id][
-                        criteria_name
-                    ].append(task)
+    for criteria_name, tasks in tasks_by_criteria_name.items():
+        for task in tasks:
+            if task.get("Id") in already_counted_task_ids:
+                continue
+            contact = contact_by_id.get(task.get("WhoId"))
+            if contact:
+                account_id = contact.account_id
+                if criteria_name not in criteria_group_tasks_by_account_id[account_id]:
+                    criteria_group_tasks_by_account_id[account_id][criteria_name] = []
+                criteria_group_tasks_by_account_id[account_id][criteria_name].append(
+                    task
+                )
 
-        api_response.data = criteria_group_tasks_by_account_id
-        api_response.success = True
-        api_response.message = "Tasks fetched and organized successfully."
-    except Exception as e:
-        raise Exception(format_error_message(e))
+    api_response.data = criteria_group_tasks_by_account_id
+    api_response.success = True
+    api_response.message = "Tasks fetched and organized successfully."
 
     return api_response
+
+
+async def fetch_contact_tasks_by_criteria_from_date_async(
+    criteria,
+    from_datetime,
+    additional_filter=None,
+    salesforce_user_ids: List[str] = [],
+    session=None,
+) -> Dict[str, List[Dict]]:
+    joined_user_ids = "','".join(salesforce_user_ids)
+    soql_query = f"SELECT Id, WhoId, OwnerId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND OwnerId IN ('{joined_user_ids}') AND "
+    if additional_filter:
+        soql_query += f"{additional_filter} AND "
+    tasks_by_filter_name = {}
+
+    for filter_container in criteria:
+        combined_conditions = _construct_where_clause_from_filter(filter_container)
+        full_query = f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC"
+
+        contact_task_models = await _fetch_sobjects_async(
+            full_query, get_credentials(), session
+        )
+
+        tasks_by_filter_name[filter_container.name] = [
+            task
+            for task in contact_task_models
+            if task.get("WhoId", "")
+            and not task.get("WhoId", "").upper().startswith("00Q")
+        ]
+
+    return tasks_by_filter_name
+
+
+async def _fetch_sobjects_async(soql_query, credentials, session):
+    try:
+        print(f"Debug: session in _fetch_sobjects_async: {session}")
+        access_token, instance_url = credentials
+        if not access_token or not instance_url:
+            raise Exception(SESSION_EXPIRED)
+
+        headers = {"Authorization": f"Bearer {access_token}"}
+        url = f"{instance_url}/services/data/v55.0/query"
+
+        all_records = []
+        next_records_url = None
+
+        while True:
+            if next_records_url:
+                async with session.get(next_records_url, headers=headers) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+            else:
+                async with session.get(
+                    url, headers=headers, params={"q": soql_query}
+                ) as response:
+                    response.raise_for_status()
+                    data = await response.json()
+
+            all_records.extend(data["records"])
+
+            if data.get("done", True):
+                break
+
+            next_records_url = f"{instance_url}{data['nextRecordsUrl']}"
+
+        return all_records
+    except aiohttp.ClientError as e:
+        raise Exception(f"API request failed: {format_error_message(e)}")
+    except Exception as e:
+        raise Exception(format_error_message(e))
 
 
 def fetch_tasks_by_user_ids(user_ids: List[str], limit: int = None):
