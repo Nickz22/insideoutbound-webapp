@@ -1,16 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Box, Paper, Typography, Divider } from "@mui/material";
-import { useNavigate } from "react-router-dom";
-import ProspectingCriteriaSelector from "../../components/ProspectingCriteriaSelector/ProspectingCriteriaSelector";
-import InfoGatheringStep from "../../components/InfoGatheringStep/InfoGatheringStep";
+import { Box, Paper, Divider } from "@mui/material";
+// import { useNavigate } from "react-router-dom";
 import ProgressTracker from "../../components/ProgressTracker/ProgressTracker";
 import {
   fetchLoggedInSalesforceUser,
   fetchSalesforceTasksByUserIds,
   fetchTaskFields,
   fetchTaskFilterFields,
-  generateCriteria,
-  saveSettings as saveSettingsToSupabase,
+  // generateCriteria,
+  // saveSettings as saveSettingsToSupabase,
 } from "../../components/Api/Api";
 
 /**
@@ -36,10 +34,10 @@ const REQUIRED_PROSPECTING_CATEGORIES = [
 ];
 
 const Onboard = () => {
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   const [step, setStep] = useState(1); // Start from step 1
   /** @type {[FilterContainer[], Function]} */
-  const [filters, setFilters] = useState(
+  const [filters] = useState(
     REQUIRED_PROSPECTING_CATEGORIES.map((category) => ({
       name: category,
       filters: [],
@@ -55,7 +53,6 @@ const Onboard = () => {
 
   /** @type {[GatheringResponses, React.Dispatch<React.SetStateAction<GatheringResponses>>]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
-  const [isLargeDialog, setIsLargeDialog] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   /** @type {[TableData, Function]} */
   const [categoryFormTableData, setCategoryFormTableData] = useState({
@@ -198,33 +195,33 @@ const Onboard = () => {
     }
   };
 
-  const saveSettings = async () => {
-    try {
-      /** @type {Settings} */
-      let settings = getSettingsFromResponses();
+  // const saveSettings = async () => {
+  //   try {
+  //     /** @type {Settings} */
+  //     let settings = getSettingsFromResponses();
 
-      settings = Object.keys(settings).reduce((acc, key) => {
-        acc[key] =
-          settings[key] === "Yes"
-            ? true
-            : settings[key] === "No"
-              ? false
-              : settings[key];
-        return acc;
-      }, /** @type {Settings} */({}));
+  //     settings = Object.keys(settings).reduce((acc, key) => {
+  //       acc[key] =
+  //         settings[key] === "Yes"
+  //           ? true
+  //           : settings[key] === "No"
+  //             ? false
+  //             : settings[key];
+  //       return acc;
+  //     }, /** @type {Settings} */({}));
 
-      const result = await saveSettingsToSupabase(settings);
+  //     const result = await saveSettingsToSupabase(settings);
 
-      if (!result.success) {
-        throw new Error(result.message);
-      }
+  //     if (!result.success) {
+  //       throw new Error(result.message);
+  //     }
 
-      console.log("Settings saved successfully");
-      navigate("/app/settings");
-    } catch (error) {
-      console.error("Error saving settings:", error);
-    }
-  };
+  //     console.log("Settings saved successfully");
+  //     navigate("/app/settings");
+  //   } catch (error) {
+  //     console.error("Error saving settings:", error);
+  //   }
+  // };
 
   /**
    * Formats the settings data from the form responses.
@@ -274,98 +271,22 @@ const Onboard = () => {
    * @param {[{label: string, value: string}]} response
    * @returns {void}
    */
-  const handleInfoGatheringComplete = (response) => {
-    setGatheringResponses(
-      /**
-       * @param {{ [key: string]: any }} prev
-       */
-      (prev) => {
-        const newResponses = { ...prev };
-        // Handle the case where we have multiple responses
-        response.forEach((res) => {
-          newResponses[res.label] = { value: res.value };
-        });
-        return newResponses;
-      }
-    );
-    handleNext();
-  };
-
-  /**
-   * @param {FilterContainer} filterContainer
-   */
-  const handleProspectingFilterChanged = (updatedFilter) => {
-    setFilters((prev) =>
-      prev.map((filter) =>
-        filter.name === updatedFilter.name ? updatedFilter : filter
-      )
-    );
-
-    setGatheringResponses((prev) => {
-      const newResponses = { ...prev };
-      if (!newResponses.criteria) {
-        newResponses.criteria = { value: [] };
-      }
-      const criteriaIndex = newResponses.criteria.value.findIndex(
-        (criteria) => criteria.name === updatedFilter.name
-      );
-      if (criteriaIndex !== -1) {
-        newResponses.criteria.value[criteriaIndex] = updatedFilter;
-      } else {
-        newResponses.criteria.value.push(updatedFilter);
-      }
-      return newResponses;
-    });
-  };
-
-  const handleTaskSelection = async (selectedTaskIds) => {
-    try {
-      const selectedTasks = tasks.filter((task) =>
-        selectedTaskIds.includes(task.id)
-      );
-      const response = await generateCriteria(
-        selectedTasks,
-        categoryFormTableData.columns
-      );
-      return response.data[0];
-    } catch (error) {
-      console.error("Error generating criteria:", error);
-    }
-  };
-
-  const renderStep = () => {
-    if (step <= ONBOARD_WIZARD_STEPS.length) {
-      return (
-        <InfoGatheringStep
-          key={step}
-          stepData={ONBOARD_WIZARD_STEPS[step - 1]}
-          onTableDisplay={handleTableDisplay}
-          onComplete={handleInfoGatheringComplete}
-          settings={getSettingsFromResponses()}
-        />
-      );
-    } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
-      return (
-        <>
-          <Typography variant="h6" gutterBottom>
-            Define criteria by which we will recognize an Inbound Call, Outbound
-            Call, Inbound Email and Outbound Email.
-          </Typography>
-          <ProspectingCriteriaSelector
-            title="Prospecting Activity Criteria"
-            initialFilterContainers={filters}
-            filterFields={taskFilterFields.current}
-            tableData={categoryFormTableData}
-            onFilterChange={handleProspectingFilterChanged}
-            onTaskSelection={handleTaskSelection}
-            onSave={saveSettings}
-          />
-        </>
-      );
-    } else {
-      return <div>Invalid step</div>;
-    }
-  };
+  // const handleInfoGatheringComplete = (response) => {
+  //   setGatheringResponses(
+  //     /**
+  //      * @param {{ [key: string]: any }} prev
+  //      */
+  //     (prev) => {
+  //       const newResponses = { ...prev };
+  //       // Handle the case where we have multiple responses
+  //       response.forEach((res) => {
+  //         newResponses[res.label] = { value: res.value };
+  //       });
+  //       return newResponses;
+  //     }
+  //   );
+  //   handleNext();
+  // };
 
   const getProgressSteps = () => {
     return [
@@ -375,36 +296,6 @@ const Onboard = () => {
     ];
   };
 
-  const isLargeDialogStep = () => {
-    return isLargeDialog || step > ONBOARD_WIZARD_STEPS.length;
-  };
-
-  const dialogStyle = {
-    transition: "all 0.3s ease-in-out",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-    border: "1px solid #e0e0e0",
-    ...(isLargeDialogStep()
-      ? {
-        maxWidth: "60vw",
-        width: "60vw",
-        maxHeight: "90vh",
-        height: "90vh",
-      }
-      : {
-        maxWidth: "600px", // Adjust as needed for small dialog
-        width: "100%",
-        maxHeight: "80vh",
-        height: "auto",
-      }),
-  };
-
-  /**
-   * @param {boolean} isDisplayed
-   */
-  const handleTableDisplay = (isDisplayed) => {
-    setIsTransitioning(true);
-    setIsLargeDialog(isDisplayed);
-  };
 
   return (
     <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
