@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Albert+Sans:ital,wght@0,100..900;1,100..900&display=swap");
+
 body {
   margin: 0;
   padding: 0;
@@ -9,8 +11,15 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-* {
-  box-sizing: border-box;
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+div {
+  font-family: "Albert Sans", sans-serif;
 }
 
 code {
