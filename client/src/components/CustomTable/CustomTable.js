@@ -59,11 +59,33 @@ const CustomTable = ({
   const [modalOpen, setModalOpen] = useState(false);
 
   const filteredData = useMemo(() => {
-    return tableData.data.filter((item) =>
-      Object.values(item).some((value) =>
-        value?.toString()?.toLowerCase()?.includes(searchTerm?.toLowerCase())
-      )
-    );
+    return tableData.data.filter((item) => {
+      return Object.values(item).some((value) => {
+        if (Array.isArray(value)) {
+          // when value is array, iterate over each element and search within each element
+          return value.some((arrayItem) => {
+            if (typeof arrayItem === 'object' && arrayItem !== null) {
+              // If the array element is an object, iterate over its values
+              return Object.values(arrayItem).some((nestedValue) => {
+                return nestedValue?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+              });
+            } else {
+              // assume the element is string if the element is not an object
+              return arrayItem?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+            }
+          });
+        } else if (typeof value === 'object' && value !== null) {
+          // If value is an object, iterate over its values
+          return Object.values(value).some((nestedValue) => {
+            return nestedValue?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+          });
+        } else {
+          // If value is not an object and not an array, assume value is primitive value
+          return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+        }
+      });
+    });
+
   }, [tableData.data, searchTerm]);
 
   const sortedData = useMemo(() => {
