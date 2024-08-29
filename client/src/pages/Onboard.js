@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, Box, Paper, Typography, Divider } from "@mui/material";
+import { Dialog, DialogContent, Box, Paper, Typography } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import ProspectingCriteriaSelector from "../components/ProspectingCriteriaSelector/ProspectingCriteriaSelector";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
@@ -25,7 +25,6 @@ import {
  */
 
 import { ONBOARD_WIZARD_STEPS } from "../utils/c";
-import Logo from "src/components/Logo/Logo";
 
 const REQUIRED_PROSPECTING_CATEGORIES = [
   "Inbound Call",
@@ -389,30 +388,23 @@ const Onboard = () => {
   };
 
   return (
-    <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
-      {/* Sidebar */}
+    <Box sx={{ display: "flex", height: "100vh" }}>
       <Paper
         elevation={3}
         sx={{
-          width: "369px",
+          width: "250px",
           height: "100vh",
           position: "fixed",
           left: 0,
           top: 0,
           zIndex: 1301,
-          padding: "28px",
-          paddingTop: "47px",
-          backgroundColor: "rgba(30, 36, 47, 1)",
+          padding: "16px",
+          backgroundColor: "rgba(255, 255, 255, 0.9)",
           backdropFilter: "blur(5px)",
           overflowY: "auto",
           boxSizing: "border-box"
         }}
       >
-        <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", width: "100%", marginBottom: "36px" }}>
-          <Logo />
-        </div>
-
-        <Divider sx={{ backgroundColor: "rgba(135, 159, 202, 0.5)", marginBottom: "41px" }} />
         <ProgressTracker
           steps={getProgressSteps()}
           currentStep={step}
@@ -420,89 +412,29 @@ const Onboard = () => {
           orientation="vertical"
         />
       </Paper>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-          backgroundColor: "white",
-          maxWidth: "100%",
-          overflow: "scroll",
-          marginLeft: "425px",
-          position: "relative",
-          alignItems: "center",
-          justifyContent: "start",
-          paddingTop: "85px"
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: "720px",
-            padding: "16px"
+      <Box sx={{ flexGrow: 1, marginLeft: "250px" }}>
+        <Dialog
+          open
+          onClose={() => {
+            console.log("closing");
           }}
+          PaperProps={{
+            style: dialogStyle,
+          }}
+          fullWidth
+          maxWidth={false}
         >
-          <p
+          <DialogContent
             style={{
-              margin: 0,
-              color: "rgba(30, 36, 47, 1)",
-              fontSize: "14px",
-              fontWeight: "500",
-              letterSpacing: "34%",
-              textAlign: "center"
-            }}
-          >
-            YOUR DATA VISUALIZED
-          </p>
-          <h1
-            style={{
-              margin: 0,
-              color: "rgba(30, 36, 47, 1)",
-              fontSize: "88px",
-              fontWeight: "700",
-              letterSpacing: "-3%",
-              lineHeight: "1.2",
-              textAlign: "center"
-            }}
-          >
-            Welcome to your
-          </h1>
-          <h1
-            style={{
-              margin: 0,
-              color: "rgba(30, 36, 47, 1)",
-              fontSize: "88px",
-              fontWeight: "700",
-              letterSpacing: "-3%",
-              lineHeight: "1.2",
-              textAlign: "center"
-            }}
-          >
-            Onboarding
-          </h1>
-          <p
-            style={{
-              margin: 0,
-              marginTop: "2rem",
-              color: "rgba(76, 76, 76, 1)",
-              fontSize: "16px",
-              fontWeight: "400",
-              letterSpacing: "-3%",
-              lineHeight: "1.5",
-              textAlign: "center"
-            }}
-          >
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Quis ipsum suspendisse ultrices gravida.
-          </p>
-          <div
-            style={{
-              marginTop: "42px"
+              padding: isLargeDialogStep() ? "24px" : "16px",
+              transition: "padding 0.3s ease-in-out",
+              height: "100%",
+              overflow: "auto",
             }}
           >
             {renderStep()}
-          </div>
-        </div>
-
+          </DialogContent>
+        </Dialog>
       </Box>
     </Box>
   );
