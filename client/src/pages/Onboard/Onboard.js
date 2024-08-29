@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, Box, Paper, Typography, Divider } from "@mui/material";
+import { Box, Paper, Typography, Divider } from "@mui/material";
 import { useNavigate } from "react-router-dom";
-import ProspectingCriteriaSelector from "../components/ProspectingCriteriaSelector/ProspectingCriteriaSelector";
-import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
-import ProgressTracker from "../components/ProgressTracker/ProgressTracker";
+import ProspectingCriteriaSelector from "../../components/ProspectingCriteriaSelector/ProspectingCriteriaSelector";
+import InfoGatheringStep from "../../components/InfoGatheringStep/InfoGatheringStep";
+import ProgressTracker from "../../components/ProgressTracker/ProgressTracker";
 import {
   fetchLoggedInSalesforceUser,
   fetchSalesforceTasksByUserIds,
@@ -11,7 +11,7 @@ import {
   fetchTaskFilterFields,
   generateCriteria,
   saveSettings as saveSettingsToSupabase,
-} from "../components/Api/Api";
+} from "../../components/Api/Api";
 
 /**
  * @typedef {import('types').SObject} SObject
@@ -24,8 +24,9 @@ import {
  * @typedef {import('types').SalesforceUser} SalesforceUser
  */
 
-import { ONBOARD_WIZARD_STEPS } from "../utils/c";
+import { ONBOARD_WIZARD_STEPS } from "../../utils/c";
 import Logo from "src/components/Logo/Logo";
+import RoleStep from "./RoleStep";
 
 const REQUIRED_PROSPECTING_CATEGORIES = [
   "Inbound Call",
@@ -48,8 +49,13 @@ const Onboard = () => {
         : "Outbound",
     }))
   );
-  /** @type {[{ [key: string]: any }, function]} */
+  /**
+   * @typedef {{ [key: string]: any }} GatheringResponses
+   */
+
+  /** @type {[GatheringResponses, React.Dispatch<React.SetStateAction<GatheringResponses>>]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
+  const [isLargeDialog, setIsLargeDialog] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   /** @type {[TableData, Function]} */
   const [categoryFormTableData, setCategoryFormTableData] = useState({
@@ -108,6 +114,7 @@ const Onboard = () => {
       });
     };
     setInitialCategoryFormTableData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
 
   useEffect(() => {
@@ -126,10 +133,16 @@ const Onboard = () => {
         if (tasks.length > 0) return;
 
         const settings = getSettingsFromResponses();
+
+        /** @type {(string)[]}  */
         const salesforceUserIds = [
           ...(settings.teamMemberIds || []),
-          settings.salesforceUserId,
         ];
+
+        if (settings.salesforceUserId) {
+          salesforceUserIds.push(settings.salesforceUserId)
+        }
+
         if (salesforceUserIds.length === 0 || !salesforceUserIds[0]) return;
         const response = await fetchSalesforceTasksByUserIds(salesforceUserIds);
         if (!response.success) {
@@ -147,6 +160,7 @@ const Onboard = () => {
       }
     };
     setSalesforceTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gatheringResponses]);
 
   useEffect(() => {
@@ -175,6 +189,9 @@ const Onboard = () => {
     }
   }, [isTransitioning]);
 
+  /**
+   * @param {number} clickedStep
+   */
   const handleStepClick = (clickedStep) => {
     if (clickedStep < step) {
       setStep(clickedStep);
@@ -185,6 +202,7 @@ const Onboard = () => {
     try {
       /** @type {Settings} */
       let settings = getSettingsFromResponses();
+
       settings = Object.keys(settings).reduce((acc, key) => {
         acc[key] =
           settings[key] === "Yes"
@@ -193,7 +211,7 @@ const Onboard = () => {
               ? false
               : settings[key];
         return acc;
-      }, {});
+      }, /** @type {Settings} */({}));
 
       const result = await saveSettingsToSupabase(settings);
 
@@ -320,7 +338,6 @@ const Onboard = () => {
       return (
         <InfoGatheringStep
           key={step}
-          step={step}
           stepData={ONBOARD_WIZARD_STEPS[step - 1]}
           onTableDisplay={handleTableDisplay}
           onComplete={handleInfoGatheringComplete}
@@ -386,6 +403,7 @@ const Onboard = () => {
    */
   const handleTableDisplay = (isDisplayed) => {
     setIsTransitioning(true);
+    setIsLargeDialog(isDisplayed);
   };
 
   return (
@@ -405,7 +423,6 @@ const Onboard = () => {
           backgroundColor: "rgba(30, 36, 47, 1)",
           backdropFilter: "blur(5px)",
           overflowY: "auto",
-          boxSizing: "border-box"
         }}
       >
         <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", width: "100%", marginBottom: "36px" }}>
@@ -420,90 +437,7 @@ const Onboard = () => {
           orientation="vertical"
         />
       </Paper>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-          backgroundColor: "white",
-          maxWidth: "100%",
-          overflow: "scroll",
-          marginLeft: "425px",
-          position: "relative",
-          alignItems: "center",
-          justifyContent: "start",
-          paddingTop: "85px"
-        }}
-      >
-        <div
-          style={{
-            width: "100%",
-            maxWidth: "720px",
-            padding: "16px"
-          }}
-        >
-          <p
-            style={{
-              margin: 0,
-              color: "rgba(30, 36, 47, 1)",
-              fontSize: "14px",
-              fontWeight: "500",
-              letterSpacing: "34%",
-              textAlign: "center"
-            }}
-          >
-            YOUR DATA VISUALIZED
-          </p>
-          <h1
-            style={{
-              margin: 0,
-              color: "rgba(30, 36, 47, 1)",
-              fontSize: "88px",
-              fontWeight: "700",
-              letterSpacing: "-3%",
-              lineHeight: "1.2",
-              textAlign: "center"
-            }}
-          >
-            Welcome to your
-          </h1>
-          <h1
-            style={{
-              margin: 0,
-              color: "rgba(30, 36, 47, 1)",
-              fontSize: "88px",
-              fontWeight: "700",
-              letterSpacing: "-3%",
-              lineHeight: "1.2",
-              textAlign: "center"
-            }}
-          >
-            Onboarding
-          </h1>
-          <p
-            style={{
-              margin: 0,
-              marginTop: "2rem",
-              color: "rgba(76, 76, 76, 1)",
-              fontSize: "16px",
-              fontWeight: "400",
-              letterSpacing: "-3%",
-              lineHeight: "1.5",
-              textAlign: "center"
-            }}
-          >
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Quis ipsum suspendisse ultrices gravida.
-          </p>
-          <div
-            style={{
-              marginTop: "42px"
-            }}
-          >
-            {renderStep()}
-          </div>
-        </div>
-
-      </Box>
+      {step === 1 && (<RoleStep handleNext={handleNext} />)}
     </Box>
   );
 };
