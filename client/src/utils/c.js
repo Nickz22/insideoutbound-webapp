@@ -51,7 +51,7 @@ export const PROSPECTING_ACTIVITY_FILTER_TITLE_PLACEHOLDERS = [
 export const ONBOARD_WIZARD_STEPS = [
   {
     description: "",
-    title: "Tell us about yourself",
+    title: "Your Role",
     inputs: [
       {
         setting: "userRole",
@@ -119,7 +119,7 @@ export const ONBOARD_WIZARD_STEPS = [
       <br><br>
       An "approach" is defined as when a rep attempts to engage with _ people at a target/prospect company within a _ day period.
       `,
-    title: "Welcome to InsideOutbound",
+    title: "Welcome",
     inputs: [
       {
         setting: "contactsPerAccount",
@@ -274,7 +274,7 @@ export const ONBOARD_WIZARD_STEPS = [
             ? await fetchSalesforceTasksByUserIds(salesforceUserIds)
             : await fetchSalesforceEventsByUserIds(salesforceUserIds);
           tableData.data = tableDataResponse.data.map(
-            /** @param {SObject} item */ (item) => ({
+            /** @param {SObject} item */(item) => ({
               ...item,
               id: item.Id,
             })
@@ -284,7 +284,7 @@ export const ONBOARD_WIZARD_STEPS = [
             ? await fetchTaskFilterFields()
             : await fetchEventFilterFields();
           tableData.availableColumns = fieldsResponse.data.map(
-            /**@param {SObjectField} field*/ (field) => ({
+            /**@param {SObjectField} field*/(field) => ({
               id: field.name,
               label: field.label,
               dataType: field.type,
