@@ -192,10 +192,18 @@ const CustomTable = ({
         );
         break;
       case "date":
-        element = new Date(item[column.id]).toLocaleDateString();
+        if (item[column.id]) {
+          element = new Date(item[column.id]).toLocaleDateString();
+          break;
+        }
+        element = null;
         break;
       case "datetime":
-        element = new Date(item[column.id]).toLocaleString();
+        if (item[column.id]) {
+          element = new Date(item[column.id]).toLocaleString();
+          break;
+        }
+        element = null;
         break;
       case "number":
         element = Number(item[column.id]).toLocaleString();

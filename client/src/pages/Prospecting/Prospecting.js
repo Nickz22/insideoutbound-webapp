@@ -325,7 +325,6 @@ const Prospecting = () => {
   };
 
   const tableColumns = [
-    { id: "id", label: "ID", dataType: "text" },
     { id: "account.name", label: "Account Name", dataType: "component" },
     {
       id: "opportunity.name",
