@@ -1,14 +1,9 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect } from "react";
 import { Box, Paper, Divider } from "@mui/material";
-// import { useNavigate } from "react-router-dom";
 import ProgressTracker from "../../components/ProgressTracker/ProgressTracker";
 import {
   fetchLoggedInSalesforceUser,
   fetchSalesforceTasksByUserIds,
-  fetchTaskFields,
-  fetchTaskFilterFields,
-  // generateCriteria,
-  // saveSettings as saveSettingsToSupabase,
 } from "../../components/Api/Api";
 
 /**
@@ -22,7 +17,6 @@ import {
  * @typedef {import('types').SalesforceUser} SalesforceUser
  */
 
-import { ONBOARD_WIZARD_STEPS } from "../../utils/c";
 import Logo from "src/components/Logo/Logo";
 import RoleStep from "./RoleStep";
 import { useOnboard } from "./OnboardProvider";
@@ -33,23 +27,14 @@ const Onboard = () => {
   const {
     step,
     filters,
-    categoryFormTableData,
     gatheringResponses,
-    isLargeDialog,
     isTransitioning,
     tasks,
-    setCategoryFormTableData,
-    setFilters,
     setGatheringResponses,
-    setIsLargeDialog,
     setIsTransitioning,
-    setStep,
     setTasks,
     handleStepClick
   } = useOnboard();
-
-  const taskSObjectFields = useRef([]);
-  const taskFilterFields = useRef([]);
 
   useEffect(() => {
     const setSalesforceTasks = async () => {
@@ -113,33 +98,6 @@ const Onboard = () => {
     }
   }, [isTransitioning]);
 
-  // const saveSettings = async () => {
-  //   try {
-  //     /** @type {Settings} */
-  //     let settings = getSettingsFromResponses();
-
-  //     settings = Object.keys(settings).reduce((acc, key) => {
-  //       acc[key] =
-  //         settings[key] === "Yes"
-  //           ? true
-  //           : settings[key] === "No"
-  //             ? false
-  //             : settings[key];
-  //       return acc;
-  //     }, /** @type {Settings} */({}));
-
-  //     const result = await saveSettingsToSupabase(settings);
-
-  //     if (!result.success) {
-  //       throw new Error(result.message);
-  //     }
-
-  //     console.log("Settings saved successfully");
-  //     navigate("/app/settings");
-  //   } catch (error) {
-  //     console.error("Error saving settings:", error);
-  //   }
-  // };
 
   /**
    * Formats the settings data from the form responses.
@@ -178,30 +136,6 @@ const Onboard = () => {
       latestDateQueried: threeMonthsAgo.toISOString(),
     };
   };
-
-  /**
-   * Corresponds to the onboarding wizard step question, if the question is composed of an array of questions,
-   * `responses` will be an array of responses, else it will be a single response
-   * @param {[{label: string, value: string}]} response
-   * @returns {void}
-   */
-  // const handleInfoGatheringComplete = (response) => {
-  //   setGatheringResponses(
-  //     /**
-  //      * @param {{ [key: string]: any }} prev
-  //      */
-  //     (prev) => {
-  //       const newResponses = { ...prev };
-  //       // Handle the case where we have multiple responses
-  //       response.forEach((res) => {
-  //         newResponses[res.label] = { value: res.value };
-  //       });
-  //       return newResponses;
-  //     }
-  //   );
-  //   handleNext();
-  // };
-
 
   return (
     <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
