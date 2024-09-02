@@ -1,26 +1,125 @@
-import React, { useState } from 'react';
-import { Box, Button, FormControl, MenuItem, Select } from '@mui/material';
+import React, { useEffect, useState } from 'react';
+import { Box, Button, CircularProgress, FormControl, MenuItem, Select } from '@mui/material';
+import { useOnboard } from './OnboardProvider';
+import CustomTable from 'src/components/CustomTable/CustomTable';
+import { fetchSalesforceUsers } from 'src/components/Api/Api';
 
 /**
  * @typedef {import('types').Settings} Settings
+ * @typedef {import('types').TableColumn} TableColumn
+ * @typedef {import('types').TableData} TableData
  */
+
+/** @type {TableColumn[]} */
+const COLUMNS = [
+    {
+        id: "select",
+        label: "Select",
+        dataType: "select",
+    },
+    {
+        id: "photoUrl",
+        label: "",
+        dataType: "image",
+    },
+    {
+        id: "firstName",
+        label: "First Name",
+        dataType: "string",
+    },
+    {
+        id: "lastName",
+        label: "Last Name",
+        dataType: "string",
+    },
+    {
+        id: "email",
+        label: "Email",
+        dataType: "string",
+    },
+    {
+        id: "role",
+        label: "Role",
+        dataType: "string",
+    },
+    {
+        id: "username",
+        label: "Username",
+        dataType: "string",
+    },
+]
+
+/** @return {TableData|null} */
+const initTableData = () => {
+    return null
+}
 
 /**
  * @param {object} props
  * @param {() => void} props.handleNext
  */
-const RoleStep = ({ handleNext }) => {
-    /** @type {[Settings, React.Dispatch<React.SetStateAction<Settings>>]} */
-    const [inputValues, setInputValues] = useState({
-        userRole: "placeholder"
-    });
+const RoleStep = () => {
+    const { setStep, step, setInputValues, inputValues } = useOnboard();
 
+    /** @type {[TableData|null, React.Dispatch<React.SetStateAction<(TableData|null)>>]} */
+    const [tableData, setTableData] = useState(initTableData());
+
+    const [isLoading, setIsLoading] = useState(false);
+
+
+    /**
+     * @param {import('@mui/material').SelectChangeEvent<string>} event
+     * @param {string} setting
+     */
     const handleInputChange = (event, setting) => {
         setInputValues((prev) => ({
             ...prev,
             [setting]: event.target.value,
         }));
     };
+
+
+    /** @param {Set<string>} newSelectedIds */
+    const handleTableSelectionChange = (newSelectedIds) => {
+        setTableData((prev) =>
+            prev ? { ...prev, selectedIds: newSelectedIds } : null
+        );
+    };
+
+    /** @param {TableColumn[]} newColumns */
+    const handleColumnsChange = (newColumns) => {
+        setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
+    };
+
+    const fetchTableData = async () => {
+        try {
+            setIsLoading(true)
+            const data = await fetchSalesforceUsers();
+
+            /** @type {TableData} */
+            const _tableData = {
+                availableColumns: [],
+                columns: COLUMNS,
+                data: data.data,
+                selectedIds: new Set(),
+            };
+
+            setTableData(_tableData);
+
+        } catch (error) {
+            console.error("Error fetching data:", error);
+        } finally {
+            setIsLoading(false);
+        }
+    }
+
+    useEffect(() => {
+        if (inputValues.userRole === "I manage a team") {
+            fetchTableData()
+        } else {
+            setTableData(null)
+        }
+    }, [inputValues])
 
     return (
         <Box
@@ -123,7 +222,6 @@ const RoleStep = ({ handleNext }) => {
                         Tell Us About Yourself
                     </h2>
                     <FormControl fullWidth variant="outlined" margin="normal">
-                        {/* <InputLabel>User Role</InputLabel> */}
                         <Select
                             value={inputValues.userRole}
                             placeholder="User Role"
@@ -166,6 +264,26 @@ const RoleStep = ({ handleNext }) => {
                                 </MenuItem>
                             ))}
                         </Select>
+                        {tableData && (
+                            <CustomTable
+                                tableData={tableData}
+                                onRowClick={() => { return; }}
+                                onSelectionChange={handleTableSelectionChange}
+                                onColumnsChange={handleColumnsChange}
+                                paginate={true}
+                            />)}
+                        {isLoading && (
+                            <Box
+                                sx={{
+                                    display: "flex",
+                                    flexDirection: "column",
+                                    alignItems: "center",
+                                    marginTop: "29px",
+                                }}
+                            >
+                                <CircularProgress size={30} />
+                            </Box>
+                        )}
                     </FormControl>
                     <Box
                         sx={{
@@ -176,7 +294,7 @@ const RoleStep = ({ handleNext }) => {
                         }}
                     >
                         <Button
-                            onClick={() => { handleNext() }}
+                            onClick={() => { setStep(step + 1); }}
                             variant="contained"
                             color="primary"
                             sx={{

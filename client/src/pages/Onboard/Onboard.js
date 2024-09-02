@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { Box, Paper, Divider } from "@mui/material";
 // import { useNavigate } from "react-router-dom";
 import ProgressTracker from "../../components/ProgressTracker/ProgressTracker";
@@ -25,104 +25,31 @@ import {
 import { ONBOARD_WIZARD_STEPS } from "../../utils/c";
 import Logo from "src/components/Logo/Logo";
 import RoleStep from "./RoleStep";
-
-const REQUIRED_PROSPECTING_CATEGORIES = [
-  "Inbound Call",
-  "Outbound Call",
-  "Inbound Email",
-  "Outbound Email",
-];
+import { useOnboard } from "./OnboardProvider";
+import { PROGRESS_STEP } from "./OnboardConstant";
 
 const Onboard = () => {
   // const navigate = useNavigate();
-  const [step, setStep] = useState(1); // Start from step 1
-  /** @type {[FilterContainer[], Function]} */
-  const [filters] = useState(
-    REQUIRED_PROSPECTING_CATEGORIES.map((category) => ({
-      name: category,
-      filters: [],
-      filterLogic: "",
-      direction: category.toLowerCase().includes("inbound")
-        ? "Inbound"
-        : "Outbound",
-    }))
-  );
-  /**
-   * @typedef {{ [key: string]: any }} GatheringResponses
-   */
+  const {
+    step,
+    filters,
+    categoryFormTableData,
+    gatheringResponses,
+    isLargeDialog,
+    isTransitioning,
+    tasks,
+    setCategoryFormTableData,
+    setFilters,
+    setGatheringResponses,
+    setIsLargeDialog,
+    setIsTransitioning,
+    setStep,
+    setTasks,
+    handleStepClick
+  } = useOnboard();
 
-  /** @type {[GatheringResponses, React.Dispatch<React.SetStateAction<GatheringResponses>>]} */
-  const [gatheringResponses, setGatheringResponses] = useState({});
-  const [isTransitioning, setIsTransitioning] = useState(false);
-  /** @type {[TableData, Function]} */
-  const [categoryFormTableData, setCategoryFormTableData] = useState({
-    availableColumns: [],
-    columns: [],
-    data: [],
-    selectedIds: new Set(),
-  });
-  /** @type {[SObject[], Function]} */
-  const [tasks, setTasks] = useState([]);
   const taskSObjectFields = useRef([]);
   const taskFilterFields = useRef([]);
-
-  useEffect(() => {
-    const setInitialCategoryFormTableData = async () => {
-      taskSObjectFields.current =
-        taskSObjectFields.current.length > 0
-          ? taskSObjectFields.current
-          : (await fetchTaskFields()).data.map(
-            /** @param {SObjectField} field */
-            (field) => ({
-              id: field.name,
-              label: field.label,
-              dataType: field.type,
-            })
-          );
-      setCategoryFormTableData({
-        availableColumns: taskSObjectFields.current,
-        columns:
-          categoryFormTableData.columns.length > 0
-            ? categoryFormTableData.columns
-            : [
-              {
-                id: "select",
-                label: "Select",
-                dataType: "select",
-              },
-              {
-                id: "Subject",
-                label: "Subject",
-                dataType: "string",
-              },
-              {
-                id: "Status",
-                label: "Status",
-                dataType: "string",
-              },
-              {
-                id: "TaskSubtype",
-                label: "TaskSubtype",
-                dataType: "string",
-              },
-            ],
-        data: tasks,
-        selectedIds: new Set(),
-      });
-    };
-    setInitialCategoryFormTableData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks]);
-
-  useEffect(() => {
-    const setTaskFilterFields = async () => {
-      taskFilterFields.current =
-        taskFilterFields.current.length > 0
-          ? taskFilterFields.current
-          : (await fetchTaskFilterFields()).data;
-    };
-    setTaskFilterFields();
-  }, []);
 
   useEffect(() => {
     const setSalesforceTasks = async () => {
@@ -185,15 +112,6 @@ const Onboard = () => {
       return () => clearTimeout(timer);
     }
   }, [isTransitioning]);
-
-  /**
-   * @param {number} clickedStep
-   */
-  const handleStepClick = (clickedStep) => {
-    if (clickedStep < step) {
-      setStep(clickedStep);
-    }
-  };
 
   // const saveSettings = async () => {
   //   try {
@@ -261,10 +179,6 @@ const Onboard = () => {
     };
   };
 
-  const handleNext = () => {
-    setStep(step + 1);
-  };
-
   /**
    * Corresponds to the onboarding wizard step question, if the question is composed of an array of questions,
    * `responses` will be an array of responses, else it will be a single response
@@ -287,14 +201,6 @@ const Onboard = () => {
   //   );
   //   handleNext();
   // };
-
-  const getProgressSteps = () => {
-    return [
-      ...ONBOARD_WIZARD_STEPS,
-      { title: "Prospecting Categories" },
-      { title: "Review" },
-    ];
-  };
 
 
   return (
@@ -322,13 +228,13 @@ const Onboard = () => {
 
         <Divider sx={{ backgroundColor: "rgba(135, 159, 202, 0.5)", marginBottom: "41px" }} />
         <ProgressTracker
-          steps={getProgressSteps()}
+          steps={PROGRESS_STEP}
           currentStep={step}
           onStepClick={handleStepClick}
           orientation="vertical"
         />
       </Paper>
-      {step === 1 && (<RoleStep handleNext={handleNext} />)}
+      {step === 1 && (<RoleStep />)}
     </Box>
   );
 };
