@@ -254,6 +254,11 @@ const CustomTable = ({
                 key={item.id}
                 onClick={() => (onRowClick ? onRowClick(item) : null)}
                 style={{ cursor: onRowClick ? "pointer" : "default" }}
+                sx={{
+                  '&:hover': {
+                    backgroundColor: onRowClick ? "Highlight" : "none",
+                  },
+                }}
               >
                 {tableData.columns.map((column) => (
                   <TableCell key={`${item.id}-${column.id}`}>
