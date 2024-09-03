@@ -38,3 +38,5 @@ server/.vscode/settings.json
 supabase/.gitignore
 supabase/config.toml
 .vscode/launch.json
+
+.sfdx
