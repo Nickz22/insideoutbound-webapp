@@ -69,40 +69,40 @@ const Onboard = () => {
         taskSObjectFields.current.length > 0
           ? taskSObjectFields.current
           : (await fetchTaskFields()).data.map(
-              /** @param {SObjectField} field */
-              (field) => ({
-                id: field.name,
-                label: field.label,
-                dataType: field.type,
-              })
-            );
+            /** @param {SObjectField} field */
+            (field) => ({
+              id: field.name,
+              label: field.label,
+              dataType: field.type,
+            })
+          );
       setCategoryFormTableData({
         availableColumns: taskSObjectFields.current,
         columns:
           categoryFormTableData.columns.length > 0
             ? categoryFormTableData.columns
             : [
-                {
-                  id: "select",
-                  label: "Select",
-                  dataType: "select",
-                },
-                {
-                  id: "Subject",
-                  label: "Subject",
-                  dataType: "string",
-                },
-                {
-                  id: "Status",
-                  label: "Status",
-                  dataType: "string",
-                },
-                {
-                  id: "TaskSubtype",
-                  label: "TaskSubtype",
-                  dataType: "string",
-                },
-              ],
+              {
+                id: "select",
+                label: "Select",
+                dataType: "select",
+              },
+              {
+                id: "Subject",
+                label: "Subject",
+                dataType: "string",
+              },
+              {
+                id: "Status",
+                label: "Status",
+                dataType: "string",
+              },
+              {
+                id: "TaskSubtype",
+                label: "TaskSubtype",
+                dataType: "string",
+              },
+            ],
         data: tasks,
         selectedIds: new Set(),
       });
@@ -190,8 +190,8 @@ const Onboard = () => {
           settings[key] === "Yes"
             ? true
             : settings[key] === "No"
-            ? false
-            : settings[key];
+              ? false
+              : settings[key];
         return acc;
       }, {});
 
@@ -367,17 +367,17 @@ const Onboard = () => {
     border: "1px solid #e0e0e0",
     ...(isLargeDialogStep()
       ? {
-          maxWidth: "60vw",
-          width: "60vw",
-          maxHeight: "90vh",
-          height: "90vh",
-        }
+        maxWidth: "60vw",
+        width: "60vw",
+        maxHeight: "90vh",
+        height: "90vh",
+      }
       : {
-          maxWidth: "600px", // Adjust as needed for small dialog
-          width: "100%",
-          maxHeight: "80vh",
-          height: "auto",
-        }),
+        maxWidth: "600px", // Adjust as needed for small dialog
+        width: "100%",
+        maxHeight: "80vh",
+        height: "auto",
+      }),
   };
 
   /**
