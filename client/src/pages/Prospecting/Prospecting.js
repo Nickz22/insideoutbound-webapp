@@ -42,6 +42,7 @@ import {
   fetchAndUpdateProspectingActivity,
   getInstanceUrl,
   generateActivationSummary,
+  getLoggedInUser,
 } from "src/components/Api/Api";
 import MetricCard from "../../components/MetricCard/MetricCard";
 import CustomTable from "../../components/CustomTable/CustomTable";
@@ -66,6 +67,42 @@ const Prospecting = () => {
 
   const [dataFilter, setDataFilter] = useState(null);
   const [originalRawData, setOriginalRawData] = useState([]);
+  const [loggedInUser, setLoggedInUser] = useState({
+    id: 0,
+    created_at: "",
+    firstName: "",
+    lastName: "",
+    email: "",
+    username: "",
+    photoUrl: "",
+    status: ""
+  });
+
+  const freeTrialDaysLeft = useMemo(() => {
+    if (loggedInUser.created_at.length === 0) {
+      return 0; // No creation date, no trial left
+    }
+
+    const createdAtDate = new Date(loggedInUser.created_at); // Convert to Date object
+    const currentDate = new Date(); // Current date
+
+    // Set both dates to midnight (00:00:00) to ignore time
+    createdAtDate.setHours(0, 0, 0, 0);
+    currentDate.setHours(0, 0, 0, 0);
+
+    // Calculate difference in milliseconds
+    const timeDifference = currentDate.getTime() - createdAtDate.getTime();
+
+    // Convert milliseconds to days
+    const daysPassed = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+
+    // Free trial is 3 days, so calculate days left
+    const trialDaysLeft = 3 - daysPassed;
+
+    // If days left is less than 0, return 0
+    return trialDaysLeft > 0 && trialDaysLeft < 4 ? trialDaysLeft : 0;
+  }, [loggedInUser])
+
 
   const accountFields = useMemo(() => {
     if (rawData.length === 0) return [];
@@ -126,11 +163,19 @@ const Prospecting = () => {
     const fetchInitialData = async () => {
       await fetchData();
       try {
-        const response = await getInstanceUrl();
-        if (response.success) {
-          setInstanceUrl(response.data[0]);
+        const [userResponse, instanceUrlResponse] = await Promise.all([
+          getLoggedInUser(),
+          getInstanceUrl(),
+        ]);
+
+        if (userResponse.success) {
+          setLoggedInUser(userResponse.data[0]);
+        }
+
+        if (instanceUrlResponse.success) {
+          setInstanceUrl(instanceUrlResponse.data[0]);
         } else {
-          console.error("Failed to fetch instance URL:", response.message);
+          console.error("Failed to fetch instance URL:", instanceUrlResponse.message);
         }
       } catch (error) {
         console.error("Error fetching instance URL:", error);
@@ -401,230 +446,295 @@ const Prospecting = () => {
   }
 
   return (
-    <Box sx={{ padding: "24px" }}>
+    <Box
+      sx={{
+        position: "relative",
+        width: "100%",
+        height: "100dvh",
+        maxHeight: "100dvh",
+        overflow: "hidden",
+        backgroundColor: "#FFFFFF",
+        maxWidth: "100%",
+        boxSizing: "border-box",
+        padding: 0,
+        margin: 0,
+      }}
+    >
       <Box
         sx={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: "16px",
+          padding: "24px",
+          overflowX: "auto",
+          maxHeight: "100%",
+          height: "100%",
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          backgroundColor: "#FFFFFF"
         }}
       >
-        <DataFilter
-          fields={accountFields}
-          onFilter={handleDataFilter}
-          onClear={handleClearFilter}
-        />
-        <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-          <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-            <InputLabel id="period-label">Period</InputLabel>
-            <Select
-              labelId="period-label"
-              id="period-select"
-              value={period}
-              onChange={handlePeriodChange}
-              label="Period"
-            >
-              <MenuItem value="All">All</MenuItem>
-              <MenuItem value="24h">24h</MenuItem>
-              <MenuItem value="48h">48h</MenuItem>
-              <MenuItem value="7d">7d</MenuItem>
-              <MenuItem value="30d">30d</MenuItem>
-              <MenuItem value="90d">90d</MenuItem>
-            </Select>
-          </FormControl>
-          <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-            <InputLabel id="view-label">View</InputLabel>
-            <Select
-              labelId="view-label"
-              id="view-select"
-              value={view}
-              onChange={handleViewChange}
-              label="View"
-            >
-              <MenuItem value="Summary">Summary</MenuItem>
-              <MenuItem value="Detailed">Detailed</MenuItem>
-            </Select>
-          </FormControl>
-          {activatedByUsers.length > 0 && (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: "16px",
+          }}
+        >
+          <DataFilter
+            fields={accountFields}
+            onFilter={handleDataFilter}
+            onClear={handleClearFilter}
+          />
+          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
             <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="activated-by-label">Activated By</InputLabel>
+              <InputLabel id="period-label">Period</InputLabel>
               <Select
-                labelId="activated-by-label"
-                id="activated-by-select"
-                value={selectedActivatedBy}
-                onChange={handleActivatedByChange}
-                label="Activated By"
+                labelId="period-label"
+                id="period-select"
+                value={period}
+                onChange={handlePeriodChange}
+                label="Period"
               >
-                <MenuItem value="">
-                  <em>All</em>
-                </MenuItem>
-                {activatedByUsers.map((user) => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {`${user.firstName} ${user.lastName}`}
-                  </MenuItem>
-                ))}
+                <MenuItem value="All">All</MenuItem>
+                <MenuItem value="24h">24h</MenuItem>
+                <MenuItem value="48h">48h</MenuItem>
+                <MenuItem value="7d">7d</MenuItem>
+                <MenuItem value="30d">30d</MenuItem>
+                <MenuItem value="90d">90d</MenuItem>
               </Select>
             </FormControl>
-          )}
-          <Tooltip title="Refresh data from org">
-            <IconButton onClick={handleRefresh} color="primary" size="small">
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
+            <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
+              <InputLabel id="view-label">View</InputLabel>
+              <Select
+                labelId="view-label"
+                id="view-select"
+                value={view}
+                onChange={handleViewChange}
+                label="View"
+              >
+                <MenuItem value="Summary">Summary</MenuItem>
+                <MenuItem value="Detailed">Detailed</MenuItem>
+              </Select>
+            </FormControl>
+            {activatedByUsers.length > 0 && (
+              <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
+                <InputLabel id="activated-by-label">Activated By</InputLabel>
+                <Select
+                  labelId="activated-by-label"
+                  id="activated-by-select"
+                  value={selectedActivatedBy}
+                  onChange={handleActivatedByChange}
+                  label="Activated By"
+                >
+                  <MenuItem value="">
+                    <em>All</em>
+                  </MenuItem>
+                  {activatedByUsers.map((user) => (
+                    <MenuItem key={user.id} value={user.id}>
+                      {`${user.firstName} ${user.lastName}`}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+            )}
+            <Tooltip
+              title={loggedInUser.status === "not paid" && freeTrialDaysLeft === 0 ? "please upgrade to continue fetching your prospecting data" : "Refresh data from org"}>
+              <IconButton
+                onClick={() => {
+                  if (loggedInUser.status === "not paid" && freeTrialDaysLeft === 0) {
+                    return;
+                  }
+                  handleRefresh()
+                }}
+                color="primary"
+                size="small"
+              >
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
         </Box>
-      </Box>
 
-      {error ? (
-        <Alert severity="error">{error}</Alert>
-      ) : view === "Summary" ? (
-        <Grid container spacing={2}>
-          {summaryLoading ? (
-            getLoadingComponent("Generating summary...")
-          ) : (
-            <>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Activations"
-                  value={summaryData.total_activations.toString()}
-                  subText=""
-                  tooltipTitle="The number of approached accounts in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Activations Today"
-                  value={summaryData.activations_today.toString()}
-                  subText=""
-                  tooltipTitle="The number of accounts which were approached today"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Tasks"
-                  value={summaryData.total_tasks.toString()}
-                  subText=""
-                  tooltipTitle="The total number of prospecting Tasks created in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Events"
-                  value={summaryData.total_events.toString()}
-                  subText=""
-                  tooltipTitle="The total number of meetings created in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Avg Tasks Per Contact"
-                  value={summaryData.avg_tasks_per_contact.toFixed(2)}
-                  subText=""
-                  tooltipTitle="The average number of tasks per contact under each activated account"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Avg Contacts Per Account"
-                  value={summaryData.avg_contacts_per_account.toFixed(2)}
-                  subText=""
-                  tooltipTitle="The average number of tasks per activated account"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Deals"
-                  value={summaryData.total_deals.toString()}
-                  subText=""
-                  tooltipTitle="The total number of open opportunities related to any activated account in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Pipeline Value"
-                  value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
-                  subText=""
-                  tooltipTitle="The total amount of open opportunities related to any activated account in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Engaged Activations"
-                  value={summaryData.engaged_activations.toString()}
-                  subText=""
-                  tooltipTitle="The number of activated Accounts which have had inbound engagement"
-                />
-              </Grid>
-            </>
-          )}
-        </Grid>
-      ) : (
-        <>
-          <CustomTable
-            tableData={{
-              columns: tableColumns,
-              data: filteredData.map((item) => ({
-                ...item,
-                "account.name": (
-                  <Link
-                    href={`${instanceUrl}/${item.account?.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {item.account?.name || "N/A"}
-                  </Link>
-                ),
-                "opportunity.name": item.opportunity ? (
-                  <Link
-                    href={`${instanceUrl}/${item.opportunity.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {item.opportunity.name || "N/A"}
-                  </Link>
-                ) : (
-                  "N/A"
-                ),
-              })),
-              selectedIds: new Set(),
-              availableColumns: tableColumns,
-            }}
-            paginate={true}
-            onRowClick={handleRowClick}
-          />
-
-          {selectedActivation && (
-            <Box
-              sx={{
-                marginTop: 4,
-                display: "flex",
-                height: "calc(100vh - 600px)",
-                minHeight: "400px",
+        {error ? (
+          <Alert severity="error">{error}</Alert>
+        ) : view === "Summary" ? (
+          <Grid container spacing={2}>
+            {summaryLoading ? (
+              getLoadingComponent("Generating summary...")
+            ) : (
+              <>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Total Activations"
+                    value={summaryData.total_activations.toString()}
+                    subText=""
+                    tooltipTitle="The number of approached accounts in the selected period"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Activations Today"
+                    value={summaryData.activations_today.toString()}
+                    subText=""
+                    tooltipTitle="The number of accounts which were approached today"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Total Tasks"
+                    value={summaryData.total_tasks.toString()}
+                    subText=""
+                    tooltipTitle="The total number of prospecting Tasks created in the selected period"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Total Events"
+                    value={summaryData.total_events.toString()}
+                    subText=""
+                    tooltipTitle="The total number of meetings created in the selected period"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Avg Tasks Per Contact"
+                    value={summaryData.avg_tasks_per_contact.toFixed(2)}
+                    subText=""
+                    tooltipTitle="The average number of tasks per contact under each activated account"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Avg Contacts Per Account"
+                    value={summaryData.avg_contacts_per_account.toFixed(2)}
+                    subText=""
+                    tooltipTitle="The average number of tasks per activated account"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Total Deals"
+                    value={summaryData.total_deals.toString()}
+                    subText=""
+                    tooltipTitle="The total number of open opportunities related to any activated account in the selected period"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Total Pipeline Value"
+                    value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+                    subText=""
+                    tooltipTitle="The total amount of open opportunities related to any activated account in the selected period"
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6} md={4} lg={4}>
+                  <MetricCard
+                    title="Engaged Activations"
+                    value={summaryData.engaged_activations.toString()}
+                    subText=""
+                    tooltipTitle="The number of activated Accounts which have had inbound engagement"
+                  />
+                </Grid>
+              </>
+            )}
+          </Grid>
+        ) : (
+          <>
+            <CustomTable
+              tableData={{
+                columns: tableColumns,
+                data: filteredData.map((item) => ({
+                  ...item,
+                  "account.name": (
+                    <Link
+                      href={`${instanceUrl}/${item.account?.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.account?.name || "N/A"}
+                    </Link>
+                  ),
+                  "opportunity.name": item.opportunity ? (
+                    <Link
+                      href={`${instanceUrl}/${item.opportunity.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.opportunity.name || "N/A"}
+                    </Link>
+                  ) : (
+                    "N/A"
+                  ),
+                })),
+                selectedIds: new Set(),
+                availableColumns: tableColumns,
               }}
-            >
-              <Box sx={{ width: "40%", overflowY: "auto", pr: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Prospecting Metadata for {selectedActivation.account.name}
-                </Typography>
-                <ProspectingMetadataOverview
-                  metadata={selectedActivation.prospecting_metadata}
-                />
-              </Box>
+              paginate={true}
+              onRowClick={handleRowClick}
+            />
+
+            {selectedActivation && (
               <Box
                 sx={{
-                  width: "60%",
-                  overflowY: "auto",
-                  pl: 2,
-                  borderLeft: "1px solid #e0e0e0",
+                  marginTop: 4,
+                  display: "flex",
+                  height: "calc(100vh - 600px)",
+                  minHeight: "400px",
                 }}
               >
-                <ProspectingEffortTimeline
-                  efforts={selectedActivation.prospecting_effort}
-                />
+                <Box sx={{ width: "40%", overflowY: "auto", pr: 2 }}>
+                  <Typography variant="h6" gutterBottom>
+                    Prospecting Metadata for {selectedActivation.account.name}
+                  </Typography>
+                  <ProspectingMetadataOverview
+                    metadata={selectedActivation.prospecting_metadata}
+                  />
+                </Box>
+                <Box
+                  sx={{
+                    width: "60%",
+                    overflowY: "auto",
+                    pl: 2,
+                    borderLeft: "1px solid #e0e0e0",
+                  }}
+                >
+                  <ProspectingEffortTimeline
+                    efforts={selectedActivation.prospecting_effort}
+                  />
+                </Box>
               </Box>
-            </Box>
-          )}
-        </>
+            )}
+          </>
+        )}
+
+
+      </Box>
+
+      {loggedInUser.status === "not paid" && freeTrialDaysLeft > 0 && (
+        <Box
+          onClick={() => {
+            navigate("/app/account")
+          }}
+          sx={{
+            position: "absolute",
+            bottom: "60px",
+            right: "-65px",
+            transform: "rotate(-45deg)",
+            backgroundColor: "#1E242F",
+            color: "white",
+            fontWeight: "bold",
+            height: "56px",
+            width: "320px",
+            boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            cursor: "pointer"
+          }}
+        >
+          {freeTrialDaysLeft} days left in trial
+        </Box>
       )}
     </Box>
   );
