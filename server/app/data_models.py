@@ -280,6 +280,7 @@ class UserModel(SerializableModel):
     firstName: Optional[str] = None
     role: Optional[str] = None
     status: Optional[str] = "not paid"
+    created_at: Optional[datetime] = None
 
     @classmethod
     def from_sobject(cls, sobject: UserSObject):
