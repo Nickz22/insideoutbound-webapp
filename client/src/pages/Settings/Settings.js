@@ -123,7 +123,7 @@ const Settings = () => {
 
   return (
 
-    <Box sx={{ width: "100%", mt: 2 }}>
+    <Box sx={{ width: "100%", height: "100%", mt: 2, overflow: "scroll" }}>
       <AppBar position="sticky" color="default" elevation={0}>
         <Tabs value={currentTab} onChange={handleTabChange} variant="fullWidth">
           <Tab label="General Settings" />

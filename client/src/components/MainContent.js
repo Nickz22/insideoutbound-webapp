@@ -9,7 +9,7 @@ import { SettingsProvider } from "src/pages/Settings/SettingProvider";
 
 const MainContent = () => {
   return (
-    <Box flex={1} p={3}>
+    <Box flex={1} sx={{ width: "100%", maxWidth: "100%", overflow: "hidden", height: "100dvh", maxHeight: "100dvh" }}>
       <Routes>
         <Route path="prospecting" element={<Prospecting />} />
         <Route path="settings" element={<SettingsProvider><Settings /></SettingsProvider>} />
