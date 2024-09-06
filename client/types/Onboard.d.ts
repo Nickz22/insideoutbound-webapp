@@ -1,5 +1,4 @@
 import { Filter } from "./Filter";
-import { Settings } from "./Settings";
 import { SObject } from "./SObject";
 
 export type RequiredProspectingCategory =
@@ -49,7 +48,7 @@ export interface OnboardContextInit {
   isTransitioning: boolean;
   categoryFormTableData: CategoryFormTableData;
   tasks: SObject[];
-  inputValues: Partial<Settings>;
+  inputValues: Partial<InputValue>;
 }
 
 export interface OnboardContextValue {
@@ -60,7 +59,7 @@ export interface OnboardContextValue {
   isTransitioning: boolean;
   categoryFormTableData: CategoryFormTableData;
   tasks: SObject[];
-  inputValues: Partial<Settings>;
+  inputValues: Partial<InputValue>;
   setFilters: React.Dispatch<React.SetStateAction<OnboardFilter[]>>;
   setStep: React.Dispatch<React.SetStateAction<number>>;
   setGatheringResponses: React.Dispatch<
@@ -72,6 +71,6 @@ export interface OnboardContextValue {
     React.SetStateAction<CategoryFormTableData>
   >;
   setTasks: React.Dispatch<React.SetStateAction<SObject[]>>;
-  setInputValues: React.Dispatch<React.SetStateAction<Partial<Settings>>>;
+  setInputValues: React.Dispatch<React.SetStateAction<Partial<InputValue>>>;
   handleStepClick: (clickedStep: number) => void;
 }

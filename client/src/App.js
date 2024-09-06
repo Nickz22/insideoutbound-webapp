@@ -10,9 +10,8 @@ import { Box } from "@mui/material";
 import Sidebar from "./components/Sidebar/Sidebar";
 import MainContent from "./components/MainContent";
 import Login from "./pages/Login";
-import Onboard from "./pages/Onboard/Onboard";
+import Onboard from "./pages/Onboard";
 import "./App.css";
-import { OnboardProvider } from "./pages/Onboard/OnboardProvider";
 
 const AppRoutes = () => {
   const navigate = useNavigate();
@@ -36,7 +35,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
-      <Route path="/onboard" element={<OnboardProvider><Onboard /></OnboardProvider>} />
+      <Route path="/onboard" element={<Onboard />} />
       <Route
         path="/app/*"
         element={

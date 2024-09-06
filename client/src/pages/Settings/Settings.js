@@ -75,7 +75,7 @@ const Settings = () => {
 
         // Set the default userRole based on teamMemberIds
         const teamMemberIds =
-          settings.teamMemberIds.length > 0 ? settings.teamMemberIds : [];
+          settings.teamMemberIds?.length > 0 ? settings.teamMemberIds : [];
         const defaultUserRole =
           teamMemberIds.length > 0
             ? "I manage a team"

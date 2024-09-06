@@ -293,6 +293,41 @@ class TableColumn(SerializableModel):
     label: str
 
 
+class UserSObject(SerializableModel):
+    Id: str
+    Email: Optional[str] = None
+    Username: Optional[str] = None
+    LastName: Optional[str] = None
+    FullPhotoUrl: Optional[str] = None
+    FirstName: Optional[str] = None
+    Role: Optional[str] = None
+
+
+class UserModel(SerializableModel):
+    id: str
+    email: Optional[str] = None
+    username: Optional[str] = None
+    lastName: Optional[str] = None
+    photoUrl: Optional[str] = None
+    orgId: Optional[str] = None
+    firstName: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = "not paid"
+    created_at: Optional[datetime] = None
+
+    @classmethod
+    def from_sobject(cls, sobject: UserSObject):
+        return cls(
+            id=sobject.Id,
+            email=sobject.Email,
+            username=sobject.Username,
+            firstName=sobject.FirstName,
+            lastName=sobject.LastName,
+            photoUrl=sobject.FullPhotoUrl,
+            role=sobject.Role,
+        )
+
+
 class TokenData(SerializableModel):
     access_token: str
     instance_url: str

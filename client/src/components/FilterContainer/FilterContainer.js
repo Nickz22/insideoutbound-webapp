@@ -49,6 +49,7 @@ const StyledTextField = styled(TextField)({
  * filterOperatorMapping: { [key: string]: {[key:string]: string} },
  * hasNameField: boolean,
  * isNameReadOnly: boolean,
+ * isDirectionReadOnly?: boolean,
  * hasDirectionField: boolean,
  * onLogicChange: Function,
  * onValueChange: Function}} props
@@ -60,6 +61,7 @@ const FilterContainer = ({
   filterOperatorMapping,
   hasNameField,
   isNameReadOnly,
+  isDirectionReadOnly = false,
   hasDirectionField,
   onLogicChange,
   onValueChange,
@@ -114,6 +116,7 @@ const FilterContainer = ({
                 value={filterContainer.direction?.toLowerCase() || ""}
                 label="Direction"
                 onChange={handleDirectionChange}
+                readOnly={isDirectionReadOnly}
               >
                 <MenuItem value="inbound">Inbound</MenuItem>
                 <MenuItem value="outbound">Outbound</MenuItem>
