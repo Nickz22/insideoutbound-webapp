@@ -4,6 +4,13 @@ import { FILTER_OPERATOR_MAPPING } from 'src/utils/c'
 import CloseIcon from "@mui/icons-material/Close";
 import { useSettings } from './SettingProvider';
 
+const REQUIRED_PROSPECTING_CATEGORIES = [
+    "Inbound Call",
+    "Outbound Call",
+    "Inbound Email",
+    "Outbound Email",
+];
+
 const TabProspecting = () => {
     const {
         criteria,
@@ -26,7 +33,8 @@ const TabProspecting = () => {
                         <Grid item xs={12} md={6} key={`criteria-${index}`}>
                             <Box sx={{ position: "relative" }}>
                                 <FilterContainer
-                                    isNameReadOnly={false}
+                                    isNameReadOnly={REQUIRED_PROSPECTING_CATEGORIES.includes(criteriaContainer.name)}
+                                    isDirectionReadOnly={REQUIRED_PROSPECTING_CATEGORIES.includes(criteriaContainer.name)}
                                     key={`filter-${index}`}
                                     initialFilterContainer={criteriaContainer}
                                     onLogicChange={
@@ -50,14 +58,17 @@ const TabProspecting = () => {
                                     hasNameField={true}
                                     hasDirectionField={true}
                                 />
-
-                                <IconButton
-                                    aria-label="delete"
-                                    onClick={() => handleDeleteFilter(index)}
-                                    sx={{ position: "absolute", top: 0, right: 0 }}
-                                >
-                                    <CloseIcon />
-                                </IconButton>
+                                {
+                                    !REQUIRED_PROSPECTING_CATEGORIES.includes(criteriaContainer.name) && (
+                                        <IconButton
+                                            aria-label="delete"
+                                            onClick={() => handleDeleteFilter(index)}
+                                            sx={{ position: "absolute", top: 0, right: 0 }}
+                                        >
+                                            <CloseIcon />
+                                        </IconButton>
+                                    )
+                                }
                             </Box>
                         </Grid>
                     ))}
