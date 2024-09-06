@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Button, CircularProgress, FormControl, MenuItem, Select } from '@mui/material';
-import { useOnboard } from './OnboardProvider';
 import CustomTable from 'src/components/CustomTable/CustomTable';
 import { fetchSalesforceUsers } from 'src/components/Api/Api';
 
@@ -56,27 +55,15 @@ const initTableData = () => {
 
 /**
  * @param {object} props
+ * @param {object} props.inputValues
  * @param {() => void} props.handleNext
+ * @param {(event: import('@mui/material').SelectChangeEvent<string>, setting: string) => void} props.handleInputChange
  */
-const RoleStep = () => {
-    const { setStep, step, setInputValues, inputValues } = useOnboard();
-
+const RoleStep = (props) => {
     /** @type {[TableData|null, React.Dispatch<React.SetStateAction<(TableData|null)>>]} */
     const [tableData, setTableData] = useState(initTableData());
-
     const [isLoading, setIsLoading] = useState(false);
-
-
-    /**
-     * @param {import('@mui/material').SelectChangeEvent<string>} event
-     * @param {string} setting
-     */
-    const handleInputChange = (event, setting) => {
-        setInputValues((prev) => ({
-            ...prev,
-            [setting]: event.target.value,
-        }));
-    };
+    const [role, setRole] = useState("")
 
 
     /** @param {Set<string>} newSelectedIds */
@@ -114,12 +101,12 @@ const RoleStep = () => {
     }
 
     useEffect(() => {
-        if (inputValues.userRole === "I manage a team") {
+        if (role === "I manage a team") {
             fetchTableData()
         } else {
             setTableData(null)
         }
-    }, [inputValues])
+    }, [role])
 
     return (
         <Box
@@ -129,8 +116,6 @@ const RoleStep = () => {
                 flex: 1,
                 backgroundColor: "white",
                 maxWidth: "100%",
-                overflow: "scroll",
-                marginLeft: "425px",
                 position: "relative",
                 alignItems: "center",
                 justifyContent: "start",
@@ -223,9 +208,12 @@ const RoleStep = () => {
                     </h2>
                     <FormControl fullWidth variant="outlined" margin="normal">
                         <Select
-                            value={inputValues.userRole}
+                            value={props.inputValues.userRole}
                             placeholder="User Role"
-                            onChange={(e) => handleInputChange(e, "userRole")}
+                            onChange={(e) => {
+                                setRole(e.target.value);
+                                props.handleInputChange(e, "userRole");
+                            }}
                             label={"User Role"}
                             variant='standard'
                             fullWidth
@@ -294,7 +282,7 @@ const RoleStep = () => {
                         }}
                     >
                         <Button
-                            onClick={() => { setStep(step + 1); }}
+                            onClick={props.handleNext}
                             variant="contained"
                             color="primary"
                             sx={{
