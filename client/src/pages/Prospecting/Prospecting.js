@@ -410,119 +410,122 @@ const Prospecting = () => {
           </Box>
         </Box>
 
-        {error ? (
-          <Alert severity="error">{error}</Alert>
-        ) : view === "Summary" ? (
-          <Grid container spacing={2}>
-            {summaryLoading ? (
-              getLoadingComponent("Generating summary...")
-            ) : (
-              <>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Activations"
-                    value={summaryData.total_activations.toString()}
-                    subText=""
-                    tooltipTitle="The number of approached accounts in the selected period"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Activations Today"
-                    value={summaryData.activations_today.toString()}
-                    subText=""
-                    tooltipTitle="The number of accounts which were approached today"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Tasks"
-                    value={summaryData.total_tasks.toString()}
-                    subText=""
-                    tooltipTitle="The total number of prospecting Tasks created in the selected period"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Events"
-                    value={summaryData.total_events.toString()}
-                    subText=""
-                    tooltipTitle="The total number of meetings created in the selected period"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Avg Tasks Per Contact"
-                    value={summaryData.avg_tasks_per_contact.toFixed(2)}
-                    subText=""
-                    tooltipTitle="The average number of tasks per contact under each activated account"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Avg Contacts Per Account"
-                    value={summaryData.avg_contacts_per_account.toFixed(2)}
-                    subText=""
-                    tooltipTitle="The average number of tasks per activated account"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Deals"
-                    value={summaryData.total_deals.toString()}
-                    subText=""
-                    tooltipTitle="The total number of open opportunities related to any activated account in the selected period"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Pipeline Value"
-                    value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
-                    subText=""
-                    tooltipTitle="The total amount of open opportunities related to any activated account in the selected period"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Engaged Activations"
-                    value={summaryData.engaged_activations.toString()}
-                    subText=""
-                    tooltipTitle="The number of activated Accounts which have had inbound engagement"
-                  />
-                </Grid>
-              </>
-            )}
-          </Grid>
-        ) : (
-          <>
-            <CustomTable
-              tableData={{
-                columns: tableColumns,
-                data: filteredData.map((item) => ({
-                  ...item,
-                  "account.name": (
-                    <Link
-                      href={`${instanceUrl}/${item.account?.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.account?.name || "N/A"}
-                    </Link>
-                  ),
-                  "opportunity.name": item.opportunity ? (
-                    <Link
-                      href={`${instanceUrl}/${item.opportunity.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.opportunity.name || "N/A"}
-                    </Link>
-                  ) : (
-                    "N/A"
-                  ),
-                })),
-                selectedIds: new Set(),
-                availableColumns: tableColumns,
+      {error ? (
+        <Alert severity="error">{error}</Alert>
+      ) : view === "Summary" ? (
+        <Grid container spacing={2}>
+          {summaryLoading ? (
+            getLoadingComponent("Generating summary...")
+          ) : (
+            <>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Activations"
+                  value={summaryData.total_activations.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Activations Today"
+                  value={summaryData.activations_today.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Tasks"
+                  value={summaryData.total_tasks.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Events"
+                  value={summaryData.total_events.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Avg Tasks Per Contact"
+                  value={summaryData.avg_tasks_per_contact.toFixed(2)}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Avg Contacts Per Account"
+                  value={summaryData.avg_contacts_per_account.toFixed(2)}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Deals"
+                  value={summaryData.total_deals.toString()}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Total Pipeline Value"
+                  value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+                  subText=""
+                />
+              </Grid>
+              <Grid item xs={12} sm={6} md={4} lg={4}>
+                <MetricCard
+                  title="Engaged Activations"
+                  value={summaryData.engaged_activations.toString()}
+                  subText=""
+                />
+              </Grid>
+            </>
+          )}
+        </Grid>
+      ) : (
+        <>
+          <CustomTable
+            tableData={{
+              columns: tableColumns,
+              data: filteredData.map((item) => ({
+                ...item,
+                "account.name": (
+                  <Link
+                    href={`${instanceUrl}/${item.account?.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {item.account?.name || "N/A"}
+                  </Link>
+                ),
+                "opportunity.name": item.opportunity ? (
+                  <Link
+                    href={`${instanceUrl}/${item.opportunity.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {item.opportunity.name || "N/A"}
+                  </Link>
+                ) : (
+                  "N/A"
+                ),
+              })),
+              selectedIds: new Set(),
+              availableColumns: tableColumns,
+            }}
+            paginate={true}
+            onRowClick={handleRowClick}
+          />
+
+          {selectedActivation && (
+            <Box
+              sx={{
+                marginTop: 4,
+                display: "flex",
+                height: "calc(100vh - 600px)",
+                minHeight: "400px",
               }}
               paginate={true}
               onRowClick={handleRowClick}
