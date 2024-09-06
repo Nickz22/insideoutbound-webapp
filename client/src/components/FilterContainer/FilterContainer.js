@@ -11,6 +11,7 @@ import {
   Grid,
   Tooltip,
   Typography,
+  styled,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
 import AddIcon from "@mui/icons-material/Add";
@@ -22,6 +23,25 @@ import { useFilterLogic } from "./useFilterLogic";
  * @typedef {import('types').CriteriaField} CriteriaField
  */
 
+const StyledTextField = styled(TextField)({
+
+  '& .MuiInput-underline:before': {
+    borderBottomColor: '#533AF3', // Blue underline
+  },
+  '& .MuiInput-underline:hover:not(.Mui-disabled):before': {
+    borderBottomColor: '#533AF3', // Blue underline on hover
+  },
+  '& .MuiInput-underline:after': {
+    borderBottomColor: '#533AF3', // Blue underline after focus
+  },
+  "& input": {
+    color: "rgba(83, 58, 243, 1)",
+    fontWeight: "400",
+    fontSize: "18px",
+  }
+
+});
+
 /**
  * @param {{
  * initialFilterContainer: FilterContainer,
@@ -29,6 +49,7 @@ import { useFilterLogic } from "./useFilterLogic";
  * filterOperatorMapping: { [key: string]: {[key:string]: string} },
  * hasNameField: boolean,
  * isNameReadOnly: boolean,
+ * isDirectionReadOnly?: boolean,
  * hasDirectionField: boolean,
  * onLogicChange: Function,
  * onValueChange: Function}} props
@@ -40,6 +61,7 @@ const FilterContainer = ({
   filterOperatorMapping,
   hasNameField,
   isNameReadOnly,
+  isDirectionReadOnly = false,
   hasDirectionField,
   onLogicChange,
   onValueChange,
@@ -94,6 +116,7 @@ const FilterContainer = ({
                 value={filterContainer.direction?.toLowerCase() || ""}
                 label="Direction"
                 onChange={handleDirectionChange}
+                readOnly={isDirectionReadOnly}
               >
                 <MenuItem value="inbound">Inbound</MenuItem>
                 <MenuItem value="outbound">Outbound</MenuItem>
@@ -117,18 +140,49 @@ const FilterContainer = ({
               sx={{
                 mb: 2,
                 p: 2,
-                backgroundColor: "#f5f5f5",
+                backgroundColor: "rgba(255, 125, 47, 0.07)",
                 borderRadius: "4px",
               }}
             >
               <Grid container spacing={2} alignItems="center">
                 <Grid item xs={12} sm={3}>
                   <FormControl fullWidth size="small">
-                    <InputLabel>Field</InputLabel>
+                    <InputLabel
+                      sx={{
+                        fontSize: "16px",
+                        color: "#4C4C4C",
+                        fontWeight: "500",
+                        margin: 0,
+                        left: "-14px",
+                        top: "4px"
+                      }}
+                    >FIELD</InputLabel>
                     <Select
                       value={filter.field}
-                      label="Field"
+                      label="FIELD"
                       onChange={(e) => handleFieldChange(index, e.target.value)}
+                      variant="standard"
+                      sx={{
+                        color: "rgba(83, 58, 243, 1)",
+                        fontWeight: "400",
+                        fontSize: "18px",
+                        borderBottom: "1px solid rgba(83, 58, 243, 1)",
+                        "::before": {
+                          borderBottom: "none"
+                        },
+                        "::after": {
+                          borderBottom: "none"
+                        },
+                        ":hover": {
+                          borderBottom: "2px solid rgba(83, 58, 243, 1)",
+                        },
+                        ":hover:not(.Mui-disabled, .Mui-error):before": {
+                          borderBottom: "2px solid rgba(83, 58, 243, 1)",
+                        },
+                        ":hover::after": {
+                          borderBottom: "none",
+                        }
+                      }}
                     >
                       {filterFields.map((field) => (
                         <MenuItem key={field.name} value={field.name}>
@@ -140,13 +194,44 @@ const FilterContainer = ({
                 </Grid>
                 <Grid item xs={12} sm={3}>
                   <FormControl fullWidth size="small">
-                    <InputLabel>Operator</InputLabel>
+                    <InputLabel
+                      sx={{
+                        fontSize: "16px",
+                        color: "#4C4C4C",
+                        fontWeight: "500",
+                        margin: 0,
+                        left: "-14px",
+                        top: "4px"
+                      }}
+                    >OPERATOR</InputLabel>
                     <Select
                       value={filter.operator}
-                      label="Operator"
+                      label="OPERATOR"
                       onChange={(e) =>
                         handleOperatorChange(index, e.target.value)
                       }
+                      variant="standard"
+                      sx={{
+                        color: "rgba(83, 58, 243, 1)",
+                        fontWeight: "400",
+                        fontSize: "18px",
+                        borderBottom: "1px solid rgba(83, 58, 243, 1)",
+                        "::before": {
+                          borderBottom: "none"
+                        },
+                        "::after": {
+                          borderBottom: "none"
+                        },
+                        ":hover": {
+                          borderBottom: "2px solid rgba(83, 58, 243, 1)",
+                        },
+                        ":hover:not(.Mui-disabled, .Mui-error):before": {
+                          borderBottom: "2px solid rgba(83, 58, 243, 1)",
+                        },
+                        ":hover::after": {
+                          borderBottom: "none",
+                        }
+                      }}
                     >
                       {Object.keys(
                         filterOperatorMapping[filter.dataType] || {}
@@ -161,10 +246,19 @@ const FilterContainer = ({
                 <Grid item xs={12} sm={5}>
                   {filter.options?.length > 0 ? (
                     <FormControl fullWidth size="small">
-                      <InputLabel>Value</InputLabel>
+                      <InputLabel
+                        sx={{
+                          fontSize: "16px",
+                          color: "#4C4C4C",
+                          fontWeight: "500",
+                          margin: 0,
+                          left: "-14px",
+                          top: "4px"
+                        }}
+                      >VALUE</InputLabel>
                       <Select
                         value={filter.value}
-                        label="Value"
+                        label="VALUE"
                         onChange={(e) =>
                           handleValueChange(
                             index,
@@ -172,6 +266,28 @@ const FilterContainer = ({
                             onValueChange
                           )
                         }
+                        sx={{
+                          color: "rgba(83, 58, 243, 1)",
+                          fontWeight: "400",
+                          fontSize: "18px",
+                          borderBottom: "1px solid rgba(83, 58, 243, 1)",
+                          "::before": {
+                            borderBottom: "none"
+                          },
+                          "::after": {
+                            borderBottom: "none"
+                          },
+                          ":hover": {
+                            borderBottom: "2px solid rgba(83, 58, 243, 1)",
+                          },
+                          ":hover:not(.Mui-disabled, .Mui-error):before": {
+                            borderBottom: "2px solid rgba(83, 58, 243, 1)",
+                          },
+                          ":hover::after": {
+                            borderBottom: "none",
+                          }
+                        }}
+                        variant="standard"
                       >
                         {filter.options.map((option, optionIndex) => (
                           <MenuItem key={optionIndex} value={option.value}>
@@ -181,15 +297,20 @@ const FilterContainer = ({
                       </Select>
                     </FormControl>
                   ) : (
-                    <TextField
+                    <StyledTextField
                       fullWidth
-                      label="Value"
+                      label="VALUE"
                       value={filter.value}
-                      variant="outlined"
+                      variant="standard"
                       size="small"
                       onChange={(e) =>
                         handleValueChange(index, e.target.value, onValueChange)
                       }
+                      sx={{
+                        color: "rgba(83, 58, 243, 1)",
+                        fontWeight: "400",
+                        fontSize: "18px",
+                      }}
                     />
                   )}
                 </Grid>
@@ -209,7 +330,13 @@ const FilterContainer = ({
           startIcon={<AddIcon />}
           onClick={handleAddFilter}
           variant="outlined"
-          sx={{ mb: 2 }}
+          sx={{
+            mb: 2,
+            backgroundColor: "rgba(73, 30, 255, 0.07)",
+            border: "1px solid rgba(83, 58, 243, 0.27)",
+            color: "#533AF3",
+            width: "180px"
+          }}
         >
           Add Filter
         </Button>

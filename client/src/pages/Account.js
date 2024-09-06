@@ -242,7 +242,7 @@ const Account = () => {
         </Button>
       )}
 
-      {userStatus === "not paid" || !userStatus && (
+      {(userStatus === "not paid" || !userStatus) && (
         <Button
           variant="contained"
           color="primary"

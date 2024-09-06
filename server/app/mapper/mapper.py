@@ -359,5 +359,6 @@ def supabase_user_to_python_user(row: Dict) -> UserModel:
         email=row["email"],
         orgId=row["org_id"],
         photoUrl=row["photo_url"],
-        status=row["status"]
+        status=row["status"],
+        created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
     )

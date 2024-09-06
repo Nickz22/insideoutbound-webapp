@@ -1,5 +1,4 @@
 import { Filter } from "./Filter";
-import { Settings } from "./Settings";
 import { SObject } from "./SObject";
 
 export type RequiredProspectingCategory =
@@ -23,6 +22,24 @@ export type CategoryFormTableData = {
   selectedIds: Set<any>;
 };
 
+export type InputValue = {
+  inactivityThreshold: number;
+  criteria: FilterContainer[];
+  meetingObject: string;
+  meetingsCriteria: FilterContainer;
+  activitiesPerContact: number;
+  contactsPerAccount: number;
+  trackingPeriod: number;
+  activateByMeeting: string;
+  activateByOpportunity: string;
+  userRole: string;
+  teamMemberIds: string[];
+  latestDateQueried: datetime;
+  skipAccountCriteria?: FilterContainer;
+  skipOpportunityCriteria?: FilterContainer;
+  salesforceUserId?: string;
+};
+
 export interface OnboardContextInit {
   filters: OnboardFilter[];
   step: number;
@@ -31,7 +48,7 @@ export interface OnboardContextInit {
   isTransitioning: boolean;
   categoryFormTableData: CategoryFormTableData;
   tasks: SObject[];
-  inputValues: Partial<Settings>;
+  inputValues: Partial<InputValue>;
 }
 
 export interface OnboardContextValue {
@@ -42,7 +59,7 @@ export interface OnboardContextValue {
   isTransitioning: boolean;
   categoryFormTableData: CategoryFormTableData;
   tasks: SObject[];
-  inputValues: Partial<Settings>;
+  inputValues: Partial<InputValue>;
   setFilters: React.Dispatch<React.SetStateAction<OnboardFilter[]>>;
   setStep: React.Dispatch<React.SetStateAction<number>>;
   setGatheringResponses: React.Dispatch<
@@ -54,6 +71,6 @@ export interface OnboardContextValue {
     React.SetStateAction<CategoryFormTableData>
   >;
   setTasks: React.Dispatch<React.SetStateAction<SObject[]>>;
-  setInputValues: React.Dispatch<React.SetStateAction<Partial<Settings>>>;
+  setInputValues: React.Dispatch<React.SetStateAction<Partial<InputValue>>>;
   handleStepClick: (clickedStep: number) => void;
 }
