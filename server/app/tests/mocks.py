@@ -194,6 +194,40 @@ def get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(
             cloned_tasks.append(task_copy)
     return cloned_tasks
 
+def get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query(
+    n, contacts, assignee_id
+):
+    if n > 3:
+        raise ValueError("Number of tasks exceeds the number of mock tasks")
+    cloned_tasks = []
+    for i, contact in enumerate(contacts):
+        for j in range(n):
+            task_copy = copy.deepcopy(
+                mock_tasks_for_criteria_with_unique_values_content[j]
+            )
+            task_copy["Id"] = f"mock_task_id_{i}_{j}"
+            task_copy["WhoId"] = contact["Id"]
+            task_copy["OwnerId"] = assignee_id
+            cloned_tasks.append(task_copy)
+    return cloned_tasks
+
+def get_n_mock_tasks_per_contact_for_contains_content_crieria_query(
+    n, contacts, assignee_id
+):
+    if len(contacts) > len(MOCK_CONTACT_IDS):
+        raise ValueError("Number of contacts exceeds the number of mock contact")
+    if n > 3:
+        raise ValueError("Number of tasks exceeds the number of mock tasks")
+    cloned_tasks = []
+    for i in range(len(contacts)):
+        for j in range(n):
+            task_copy = copy.deepcopy(mock_tasks_for_criteria_with_contains_content[j])
+            task_copy["Id"] = f"mock_task_id_{i}_{j}"
+            task_copy["WhoId"] = contacts[i]["Id"]
+            task_copy["OwnerId"] = assignee_id
+            cloned_tasks.append(task_copy)
+    return cloned_tasks
+
 
 def get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query(
     assignee_id,

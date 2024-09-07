@@ -98,7 +98,6 @@ def fetch_accounts_not_in_ids(account_ids):
 
     return api_response
 
-
 def fetch_criteria_tasks_by_account_ids_from_date(
     account_ids: list[str],
     start: str,
