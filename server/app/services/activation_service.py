@@ -543,8 +543,8 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 
             is_account_active_for_tracking_period = (
                 len(active_contact_ids) >= settings.contacts_per_account
-                or qualifying_event
-                or qualifying_opportunity
+                or bool(qualifying_event)
+                or bool(qualifying_opportunity)
             )
             if not is_account_active_for_tracking_period:
                 continue
@@ -553,7 +553,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 task.get("CreatedDate")
             ).date()
 
-            is_active_via_meeting_or_opportunity = len(active_contact_ids) == 0
+            is_active_via_meeting_or_opportunity = len(active_contact_ids) < settings.contacts_per_account
             active_contact_ids = (
                 list(valid_task_ids_by_who_id.keys())
                 if is_active_via_meeting_or_opportunity
@@ -778,6 +778,17 @@ def create_activation(
             task_ids_by_criteria_name,
         )
     )
+
+    if not any(pe.status == activation.status for pe in prospecting_efforts):
+        prospecting_efforts.append(
+            create_prospecting_effort(
+                activation.id,
+                activation.status,
+                activation.activated_date,
+                [],
+                {}
+            )
+        )
 
     activation.prospecting_effort = prospecting_efforts
 

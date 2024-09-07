@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, Box, Paper, Typography } from "@mui/material";
+import { Box, Paper, Typography, Divider } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import ProspectingCriteriaSelector from "../components/ProspectingCriteriaSelector/ProspectingCriteriaSelector";
 import InfoGatheringStep from "../components/InfoGatheringStep/InfoGatheringStep";
@@ -25,6 +25,7 @@ import {
  */
 
 import { ONBOARD_WIZARD_STEPS } from "../utils/c";
+import Logo from "src/components/Logo/Logo";
 
 const REQUIRED_PROSPECTING_CATEGORIES = [
   "Inbound Call",
@@ -49,7 +50,6 @@ const Onboard = () => {
   );
   /** @type {[{ [key: string]: any }, function]} */
   const [gatheringResponses, setGatheringResponses] = useState({});
-  const [isLargeDialog, setIsLargeDialog] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
   /** @type {[TableData, Function]} */
   const [categoryFormTableData, setCategoryFormTableData] = useState({
@@ -69,40 +69,40 @@ const Onboard = () => {
         taskSObjectFields.current.length > 0
           ? taskSObjectFields.current
           : (await fetchTaskFields()).data.map(
-              /** @param {SObjectField} field */
-              (field) => ({
-                id: field.name,
-                label: field.label,
-                dataType: field.type,
-              })
-            );
+            /** @param {SObjectField} field */
+            (field) => ({
+              id: field.name,
+              label: field.label,
+              dataType: field.type,
+            })
+          );
       setCategoryFormTableData({
         availableColumns: taskSObjectFields.current,
         columns:
           categoryFormTableData.columns.length > 0
             ? categoryFormTableData.columns
             : [
-                {
-                  id: "select",
-                  label: "Select",
-                  dataType: "select",
-                },
-                {
-                  id: "Subject",
-                  label: "Subject",
-                  dataType: "string",
-                },
-                {
-                  id: "Status",
-                  label: "Status",
-                  dataType: "string",
-                },
-                {
-                  id: "TaskSubtype",
-                  label: "TaskSubtype",
-                  dataType: "string",
-                },
-              ],
+              {
+                id: "select",
+                label: "Select",
+                dataType: "select",
+              },
+              {
+                id: "Subject",
+                label: "Subject",
+                dataType: "string",
+              },
+              {
+                id: "Status",
+                label: "Status",
+                dataType: "string",
+              },
+              {
+                id: "TaskSubtype",
+                label: "TaskSubtype",
+                dataType: "string",
+              },
+            ],
         data: tasks,
         selectedIds: new Set(),
       });
@@ -190,8 +190,8 @@ const Onboard = () => {
           settings[key] === "Yes"
             ? true
             : settings[key] === "No"
-            ? false
-            : settings[key];
+              ? false
+              : settings[key];
         return acc;
       }, {});
 
@@ -320,6 +320,7 @@ const Onboard = () => {
       return (
         <InfoGatheringStep
           key={step}
+          step={step}
           stepData={ONBOARD_WIZARD_STEPS[step - 1]}
           onTableDisplay={handleTableDisplay}
           onComplete={handleInfoGatheringComplete}
@@ -357,54 +358,35 @@ const Onboard = () => {
     ];
   };
 
-  const isLargeDialogStep = () => {
-    return isLargeDialog || step > ONBOARD_WIZARD_STEPS.length;
-  };
-
-  const dialogStyle = {
-    transition: "all 0.3s ease-in-out",
-    boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
-    border: "1px solid #e0e0e0",
-    ...(isLargeDialogStep()
-      ? {
-          maxWidth: "60vw",
-          width: "60vw",
-          maxHeight: "90vh",
-          height: "90vh",
-        }
-      : {
-          maxWidth: "600px", // Adjust as needed for small dialog
-          width: "100%",
-          maxHeight: "80vh",
-          height: "auto",
-        }),
-  };
-
-  /**
-   * @param {boolean} isDisplayed
-   */
-  const handleTableDisplay = (isDisplayed) => {
+  const handleTableDisplay = () => {
     setIsTransitioning(true);
-    setIsLargeDialog(isDisplayed);
   };
 
   return (
-    <Box sx={{ display: "flex", height: "100vh" }}>
+    <Box sx={{ display: "flex", height: "100vh", width: "100vw" }}>
+      {/* Sidebar */}
       <Paper
         elevation={3}
         sx={{
-          width: "250px",
+          width: "369px",
           height: "100vh",
           position: "fixed",
           left: 0,
           top: 0,
           zIndex: 1301,
-          padding: "16px",
-          backgroundColor: "rgba(255, 255, 255, 0.9)",
+          padding: "28px",
+          paddingTop: "47px",
+          backgroundColor: "rgba(30, 36, 47, 1)",
           backdropFilter: "blur(5px)",
           overflowY: "auto",
+          boxSizing: "border-box"
         }}
       >
+        <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", width: "100%", marginBottom: "36px" }}>
+          <Logo />
+        </div>
+
+        <Divider sx={{ backgroundColor: "rgba(135, 159, 202, 0.5)", marginBottom: "41px" }} />
         <ProgressTracker
           steps={getProgressSteps()}
           currentStep={step}
@@ -412,7 +394,7 @@ const Onboard = () => {
           orientation="vertical"
         />
       </Paper>
-      <Box sx={{ flexGrow: 1, marginLeft: "250px" }}>
+      {/* <Box sx={{ flexGrow: 1, marginLeft: "250px" }}>
         <Dialog
           open
           onClose={() => {
@@ -435,6 +417,35 @@ const Onboard = () => {
             {renderStep()}
           </DialogContent>
         </Dialog>
+      </Box> */}
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          backgroundColor: "white",
+          width: "calc(100% - 369px)",
+          maxWidth: "calc(100% - 369px)",
+          overflow: "auto",
+          marginLeft: "369px",
+          position: "relative",
+          alignItems: "start",
+          justifyContent: "start",
+          paddingTop: "37px",
+          paddingBottom: "37px",
+          paddingLeft: "68px",
+          paddingRight: "68px",
+          boxSizing: "border-box"
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            boxSizing: "border-box"
+          }}
+        >
+          {renderStep()}
+        </div>
       </Box>
     </Box>
   );

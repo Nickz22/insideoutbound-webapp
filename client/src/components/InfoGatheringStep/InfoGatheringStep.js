@@ -4,31 +4,60 @@ import {
   CircularProgress,
   Typography,
   TextField,
-  Select,
-  MenuItem,
+
   Button,
   FormControl,
-  InputLabel,
-  Paper,
+
   Grid,
   Tooltip,
+  styled,
 } from "@mui/material";
 import { generateCriteria } from "../Api/Api";
 import parse from "html-react-parser";
 import ProspectingCriteriaSelector from "../ProspectingCriteriaSelector/ProspectingCriteriaSelector";
 import CustomTable from "../CustomTable/CustomTable";
+import CustomSelect from "../CustomSelect/CustomSelect";
+import RoleStep from "../RoleStep/RoleStep";
 
 /**
  * @typedef {import('types').OnboardWizardStepInput} OnboardWizardStepInput
  */
+
+const StyledTextField = styled(TextField)({
+  '& .MuiInputLabel-root': {
+    color: '#533AF3', // Adjust the color to match the blue color in the image
+    fontSize: '22px', // Larger font size
+    fontWeight: 'normal', // Normal font weight
+  },
+  '& .MuiInputLabel-root.Mui-focused': {
+    color: '#533AF3', // Adjust the color to match the blue color in the image
+    fontSize: '22px', // Larger font size
+    fontWeight: 'normal', // Normal font weight
+    fontFamiliy: '"Albert Sans", sans-serif'
+  },
+  '& .MuiInput-underline:before': {
+    borderBottomColor: '#533AF3', // Blue underline
+  },
+  '& .MuiInput-underline:hover:not(.Mui-disabled):before': {
+    borderBottomColor: '#533AF3', // Blue underline on hover
+  },
+  '& .MuiInput-underline:after': {
+    borderBottomColor: '#533AF3', // Blue underline after focus
+  },
+  '& .MuiInputBase-input': {
+    fontSize: '16px',
+    marginTop: "16px"
+  },
+});
 
 const InfoGatheringStep = ({
   stepData,
   onComplete,
   onTableDisplay,
   settings,
+  step
 }) => {
-  const [inputValues, setInputValues] = useState({});
+  const [inputValues, setInputValues] = useState({ userRole: "placeholder" });
   const [tableData, setTableData] = useState(null);
   const [filterFields, setFilterFields] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
@@ -81,11 +110,11 @@ const InfoGatheringStep = ({
           const tableData = isProspectingCriteria
             ? data.data
             : {
-                availableColumns: criteriaOrTableInput.availableColumns,
-                columns: criteriaOrTableInput.columns,
-                data: data.data,
-                selectedIds: new Set(),
-              };
+              availableColumns: criteriaOrTableInput.availableColumns,
+              columns: criteriaOrTableInput.columns,
+              data: data.data,
+              selectedIds: new Set(),
+            };
 
           setTableData(tableData);
           onTableDisplay(true);
@@ -174,26 +203,18 @@ const InfoGatheringStep = ({
             {isLoading && <CircularProgress size={20} />}
             {input.inputType === "picklist" ? (
               <FormControl fullWidth variant="outlined" margin="normal">
-                <InputLabel>{input.inputLabel}</InputLabel>
-                <Select
+                <CustomSelect
                   value={
                     inputValues[input.setting] || settings[input.setting] || ""
                   }
                   onChange={(e) => handleInputChange(e, input.setting)}
                   label={input.inputLabel}
-                >
-                  <MenuItem value="">
-                    <em>Select an option</em>
-                  </MenuItem>
-                  {input.options?.map((option, index) => (
-                    <MenuItem key={index} value={option}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                </Select>
+                  placeholder={input.inputLabel}
+                  options={input.options}
+                />
               </FormControl>
             ) : (
-              <TextField
+              <StyledTextField
                 fullWidth
                 type={input.inputType}
                 value={
@@ -201,8 +222,11 @@ const InfoGatheringStep = ({
                 }
                 onChange={(e) => handleInputChange(e, input.setting)}
                 label={input.inputLabel}
-                variant="outlined"
-                margin="normal"
+                variant="standard"
+                InputLabelProps={{
+                  shrink: true,
+                }}
+
               />
             )}
           </>
@@ -281,9 +305,19 @@ const InfoGatheringStep = ({
     return input.renderEval(inputValues);
   };
 
+  if (step === 1) {
+    return (
+      <RoleStep
+        inputValues={inputValues}
+        handleInputChange={handleInputChange}
+        handleNext={handleSubmit}
+      />
+    )
+  }
+
   return (
     stepData && (
-      <Paper elevation={3} sx={{ mx: "auto", p: 4 }}>
+      <Box sx={{ p: 4 }}>
         <Typography variant="h4" component="h2" gutterBottom>
           {stepData.title}
         </Typography>
@@ -300,18 +334,26 @@ const InfoGatheringStep = ({
               )
           )}
         </Grid>
-        <Box mt={2}>
+        <Box mt={2} sx={{ width: "100%", display: "flex", justifyContent: "center" }}>
           <Button
+            onClick={handleSubmit}
             variant="contained"
             color="primary"
-            onClick={handleSubmit}
-            size="large"
-            fullWidth
+            sx={{
+              background: "linear-gradient(131.16deg, #FF7D2F 24.98%, #491EFF 97.93%)",
+              width: "271px",
+              height: "52px",
+              borderRadius: "40px",
+              fontWeight: "700",
+              fontSize: "32px",
+              letterSpacing: "-0.96px"
+            }}
+
           >
             Next
           </Button>
         </Box>
-      </Paper>
+      </Box>
     )
   );
 };
