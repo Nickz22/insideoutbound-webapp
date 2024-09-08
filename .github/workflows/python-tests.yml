@@ -50,7 +50,7 @@ jobs:
     
     - name: Run tests
       run: |
-        pytest -v -s --asyncio-mode=auto app/tests/test_should_parse_activations_async_test.py
+        pytest -v -s --asyncio-mode=auto app/tests
       working-directory: ./server
       env:
         PYTHONPATH: ${{ github.workspace }}/server

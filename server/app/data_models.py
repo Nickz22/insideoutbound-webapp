@@ -142,9 +142,9 @@ class Opportunity(SerializableModel):
 
 class ProspectingMetadata(SerializableModel):
     name: str
-    first_occurrence: date
-    last_occurrence: date
     total: int
+    first_occurrence: Optional[date] = None
+    last_occurrence: Optional[date] = None
 
 
 class ProspectingEffort(SerializableModel):

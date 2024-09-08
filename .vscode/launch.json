@@ -26,6 +26,25 @@
       "jinja": true
     },
     {
+      "name": "Python: Pytest Asyncio",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": [
+        "-v",
+        "-s",
+        "-o",
+        "asyncio_mode=auto",
+        "--disable-warnings",
+        "/Users/nzozaya/Salesforce/io-webapp/server/app/tests"
+      ],
+      "cwd": "${workspaceFolder}",
+      "env": {
+        "PYTHONPATH": "${workspaceFolder}"
+      },
+      "console": "integratedTerminal"
+    },
+    {
       "type": "chrome",
       "request": "launch",
       "name": "Launch Chrome against localhost",
