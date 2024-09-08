@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from app.salesforce_api import (
     fetch_opportunities_by_account_ids_from_date,
     fetch_events_by_account_ids_from_date,
+    fetch_salesforce_users,
 )
 from app.utils import (
     generate_unique_id,
@@ -395,13 +396,11 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     Returns:
     - `ApiResponse`: `data` parameter contains all activations and any relevant messages.
     """
-    response = ApiResponse(data=[], message="", success=True)
 
-    try:
+    def fetch_account_data(settings, tasks_by_account_id, first_prospecting_activity):
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
-        tasks_by_account_id = get_tasks_by_account_id(tasks_by_criteria, contacts)
-        first_prospecting_activity = get_first_prospecting_activity_date(
-            tasks_by_criteria
+        salesforce_user_by_id = group_by(
+            fetch_salesforce_users(salesforce_user_ids).data, "id"
         )
         opportunity_by_account_id = group_by(
             fetch_opportunities_by_account_ids_from_date(
@@ -416,6 +415,19 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             tasks_by_account_id.keys(),
             first_prospecting_activity,
             salesforce_user_ids,
+        )
+        return salesforce_user_by_id, opportunity_by_account_id, meetings_by_account_id
+
+    response = ApiResponse(data=[], message="", success=True)
+
+    try:
+        tasks_by_account_id = get_tasks_by_account_id(tasks_by_criteria, contacts)
+        salesforce_user_by_id, opportunity_by_account_id, meetings_by_account_id = (
+            fetch_account_data(
+                settings,
+                tasks_by_account_id,
+                get_first_prospecting_activity_date(tasks_by_criteria),
+            )
         )
 
         criteria_name_by_direction = {
@@ -443,23 +455,22 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 all_tasks_under_account[0].get("CreatedDate")
             )
 
-            qualifying_event = get_qualifying_meeting(
-                meetings_by_account_id.get(account_id, []),
-                start_tracking_period,
-                settings.tracking_period,
-            )
-
-            qualifying_opportunity = get_qualifying_opportunity(
-                opportunity_by_account_id.get(account_id, []),
-                start_tracking_period,
-                settings.tracking_period,
-            )
-
             valid_task_ids_by_who_id = {}
             task_ids = []
             last_valid_task_creator_id = None
 
             for task in all_tasks_under_account:
+                qualifying_event = get_qualifying_meeting(
+                    meetings_by_account_id.get(account_id, []),
+                    start_tracking_period,
+                    settings.tracking_period,
+                )
+
+                qualifying_opportunity = get_qualifying_opportunity(
+                    opportunity_by_account_id.get(account_id, []),
+                    start_tracking_period,
+                    settings.tracking_period,
+                )
                 is_task_in_tracking_period = is_model_date_field_within_window(
                     sobject_model=task,
                     start_date=start_tracking_period,
@@ -488,6 +499,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         or qualifying_opportunity
                     )
                     if not is_account_active_for_tracking_period:
+                        ## reset tracking
                         start_tracking_period = add_days(
                             start_tracking_period,
                             settings.tracking_period + settings.inactivity_threshold,
@@ -514,31 +526,55 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         task.get("CreatedDate")
                     ).date()
 
-                    is_active_via_meeting_or_opportunity = len(active_contact_ids) == 0
+                    is_active_via_meeting_or_opportunity = (
+                        len(active_contact_ids) < settings.contacts_per_account
+                    )
                     active_contact_ids = (
                         list(valid_task_ids_by_who_id.keys())
                         if is_active_via_meeting_or_opportunity
                         else active_contact_ids
                     )
                     activation = create_activation(
-                        contact_by_id,
-                        account_first_prospecting_activity,
-                        active_contact_ids,
-                        last_valid_task_creator_id,
-                        last_prospecting_activity,
-                        task_ids,
-                        qualifying_opportunity,
-                        qualifying_event,
-                        task_ids_by_criteria_name,
-                        criteria_name_by_direction,
-                        settings,
-                        all_tasks_under_account,
+                        contact_by_id=contact_by_id,
+                        account_first_prospecting_activity=account_first_prospecting_activity,
+                        active_contact_ids=active_contact_ids,
+                        last_valid_task_creator=salesforce_user_by_id.get(
+                            last_valid_task_creator_id
+                        )[0],
+                        last_prospecting_activity=last_prospecting_activity,
+                        task_ids=task_ids,
+                        qualifying_opportunity=qualifying_opportunity,
+                        qualifying_event=qualifying_event,
+                        task_ids_by_criteria_name=task_ids_by_criteria_name,
+                        criteria_name_by_direction=criteria_name_by_direction,
+                        settings=settings,
+                        all_tasks_under_account=all_tasks_under_account,
                     )
                     activations.append(activation)
+                    ## reset tracking period
+                    start_tracking_period = add_days(
+                        start_tracking_period,
+                        settings.tracking_period + settings.inactivity_threshold,
+                    )
+                    valid_task_ids_by_who_id.clear()
+                    account_first_prospecting_activity = None
+                    task_ids.clear()
 
             # this account's tasks have ended, check for activation
             active_contact_ids = get_active_contact_ids(
                 valid_task_ids_by_who_id, settings.activities_per_contact
+            )
+            
+            qualifying_event = get_qualifying_meeting(
+                meetings_by_account_id.get(account_id, []),
+                start_tracking_period,
+                settings.tracking_period,
+            )
+
+            qualifying_opportunity = get_qualifying_opportunity(
+                opportunity_by_account_id.get(account_id, []),
+                start_tracking_period,
+                settings.tracking_period,
             )
 
             is_account_active_for_tracking_period = (
@@ -553,25 +589,29 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 task.get("CreatedDate")
             ).date()
 
-            is_active_via_meeting_or_opportunity = len(active_contact_ids) < settings.contacts_per_account
+            is_active_via_meeting_or_opportunity = (
+                len(active_contact_ids) < settings.contacts_per_account
+            )
             active_contact_ids = (
                 list(valid_task_ids_by_who_id.keys())
                 if is_active_via_meeting_or_opportunity
                 else active_contact_ids
             )
             activation = create_activation(
-                contact_by_id,
-                account_first_prospecting_activity,
-                active_contact_ids,
-                last_valid_task_creator_id,
-                last_prospecting_activity,
-                task_ids,
-                qualifying_opportunity,
-                qualifying_event,
-                task_ids_by_criteria_name,
-                criteria_name_by_direction,
-                settings,
-                all_tasks_under_account,
+                contact_by_id=contact_by_id,
+                account_first_prospecting_activity=account_first_prospecting_activity,
+                active_contact_ids=active_contact_ids,
+                last_valid_task_creator=salesforce_user_by_id.get(
+                    last_valid_task_creator_id
+                )[0],
+                last_prospecting_activity=last_prospecting_activity,
+                task_ids=task_ids,
+                qualifying_opportunity=qualifying_opportunity,
+                qualifying_event=qualifying_event,
+                task_ids_by_criteria_name=task_ids_by_criteria_name,
+                criteria_name_by_direction=criteria_name_by_direction,
+                settings=settings,
+                all_tasks_under_account=all_tasks_under_account,
             )
             activations.append(activation)
             response.data.extend(activations)
@@ -656,7 +696,11 @@ def create_activation(
 
     activation = Activation(
         id=generate_unique_id(),
-        account=contact_by_id[active_contact_ids[0]].account,
+        account=(
+            contact_by_id[active_contact_ids[0]].account
+            if active_contact_ids
+            else next(iter(contact_by_id.values())).account
+        ),
         activated_date=activated_date,
         days_activated=(today - activated_date).days,
         engaged_date=engaged_date.date() if engaged_date else None,
@@ -782,11 +826,7 @@ def create_activation(
     if not any(pe.status == activation.status for pe in prospecting_efforts):
         prospecting_efforts.append(
             create_prospecting_effort(
-                activation.id,
-                activation.status,
-                activation.activated_date,
-                [],
-                {}
+                activation.id, activation.status, activation.activated_date, [], {}
             )
         )
 
