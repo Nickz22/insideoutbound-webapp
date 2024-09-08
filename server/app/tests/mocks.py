@@ -37,6 +37,7 @@ sobject_api_mock_response_by_request_key: Dict[str, List[Dict]] = {
     "fetch_accounts_not_in_ids": [],
     "fetch_logged_in_salesforce_user": [],
     "fetch_sobject_fields__account": MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT,
+    "fetch_salesforce_users": []
 }
 
 
@@ -110,8 +111,9 @@ def response_based_on_query(url, **kwargs):
             (
                 "AccountId IN" in query_param and "FROM Contact" in query_param
             ): "fetch_contacts_by_account_ids",
-            ("SELECT Id,Name FROM Account" in query_param): "fetch_accounts_not_in_ids",
+            ("SELECT Id,Name,Industry,AnnualRevenue,NumberOfEmployees,CreatedDate FROM Account" in query_param): "fetch_accounts_not_in_ids",
             ("Account" in url and "describe" in url): "fetch_sobject_fields__account",
+            ("FROM User" in query_param): "fetch_salesforce_users",
         }
 
         # Determine which mock response to use based on the query characteristics
@@ -228,36 +230,10 @@ def get_n_mock_tasks_per_contact_for_contains_content_crieria_query(
             cloned_tasks.append(task_copy)
     return cloned_tasks
 
-
-def get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query(
-    assignee_id,
-):
-    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
-        3, 2, assignee_id=assignee_id
-    )
-
-
 def get_one_mock_task_per_contact_for_contains_content_criteria_query(assignee_id):
     return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
         1, len(MOCK_CONTACT_IDS), assignee_id=assignee_id
     )
-
-
-def get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query(
-    assignee_id,
-):
-    return get_n_mock_tasks_per_x_contacts_for_contains_content_crieria_query(
-        3, 10, assignee_id=assignee_id
-    )
-
-
-def get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query(
-    assignee_id,
-):
-    return get_n_mock_tasks_per_x_contacts_for_unique_values_content_criteria_query(
-        3, 10, assignee_id=assignee_id
-    )
-
 
 def get_n_mock_contacts_for_account(n, account_id):
     contacts = []
@@ -271,22 +247,6 @@ def get_n_mock_contacts_for_account(n, account_id):
         }
         contacts.append(contact)
     return contacts
-
-
-def get_ten_mock_contacts_spread_across_five_accounts():
-    contacts = []
-    for i, contact_id in enumerate(MOCK_CONTACT_IDS):
-        account_index = i // 2  # This will assign two contacts per account
-        contact = {
-            "Id": contact_id,
-            "FirstName": f"MockFirstName{i}",
-            "LastName": f"MockLastName{i}",
-            "AccountId": MOCK_ACCOUNT_IDS[account_index],
-            "Account": {"Name": f"MockAccountName_{account_index + 1}"},
-        }
-        contacts.append(contact)
-    return contacts
-
 
 def get_two_mock_contacts_per_account(accounts):
     mock_contacts = []

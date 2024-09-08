@@ -61,10 +61,10 @@ class Account(SerializableModel):
     id: str
     name: Optional[str] = None
     owner_id: Optional[str] = None
-    additional_properties: Dict[str, Any] = {}
-
-    class Config:
-        extra = "allow"
+    industry: Optional[str] = None
+    annual_revenue: Optional[float] = None
+    number_of_employees: Optional[int] = None
+    created_date: Optional[datetime] = None
 
 
 class Task(SerializableModel):
@@ -154,11 +154,44 @@ class ProspectingEffort(SerializableModel):
     date_entered: date
     task_ids: Set[str]
 
+class UserSObject(SerializableModel):
+    Id: str
+    Email: Optional[str] = None
+    Username: Optional[str] = None
+    LastName: Optional[str] = None
+    FullPhotoUrl: Optional[str] = None
+    FirstName: Optional[str] = None
+    Role: Optional[str] = None
+
+class UserModel(SerializableModel):
+    id: str
+    email: Optional[str] = None
+    username: Optional[str] = None
+    lastName: Optional[str] = None
+    photoUrl: Optional[str] = None
+    orgId: Optional[str] = None
+    firstName: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = "not paid"
+    created_at: Optional[datetime] = None
+
+    @classmethod
+    def from_sobject(cls, sobject: UserSObject):
+        return cls(
+            id=sobject.Id,
+            email=sobject.Email,
+            username=sobject.Username,
+            firstName=sobject.FirstName,
+            lastName=sobject.LastName,
+            photoUrl=sobject.FullPhotoUrl,
+            role=sobject.Role,
+        )
 
 class Activation(SerializableModel):
     id: str
     account: Account
     activated_by_id: str
+    activated_by: UserModel
     active_contact_ids: Set[str]
     task_ids: Set[str]
     activated_date: Optional[date] = None
@@ -258,41 +291,6 @@ class TableColumn(SerializableModel):
     id: str
     dataType: DataType
     label: str
-
-
-class UserSObject(SerializableModel):
-    Id: str
-    Email: Optional[str] = None
-    Username: Optional[str] = None
-    LastName: Optional[str] = None
-    FullPhotoUrl: Optional[str] = None
-    FirstName: Optional[str] = None
-    Role: Optional[str] = None
-
-
-class UserModel(SerializableModel):
-    id: str
-    email: Optional[str] = None
-    username: Optional[str] = None
-    lastName: Optional[str] = None
-    photoUrl: Optional[str] = None
-    orgId: Optional[str] = None
-    firstName: Optional[str] = None
-    role: Optional[str] = None
-    status: Optional[str] = "not paid"
-    created_at: Optional[datetime] = None
-
-    @classmethod
-    def from_sobject(cls, sobject: UserSObject):
-        return cls(
-            id=sobject.Id,
-            email=sobject.Email,
-            username=sobject.Username,
-            firstName=sobject.FirstName,
-            lastName=sobject.LastName,
-            photoUrl=sobject.FullPhotoUrl,
-            role=sobject.Role,
-        )
 
 
 class TokenData(SerializableModel):

@@ -228,6 +228,7 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
         "account_id",
         "account",
         "activated_by_id",
+        "activated_by",
         "active_contact_ids",
         "task_ids",
         "activated_date",

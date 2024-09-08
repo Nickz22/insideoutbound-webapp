@@ -21,13 +21,9 @@ from app.database.supabase_connection import get_supabase_admin_client
 from app.tests.mocks import (
     mock_tasks_for_criteria_with_contains_content,
     mock_tasks_for_criteria_with_unique_values_content,
-    get_thirty_mock_tasks_across_ten_contacts_for_contains_content_criteria_query,
-    get_thirty_mock_tasks_across_ten_contacts_for_unique_values_content_criteria_query,
-    get_ten_mock_contacts_spread_across_five_accounts,
     get_five_mock_accounts,
     get_mock_opportunity_for_account,
     add_mock_response,
-    MOCK_ACCOUNT_IDS,
     response_based_on_query,
     mock_fetch_sobjects_async,
     clear_mocks,
@@ -38,7 +34,6 @@ from app.tests.mocks import (
     get_mock_opportunity_for_account,
     get_one_mock_task_per_contact_for_unique_content_criteria_query_x,
     add_mock_response,
-    get_three_mock_tasks_per_two_contacts_for_contains_content_criteria_query,
     get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query,
     get_n_mock_tasks_per_contact_for_contains_content_crieria_query,
 )
@@ -50,7 +45,6 @@ import json
 
 pytest_plugins = ("pytest_asyncio",)
 
-from flask import has_app_context
 import logging
 from contextlib import contextmanager
 
@@ -140,6 +134,10 @@ class TestActivationLogic:
             )
 
             # Setup mock responses
+            add_mock_response(
+                "fetch_salesforce_users",
+                [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
+            )
             add_mock_response("fetch_accounts_not_in_ids", [mock_account])
             add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
             add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
@@ -216,6 +214,10 @@ class TestActivationLogic:
             )
 
             # Setup mock responses
+            add_mock_response(
+                "fetch_salesforce_users",
+                [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
+            )
             add_mock_response("fetch_accounts_not_in_ids", [mock_account])
             add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
             add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
@@ -672,6 +674,14 @@ class TestActivationLogic:
             "fetch_contacts_by_account_ids",
             mock_contacts,
         )
+        add_mock_response(
+            "fetch_salesforce_users",
+            [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
+        )
+        add_mock_response(
+            "fetch_salesforce_users",
+            [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
+        )
 
     def setup_six_tasks_across_two_contacts_and_one_account(self, account_id):
         mock_contacts = get_n_mock_contacts_for_account(2, account_id)
@@ -680,14 +690,18 @@ class TestActivationLogic:
                 3, mock_contacts, mock_user_id
             )
         )
-        
+
         for task in mock_tasks:
             task["Id"] = str(random.randint(1000, 9999))
 
         add_mock_response("unique_values_content_criteria_query", mock_tasks)
         add_mock_response(
             "fetch_accounts_not_in_ids",
-            [account for account in get_five_mock_accounts() if account["Id"] == account_id],
+            [
+                account
+                for account in get_five_mock_accounts()
+                if account["Id"] == account_id
+            ],
         )
         add_mock_response(
             "fetch_contacts_by_account_ids",
@@ -722,6 +736,10 @@ class TestActivationLogic:
         add_mock_response(
             "fetch_contacts_by_account_ids",
             mock_contacts,
+        )
+        add_mock_response(
+            "fetch_salesforce_users",
+            [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
         )
 
     def _validate_prospecting_metadata(self, activation):
@@ -918,6 +936,10 @@ class TestActivationLogic:
             "fetch_contacts_by_account_ids",
             mock_contacts,
         )
+        add_mock_response(
+            "fetch_salesforce_users",
+            [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
+        )
 
     def get_filter_container_via_tasks_from_generate_filters_api(
         self, tasks, columns
@@ -947,3 +969,7 @@ class TestActivationLogic:
         add_mock_response("fetch_accounts_not_in_ids", [])
         add_mock_response("fetch_contacts_by_account_ids", [])
         add_mock_response("fetch_contacts_by_account_ids", [])
+        add_mock_response(
+            "fetch_salesforce_users",
+            [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
+        )

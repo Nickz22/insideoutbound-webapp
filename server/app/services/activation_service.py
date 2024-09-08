@@ -16,6 +16,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 from app.salesforce_api import (
     fetch_opportunities_by_account_ids_from_date,
     fetch_events_by_account_ids_from_date,
+    fetch_salesforce_users
 )
 from app.utils import (
     generate_unique_id,
@@ -399,6 +400,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 
     try:
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
+        salesforce_user_by_id = group_by(fetch_salesforce_users(salesforce_user_ids).data, "id")
         tasks_by_account_id = get_tasks_by_account_id(tasks_by_criteria, contacts)
         first_prospecting_activity = get_first_prospecting_activity_date(
             tasks_by_criteria
@@ -521,18 +523,18 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         else active_contact_ids
                     )
                     activation = create_activation(
-                        contact_by_id,
-                        account_first_prospecting_activity,
-                        active_contact_ids,
-                        last_valid_task_creator_id,
-                        last_prospecting_activity,
-                        task_ids,
-                        qualifying_opportunity,
-                        qualifying_event,
-                        task_ids_by_criteria_name,
-                        criteria_name_by_direction,
-                        settings,
-                        all_tasks_under_account,
+                        contact_by_id=contact_by_id,
+                        account_first_prospecting_activity=account_first_prospecting_activity,
+                        active_contact_ids=active_contact_ids,
+                        last_valid_task_creator=salesforce_user_by_id.get(last_valid_task_creator_id)[0],
+                        last_prospecting_activity=last_prospecting_activity,
+                        task_ids=task_ids,
+                        qualifying_opportunity=qualifying_opportunity,
+                        qualifying_event=qualifying_event,
+                        task_ids_by_criteria_name=task_ids_by_criteria_name,
+                        criteria_name_by_direction=criteria_name_by_direction,
+                        settings=settings,
+                        all_tasks_under_account=all_tasks_under_account,
                     )
                     activations.append(activation)
 
@@ -560,18 +562,19 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 else active_contact_ids
             )
             activation = create_activation(
-                contact_by_id,
-                account_first_prospecting_activity,
-                active_contact_ids,
-                last_valid_task_creator_id,
-                last_prospecting_activity,
-                task_ids,
-                qualifying_opportunity,
-                qualifying_event,
-                task_ids_by_criteria_name,
-                criteria_name_by_direction,
-                settings,
-                all_tasks_under_account,
+                contact_by_id=contact_by_id,
+                account_first_prospecting_activity=account_first_prospecting_activity,
+                active_contact_ids=active_contact_ids,
+                last_valid_task_creator=salesforce_user_by_id.get(last_valid_task_creator_id)[0],
+                last_prospecting_activity=last_prospecting_activity,
+                task_ids=task_ids,
+                qualifying_opportunity=qualifying_opportunity,
+                qualifying_event=qualifying_event,
+                task_ids_by_criteria_name=task_ids_by_criteria_name,
+                criteria_name_by_direction=criteria_name_by_direction,
+                settings=settings,
+                all_tasks_under_account=all_tasks_under_account,
+                
             )
             activations.append(activation)
             response.data.extend(activations)
@@ -586,7 +589,7 @@ def create_activation(
     contact_by_id,
     account_first_prospecting_activity,
     active_contact_ids,
-    last_valid_task_creator_id,
+    last_valid_task_creator,
     last_prospecting_activity,
     task_ids,
     qualifying_opportunity,
@@ -594,7 +597,7 @@ def create_activation(
     task_ids_by_criteria_name,
     criteria_name_by_direction,
     settings,
-    all_tasks_under_account,
+    all_tasks_under_account
 ):
     today = date.today()
 
@@ -662,7 +665,8 @@ def create_activation(
         engaged_date=engaged_date.date() if engaged_date else None,
         days_engaged=(today - engaged_date.date()).days if engaged_date else None,
         active_contact_ids=active_contact_ids,
-        activated_by_id=last_valid_task_creator_id,
+        activated_by_id=last_valid_task_creator.id,
+        activated_by=last_valid_task_creator,
         first_prospecting_activity=account_first_prospecting_activity,
         last_prospecting_activity=last_prospecting_activity,
         opportunity=(
