@@ -79,7 +79,7 @@ const Prospecting = () => {
   });
 
   const freeTrialDaysLeft = useMemo(() => {
-    if (loggedInUser.created_at.length === 0) {
+    if (loggedInUser.created_at?.length === 0) {
       return 0; // No creation date, no trial left
     }
 
