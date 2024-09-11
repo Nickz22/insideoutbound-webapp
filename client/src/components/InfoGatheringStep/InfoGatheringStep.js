@@ -13,7 +13,7 @@ import {
   styled,
 } from "@mui/material";
 import { generateCriteria } from "../Api/Api";
-import parse from "html-react-parser";
+import parse, { domToReact } from "html-react-parser";
 import ProspectingCriteriaSelector from "../ProspectingCriteriaSelector/ProspectingCriteriaSelector";
 import CustomTable from "../CustomTable/CustomTable";
 import CustomSelect from "../CustomSelect/CustomSelect";
@@ -315,15 +315,44 @@ const InfoGatheringStep = ({
     )
   }
 
+  /** @type {import("html-react-parser").HTMLReactParserOptions} */
+  const options = {
+    replace: (domNode) => {
+      // Check if the node is an element node
+      if (domNode.type === 'tag') {
+        if (domNode.name === 'h1') {
+          return <Typography variant="h1">{domToReact(domNode.children)}</Typography>;
+        }
+        if (domNode.name === 'h2') {
+          return <Typography variant="h2">{domToReact(domNode.children)}</Typography>;
+        }
+        if (domNode.name === 'h3') {
+          return <Typography variant="h3">{domToReact(domNode.children)}</Typography>;
+        }
+        if (domNode.name === 'p') {
+          return <Typography variant="body1" paragraph>{domToReact(domNode.children)}</Typography>;
+        }
+
+        // Default case for all other elements
+        return domNode;
+      }
+    },
+  };
+
   return (
     stepData && (
       <Box sx={{ p: 4 }}>
-        <Typography variant="h4" component="h2" gutterBottom>
+        <Typography
+          variant="h2"
+          component="h2"
+          gutterBottom
+          sx={{
+            letterSpacing: "-1.2px",
+          }}
+        >
           {stepData.title}
         </Typography>
-        <Typography variant="body1" paragraph>
-          {parse(renderedDescription)}
-        </Typography>
+        {parse(renderedDescription, options)}
         <Grid container spacing={2}>
           {stepData.inputs.map(
             (input, index) =>
@@ -346,7 +375,8 @@ const InfoGatheringStep = ({
               borderRadius: "40px",
               fontWeight: "700",
               fontSize: "32px",
-              letterSpacing: "-0.96px"
+              letterSpacing: "-0.96px",
+              textTransform: "none"
             }}
 
           >

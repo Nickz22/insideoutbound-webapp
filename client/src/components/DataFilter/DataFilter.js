@@ -1,13 +1,17 @@
 import React, { useState } from "react";
 import {
   Box,
-  Select,
-  MenuItem,
   TextField,
   Button,
-  Tooltip,
 } from "@mui/material";
+import CustomSelect from "../CustomSelect/CustomSelect";
 
+/**
+ * @param {object} props
+ * @param {any} props.fields
+ * @param {any} props.onFilter
+ * @param {any} props.onClear
+ */
 const DataFilter = ({ fields, onFilter, onClear }) => {
   const [selectedField, setSelectedField] = useState("");
   const [operator, setOperator] = useState("equals");
@@ -25,53 +29,130 @@ const DataFilter = ({ fields, onFilter, onClear }) => {
   };
 
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-      <Tooltip
-        title="Filter on Activation Account fields"
-        arrow
-        placement="top"
-      >
-        <Select
-          value={selectedField}
-          onChange={(e) => setSelectedField(e.target.value)}
-          displayEmpty
-          size="small"
-          sx={{ minWidth: 120 }}
-        >
-          <MenuItem value="" disabled>
-            Select Field
-          </MenuItem>
-          {fields.map((field) => (
-            <MenuItem key={field} value={field}>
-              {field}
-            </MenuItem>
-          ))}
-        </Select>
-      </Tooltip>
-      <Select
+    <Box sx={{ display: "flex", alignItems: "center", gap: "25px" }}>
+      <CustomSelect
+        tooltip={{ title: "Filter on Activation Account fields", arrow: true, placement: "bottom" }}
+        key={"Filter activation"}
+        value={selectedField}
+        onChange={(e) => setSelectedField(e.target.value)}
+        options={fields}
+        placeholder="Select Field"
+        selectSx={{
+          width: "125px",
+          fontSize: "16px",
+          lineHeight: "1.78",
+          letterSpacing: "-0.48px",
+        }}
+      />
+
+      <CustomSelect
         value={operator}
         onChange={(e) => setOperator(e.target.value)}
-        size="small"
-        sx={{ minWidth: 100 }}
-      >
-        <MenuItem value="equals">Equals</MenuItem>
-        <MenuItem value="notEquals">Does Not Equal</MenuItem>
-      </Select>
-      <TextField
-        placeholder="Filter Value"
-        value={filterValue}
-        onChange={(e) => setFilterValue(e.target.value)}
-        size="small"
-        sx={{ width: 150 }}
+        placeholder="Select Field"
+        selectSx={{
+          width: "100px",
+          fontSize: "16px",
+          lineHeight: "1.78",
+          letterSpacing: "-0.48px",
+        }}
+        options={[
+          { value: "equals", label: "Equals" },
+          { value: "notEquals", label: "Does Not Equal" },
+        ]}
       />
-      <Button onClick={handleApplyFilter} variant="contained" size="small">
-        Apply
-      </Button>
-      {filterValue && (
-        <Button onClick={handleClearFilter} variant="outlined" size="small">
-          Clear
+
+      <Box sx={{ display: "flex", alignItems: "center", gap: "9px" }}>
+        <TextField
+          placeholder="Filter Value"
+          value={filterValue}
+          onChange={(e) => setFilterValue(e.target.value)}
+          size="small"
+          sx={{
+            width: "177px",
+            height: "38px",
+            '& .MuiInputBase-input': {
+              boxSizing: "border-box",
+              height: "38px",
+              fontSize: '13px',
+              lineHeight: "1.78",
+              fontWeight: "500",
+              color: "#4C4C4C",
+              '&:hover': {
+                borderColor: "rgba(83, 58, 243, 1)"
+              },
+              '&::placeholder': {
+                color: "#4C4C4C",
+                opacity: 1
+              }
+            },
+            '& .MuiOutlinedInput-root': {
+              '& fieldset': {
+                borderColor: "#E9E9E9", // Normal border color
+              },
+              '&:hover fieldset': {
+                borderColor: "rgba(83, 58, 243, 1)", // Hover border color
+              }
+            }
+          }}
+        />
+        <Button
+          onClick={handleApplyFilter}
+          variant="contained"
+          size="small"
+          sx={{
+            width: "96px",
+            padding: "4px 10px",
+            height: "38px",
+            boxSizing: "border-box",
+            backgroundColor: "#F3F0FE",
+            color: "#533AF3",
+            fontSize: "16px",
+            fontWeight: 600,
+            lineHeight: "1.78",
+            letterSpacing: "0.64px",
+            border: "1px solid rgba(83, 58, 243, 0.27)",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            boxShadow: "none",
+            '&:hover': {
+              boxShadow: "none",
+              backgroundColor: "#E0DCF5",
+              borderColor: "rgba(83, 58, 243, 0.4)"
+            }
+          }}
+        >
+          Apply
         </Button>
-      )}
+        {filterValue && (
+          <Button
+            onClick={handleClearFilter}
+            variant="outlined"
+            size="small"
+            sx={{
+              width: "96px",
+              height: "38px",
+              fontSize: "16px",
+              fontWeight: 600,
+              lineHeight: "1.78",
+              letterSpacing: "0.64px",
+              padding: "4px 10px",
+              boxSizing: "border-box",
+              borderColor: "#F3F0FE",
+              color: "#533AF3",
+              '& .MuiButton-outlined': {
+                borderColor: "#F3F0FE"
+              },
+              '&:hover': {
+                backgroundColor: "#533AF3",
+                color: "#FFFFFF"
+              },
+            }}
+          >
+            Clear
+          </Button>
+        )}
+      </Box>
     </Box>
   );
 };

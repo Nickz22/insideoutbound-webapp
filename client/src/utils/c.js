@@ -110,16 +110,17 @@ export const ONBOARD_WIZARD_STEPS = [
   },
   {
     description: `
-      Our goal is to help you better measure and manage your account-based prospecting efforts. 
-      <br><br> 
-      To do that, <b>we need to define prospecting</b>. The term we use is an \"approach\". 
-      Clearly defining an approach helps us differentiate prospecting efforts from all other stuff sales reps do, like working deals or sending one-off emails.
-      <br><br>
-      Please start by filling out the blanks below: 
-      <br><br>
-      An "approach" is defined as when a rep attempts to engage with _ people at a target/prospect company within a _ day period.
+      <h3>Our Goal</h3>
+      <p>Our goal is to help you better measure and manage your account-based prospecting efforts. This will allow you to effectively track and optimize your outreach activities to ensure the best results.</p>
+      <br>
+      <h3>Define Prospecting</h3>
+      <p>To do that, <b>we need to define prospecting</b>. The term we use is an \"approach\".</br>Clearly defining an approach helps us differentiate prospecting efforts from all other stuff sales reps do, like working deals or sending one-off emails.</p>
+      <br>
+      <h3>Please start by filling out the blank below:</h3>
+      <p>An "approach" is defined as when a rep attempts to engage with _ people at a target/prospect company within a _ day period.</p>
+      <br>
       `,
-    title: "Welcome",
+    title: "Welcome to InsideOutbound",
     inputs: [
       {
         setting: "contactsPerAccount",
@@ -147,10 +148,8 @@ export const ONBOARD_WIZARD_STEPS = [
   {
     title: "Activities per Contact",
     description: `
-      Great — we have a definition for prospecting at the company level! Next, we need to do the same thing for the people who work at target companies. 
-      Help us fill in the blank below: 
-      <br><br>
-      Once a rep logs _ attempts to contact an individual (emails, calls, InMails, etc.), we consider that "prospecting".
+      <p>Great — we have a definition for prospecting at the company level! Next, we need to do the same thing for the people who work at target companies.</p>
+      <p>Help us fill in the blank below:<br />Once a rep logs _ attempts to contact an individual (emails, calls, InMails, etc.), we consider that "prospecting".</p>
       `,
     inputs: [
       {
@@ -169,12 +168,8 @@ export const ONBOARD_WIZARD_STEPS = [
   {
     title: "Account Inactivity Threshold",
     description: `
-      You're on a roll — we've got a measurable definition for what counts as account-based prospecting!
-      <br><br>
-      Next up, we\'re going to decide when a prospecting "approach" has ended due to inactivity.
-      Help us fill in the blank below:
-      <br><br>
-      An account should be removed from my prospecting funnel after _ days without a new Task, Event or Opportunity.
+      <p>You're on a roll — we've got a measurable definition for what counts as account-based prospecting!<br />Next up, we\'re going to decide when a prospecting "approach" has ended due to inactivity.</p>
+      <p>Help us fill in the blank below:<br />An account should be removed from my prospecting funnel after _ days without a new Task, Event or Opportunity.</p>
       `,
     inputs: [
       {
@@ -192,7 +187,7 @@ export const ONBOARD_WIZARD_STEPS = [
   },
   {
     title: "Define an Approach",
-    description: `The next few questions will help us understand when to consider an Account 'approached'.`,
+    description: `<p>The next few questions will help us understand when to consider an Account 'approached'.</p>`,
     inputs: [
       {
         setting: "activateByOpportunity",

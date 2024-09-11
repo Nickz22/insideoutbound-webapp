@@ -17,6 +17,13 @@ import ProspectIcon from "../icons/ProspectIcon";
 import SettingIcon from "../icons/SettingIcon";
 import TaskQueryCounterIcon from "../icons/TaskQueryCounterIcon";
 
+/**
+ * @param {object} props
+ * @param {string} props.to
+ * @param {string} props.label
+ * @param {import("react").ReactElement} props.icon
+ * @param {boolean} [props.alignIconRight = false]
+ */
 const CustomNavLink = ({ to, label, icon, alignIconRight = false }) => {
   const location = useLocation();
   const isActive = location.pathname === to;
@@ -62,7 +69,8 @@ const CustomNavLink = ({ to, label, icon, alignIconRight = false }) => {
 
 const Sidebar = () => {
   const navigate = useNavigate();
-  const [userPhoto, setUserPhoto] = useState(null);
+  const [userPhoto, setUserPhoto] = useState(undefined);
+  const [userFirstName, setUserFirstName] = useState(undefined);
 
   useEffect(() => {
     const fetchUserPhoto = async () => {
@@ -70,6 +78,7 @@ const Sidebar = () => {
         const userData = await getLoggedInUser();
         if (userData.success && userData.data[0].photoUrl) {
           setUserPhoto(userData.data[0].photoUrl);
+          setUserFirstName(userData.data[0].firstName);
         }
       } catch (error) {
         console.error("Failed to fetch user photo:", error);
@@ -111,19 +120,19 @@ const Sidebar = () => {
 
       <Divider sx={{ backgroundColor: "rgba(135, 159, 202, 0.5)", margin: "0px 33px 28px" }} />
       <List>
-        <CustomNavLink to="/app/prospecting" label="Prospecting" icon={<ProspectIcon />} />
-        <CustomNavLink to="/app/settings" label="Settings" icon={<SettingIcon />} />
+        <CustomNavLink to="/app/prospecting" label="Prospecting" icon={<Box sx={{ width: "24px", height: "24px" }}><ProspectIcon /></Box>} />
+        <CustomNavLink to="/app/settings" label="Settings" icon={<Box sx={{ width: "24px", height: "24px" }}><SettingIcon /></Box>} />
         <CustomNavLink
           to="/app/task-query-counter"
           label="Task Query Counter"
-          icon={<TaskQueryCounterIcon />}
+          icon={<Box sx={{ width: "24px", height: "24px" }}><TaskQueryCounterIcon /></Box>}
         />
       </List>
       <Box sx={{ marginTop: "auto", marginBottom: 2 }}>
         <CustomNavLink
           to="/app/account"
-          label="Account"
-          icon={<Avatar src={userPhoto} sx={{ width: 24, height: 24 }} />}
+          label={`${userFirstName || "User"} Account`}
+          icon={<Avatar src={userPhoto} sx={{ width: 24, height: 24, background: "#0E1420", color: "#879FCA" }} />}
           alignIconRight={true}
         />
         <ListItemButton

@@ -17,7 +17,6 @@ import {
   MenuItem,
   Card,
   CardContent,
-  LinearProgress,
   IconButton,
   Tooltip,
   Link,
@@ -48,7 +47,10 @@ import {
 } from "src/components/Api/Api";
 import MetricCard from "../../components/MetricCard/MetricCard";
 import CustomTable from "../../components/CustomTable/CustomTable";
-
+import Lottie from "lottie-react";
+import ProspectingLoadingAnimation from "../../assets/lottie/prospecting-loading-animation.json"
+import HintsShowOnLoading from "src/components/HintsShowOnLoading/HintsShowOnLoading";
+import CustomSelect from "src/components/CustomSelect/CustomSelect";
 /**
  * @typedef {import('types').Activation} Activation
  */
@@ -366,11 +368,19 @@ const Prospecting = () => {
           width: "100%",
         }}
       >
-        <Box sx={{ width: "100%", maxWidth: 400, textAlign: "center" }}>
-          <Typography variant="h6" gutterBottom>
+        <Box sx={{ position: "relative", width: "100%", maxWidth: 852, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: "700", fontSize: "54px", letterSpacing: "-1.62px", lineHeight: "1" }}>
             {message}
           </Typography>
-          <LinearProgress />
+          <Box sx={{ width: "271px", height: "271px", position: "relative", top: "-75px" }}>
+            <Lottie animationData={ProspectingLoadingAnimation} loop={true} />
+          </Box>
+
+          <Typography variant="caption" gutterBottom sx={{ marginTop: "-130px", marginBottom: "20px", width: "586px", fontSize: "18px", lineHeight: "1.78" }}>
+            While the magic runs behind the scenes, here are some helpful hints to get the best use case from the app:
+          </Typography>
+
+          <HintsShowOnLoading />
         </Box>
       </Box>
     );
@@ -445,7 +455,7 @@ const Prospecting = () => {
   }, [filteredData]);
 
   if (loading || initialDataLoading) {
-    return getLoadingComponent("Looking for prospecting activities...");
+    return getLoadingComponent("We are fetching your activity...");
   }
 
   if (error) {
@@ -554,36 +564,65 @@ const Prospecting = () => {
             onFilter={handleDataFilter}
             onClear={handleClearFilter}
           />
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="period-label">Period</InputLabel>
-              <Select
-                labelId="period-label"
-                id="period-select"
+          <Box sx={{ display: "flex", alignItems: "center", gap: "24px" }}>
+            <FormControl variant="outlined" size="small" sx={{ minWidth: "64px", marginTop: "-12px", }}>
+              <CustomSelect
                 value={period}
-                onChange={handlePeriodChange}
                 label="Period"
-              >
-                <MenuItem value="All">All</MenuItem>
-                <MenuItem value="24h">24h</MenuItem>
-                <MenuItem value="48h">48h</MenuItem>
-                <MenuItem value="7d">7d</MenuItem>
-                <MenuItem value="30d">30d</MenuItem>
-                <MenuItem value="90d">90d</MenuItem>
-              </Select>
+                onChange={handlePeriodChange}
+                placeholder="Select Field"
+                selectSx={{
+                  width: "100%",
+                  fontSize: "16px",
+                  lineHeight: "1.78",
+                  letterSpacing: "-0.48px",
+                  paddingBottom: "0px"
+                }}
+                labelSx={{
+                  fontSize: "12px",
+                  top: "13px",
+                  left: "-14px",
+                  "&.Mui-focused": {
+                    top: "0px"
+                  },
+                }}
+                options={[
+                  "All",
+                  "24h",
+                  "48h",
+                  "7d",
+                  "30d",
+                  "90d",
+                ]}
+              />
+
             </FormControl>
-            <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="view-label">View</InputLabel>
-              <Select
-                labelId="view-label"
-                id="view-select"
+            <FormControl variant="outlined" size="small" sx={{ minWidth: "93px", marginTop: "-12px" }}>
+              <CustomSelect
                 value={view}
-                onChange={handleViewChange}
                 label="View"
-              >
-                <MenuItem value="Summary">Summary</MenuItem>
-                <MenuItem value="Detailed">Detailed</MenuItem>
-              </Select>
+                onChange={handleViewChange}
+                placeholder="Select View"
+                selectSx={{
+                  width: "100%",
+                  fontSize: "16px",
+                  lineHeight: "1.78",
+                  letterSpacing: "-0.48px",
+                  paddingBottom: "0px"
+                }}
+                labelSx={{
+                  fontSize: "12px",
+                  top: "13px",
+                  left: "-14px",
+                  "&.Mui-focused": {
+                    top: "0px"
+                  },
+                }}
+                options={[
+                  "Summary",
+                  "Detailed",
+                ]}
+              />
             </FormControl>
             {activatedByUsers.length > 0 && (
               <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
