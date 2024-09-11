@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   getInstanceUrl,
   getLoggedInUser,
@@ -200,14 +200,15 @@ const Account = () => {
    */
   const [user, setUser] = useState({
     id: "0",
-    firstName: "Peter",
-    lastName: "User",
-    email: "datalover@gmail.com",
-    username: "testuser123",
+    firstName: "",
+    lastName: "",
+    email: "",
+    username: "",
     photoUrl: "",
     status: "not paid"
   });
   const [userStatus, setUserStatus] = useState("not paid");
+  const [userCreatedAt, setUserCreatedAt] = useState("");
   const [instanceUrl, setInstanceUrl] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -230,6 +231,7 @@ const Account = () => {
           setUser(userResponse.data[0]);
           setInstanceUrl(instanceUrlResponse.data[0]);
           setUserStatus(userResponse.data[0].status);
+          setUserCreatedAt(userResponse.data[0].created_at);
         } else {
           setError("Failed to fetch user data or instance URL");
         }
@@ -290,6 +292,31 @@ const Account = () => {
     handleCloseUpgradeDialog();
     setSupabaseUserStatusToPaid(user.id);
   };
+
+  const freeTrialDaysLeft = useMemo(() => {
+    if (userCreatedAt.length === 0) {
+      return 0; // No creation date, no trial left
+    }
+
+    const createdAtDate = new Date(userCreatedAt); // Convert to Date object
+    const currentDate = new Date(); // Current date
+
+    // Set both dates to midnight (00:00:00) to ignore time
+    createdAtDate.setHours(0, 0, 0, 0);
+    currentDate.setHours(0, 0, 0, 0);
+
+    // Calculate difference in milliseconds
+    const timeDifference = currentDate.getTime() - createdAtDate.getTime();
+
+    // Convert milliseconds to days
+    const daysPassed = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+
+    // Free trial is 3 days, so calculate days left
+    const trialDaysLeft = 3 - daysPassed;
+
+    // If days left is less than 0, return 0
+    return trialDaysLeft > 0 && trialDaysLeft < 4 ? trialDaysLeft : 0;
+  }, [userCreatedAt])
 
   if (loading) {
     return <CircularProgress />;
@@ -367,8 +394,8 @@ const Account = () => {
 
       {userStatus === "paused" && (
         <SubscriptionAlertCard
-          title="Don't Miss Out!"
-          subtitle="Membership on Paused!"
+          title="Your Membership on Paused!"
+          subtitle="Don't Miss Out!"
           description="Your membership is on hold, but don't worry — you can resume anytime to unlock all the perks again. We're here when you're ready!"
           buttonText="Resume Membership"
           onButtonClick={handleUpgradeClick}
@@ -376,10 +403,22 @@ const Account = () => {
       )}
 
       {
-        (userStatus === "not paid" || !userStatus) && (
+        ((userStatus === "not paid" && freeTrialDaysLeft > 0)) && (
           <SubscriptionAlertCard
-            title="HEADS UP!"
-            subtitle="Your free trial is over"
+            title="Your free trial is ending soon"
+            subtitle="Reminder"
+            description="Don't miss out on all the premium features you've been enjoying. Upgrade to a paid plan now to continue accessing the full range of benefits."
+            buttonText="Upgrade Now"
+            onButtonClick={handleUpgradeClick}
+          />
+        )
+      }
+
+      {
+        ((userStatus === "not paid" && freeTrialDaysLeft === 0) || !userStatus) && (
+          <SubscriptionAlertCard
+            title="Your free trial is over"
+            subtitle="HEADS UP!"
             description="Your free trial has ended, but the perks don't have to stop! Upgrade now to keep enjoying all the premium features and exclusive benefits."
             buttonText="Upgrade to Paid"
             onButtonClick={handleUpgradeClick}
