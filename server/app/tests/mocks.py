@@ -11,17 +11,15 @@ from datetime import datetime
 
 MOCK_CONTACT_IDS = [f"mock_contact_id{i}" for i in range(10)]
 MOCK_ACCOUNT_IDS = [f"mock_account_id{i}" for i in range(1, 6)]
-MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT = [
-    {
-        "fields": [
-            {"name": "Id", "label": "Account ID", "type": "id"},
+MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT = {
+    "fields": [
+        {"name": "Id", "label": "Account ID", "type": "id"},
             {"name": "Name", "label": "Account Name", "type": "string"},
             {"name": "BillingStreet", "label": "Billing Street", "type": "textarea"},
             {"name": "Phone", "label": "Phone", "type": "phone"},
             {"name": "Industry", "label": "Industry", "type": "picklist"},
-        ]
-    }
-]
+    ]
+}
 
 
 today = datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000+0000")
@@ -36,10 +34,13 @@ sobject_api_mock_response_by_request_key: Dict[str, List[Dict]] = {
     "fetch_contacts_by_account_ids": [],
     "fetch_accounts_not_in_ids": [],
     "fetch_logged_in_salesforce_user": [],
-    "fetch_sobject_fields__account": MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT,
-    "fetch_salesforce_users": []
+    "fetch_salesforce_users": [],
 }
 
+# Add this new dictionary for permanent mock responses
+permanent_mock_responses = {
+    "fetch_sobject_fields__account": MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT
+}
 
 def add_mock_response(request_key, response):
     """
@@ -61,10 +62,13 @@ def clear_mocks():
     for key in sobject_api_mock_response_by_request_key.keys():
         sobject_api_mock_response_by_request_key[key] = []
 
+
 import re
+
 
 def mock_fetch_sobjects_async(soql_query, credentials, session):
     return response_based_on_query(soql_query, return_raw_data=True)
+
 
 def response_based_on_query(url, **kwargs):
     """
@@ -75,12 +79,10 @@ def response_based_on_query(url, **kwargs):
     print(f"Return raw data: {kwargs.get('return_raw_data', False)}")
     try:
         query_param = kwargs.get("params", {}).get("q", "") or url
-        is_valid_query = "/describe" or is_valid_salesforce_query(query_param) in url
-        return_raw_data = kwargs.get('return_raw_data', False)
+        is_valid_query = "/describe" in url or is_valid_salesforce_query(query_param)
+        return_raw_data = kwargs.get("return_raw_data", False)
         if not is_valid_query:
-            return MagicMock(
-                status_code=400, json=lambda: {"error": f"Invalid query {query_param}"}
-            )
+            raise ValueError(f"Invalid query {query_param}")
 
         # Mapping query characteristics to the corresponding key in the mock response dictionary
         query_to_key_map = {
@@ -111,33 +113,45 @@ def response_based_on_query(url, **kwargs):
             (
                 "AccountId IN" in query_param and "FROM Contact" in query_param
             ): "fetch_contacts_by_account_ids",
-            ("SELECT Id,Name,Industry,AnnualRevenue,NumberOfEmployees,CreatedDate FROM Account" in query_param): "fetch_accounts_not_in_ids",
+            (
+                "SELECT Id,Name,Industry,AnnualRevenue,NumberOfEmployees,CreatedDate FROM Account"
+                in query_param
+            ): "fetch_accounts_not_in_ids",
             ("Account" in url and "describe" in url): "fetch_sobject_fields__account",
             ("FROM User" in query_param): "fetch_salesforce_users",
         }
 
         # Determine which mock response to use based on the query characteristics
         for condition, key in query_to_key_map.items():
-            if condition:
+            if not condition: 
+                continue
+            
+            mock_response = None
+            if key in permanent_mock_responses:
+                mock_response = permanent_mock_responses[key]
+            else:
                 mock_responses = sobject_api_mock_response_by_request_key.get(key)
                 mock_response = mock_responses.pop(0) if mock_responses else None
-                if mock_response and not return_raw_data:
-                    return MagicMock(status_code=200, json=lambda: mock_response)
-                elif mock_response and return_raw_data:
-                    return mock_response["records"]
-                else:
-                    return MagicMock(
-                        status_code=404,
-                        json=lambda: {
-                            "error": f"No more mock data available for endpoint {key}"
-                        },
-                    )
+                
+            if mock_response and not return_raw_data:
+                return MagicMock(status_code=200, json=lambda: mock_response)
+            elif mock_response and return_raw_data:
+                return mock_response["records"]
+            else:
+                return MagicMock(
+                    status_code=404,
+                    json=lambda: {
+                        "error": f"No more mock data available for endpoint {key}"
+                    },
+                )
 
         return MagicMock(status_code=404, json=lambda: {"error": "Not found"})
     except Exception as e:
         raise Exception(f"An error occurred while processing the query: {str(e)}")
 
+
 # mock data
+
 
 def get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query(
     n, contacts, assignee_id
@@ -156,6 +170,7 @@ def get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query(
             cloned_tasks.append(task_copy)
     return cloned_tasks
 
+
 def get_n_mock_tasks_per_contact_for_contains_content_crieria_query(
     n, contacts, assignee_id
 ):
@@ -173,6 +188,7 @@ def get_n_mock_tasks_per_contact_for_contains_content_crieria_query(
             cloned_tasks.append(task_copy)
     return cloned_tasks
 
+
 def get_n_mock_contacts_for_account(n, account_id):
     contacts = []
     for range_index in range(n):
@@ -185,6 +201,7 @@ def get_n_mock_contacts_for_account(n, account_id):
         }
         contacts.append(contact)
     return contacts
+
 
 def get_two_mock_contacts_per_account(accounts):
     mock_contacts = []
