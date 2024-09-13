@@ -189,6 +189,8 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
         activations_by_account_id: Dict[str, List[Activation]] = {
             activation.account.id: activation for activation in activations
         }
+        
+        criterion_by_name = {criterion.name: criterion for criterion in settings.criteria}
 
         for account_id, tasks_by_criteria in criteria_group_tasks_by_account_id.items():
             activation = activations_by_account_id.get(account_id)
@@ -230,7 +232,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                 # Determine new status
                 new_status = get_new_status(
                     activation=activation,
-                    criteria=settings.criteria,
+                    criterion=criterion_by_name.get(criteria_name),
                     task=task,
                     opportunities=opportunities,
                     events=meetings,
@@ -284,9 +286,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     )
 
                 # Update engagement date if necessary
-                if not activation.engaged_date and is_inbound_criteria(
-                    task, settings.criteria
-                ):
+                if not activation.engaged_date and criterion_by_name.get(criteria_name).direction.lower() == "inbound":
                     activation.engaged_date = task_created_datetime.date()
 
             # Update activation status and dates
@@ -379,9 +379,6 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
             )
         )
 
-        criteria_name_by_direction = {
-            criteria.name: criteria.direction for criteria in settings.criteria
-        }
         task_ids_by_criteria_name = get_task_ids_by_criteria_name(tasks_by_account_id)
         contact_by_id = {contact.id: contact for contact in contacts}
         for account_id, tasks_by_criteria_by_who_id in tasks_by_account_id.items():

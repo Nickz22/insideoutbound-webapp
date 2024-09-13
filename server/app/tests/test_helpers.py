@@ -246,17 +246,22 @@ def validate_prospecting_effort(
 
 
 def assert_and_return_payload(response):
-    assert response.status_code == 200
+    assert response.status_code == 200, f"Unexpected status code: {response.status_code}, Response data: {response.data}"
     data = response.get_json()
     return data["data"][0]["raw_data"]
 
 
 async def assert_and_return_payload_async(response_future):
     response = await response_future
-    assert response.status_code == 200
+    response_data = response.data.decode('utf-8')
+    response_json = json.loads(response_data)
+    assert response.status_code == 200, f"Unexpected status code: {response.status_code}, Response message: {response_json.get('message', 'No message')}"
     data = response.get_json()
     return data["data"][0]["raw_data"]
 
+def get_salesforce_compatible_datetime_now():
+    now = datetime.now()
+    return now.strftime("%Y-%m-%dT%H:%M:%S.000+0000")
 
 def setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account(
     mock_user_id,

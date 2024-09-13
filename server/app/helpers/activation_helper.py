@@ -93,7 +93,7 @@ def update_prospecting_metadata(prospecting_effort, task, criteria_name):
 def get_new_status(
     activation: Activation,
     task: Dict,
-    criteria: List[FilterContainer],
+    criterion: FilterContainer,
     opportunities: List[Dict],
     events: List[Dict],
 ):
@@ -111,9 +111,7 @@ def get_new_status(
         and activation.status != StatusEnum.opportunity_created
     ):
         return StatusEnum.meeting_set
-    elif activation.status == StatusEnum.activated and is_inbound_criteria(
-        task, criteria
-    ):
+    elif activation.status == StatusEnum.activated and criterion.direction.lower() == "inbound":
         return StatusEnum.engaged
 
     return activation.status
