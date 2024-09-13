@@ -45,15 +45,127 @@ import {
   generateActivationSummary,
   getLoggedInUser,
 } from "src/components/Api/Api";
-import MetricCard from "../../components/MetricCard/MetricCard";
 import CustomTable from "../../components/CustomTable/CustomTable";
 import Lottie from "lottie-react";
 import ProspectingLoadingAnimation from "../../assets/lottie/prospecting-loading-animation.json"
 import HintsShowOnLoading from "src/components/HintsShowOnLoading/HintsShowOnLoading";
 import CustomSelect from "src/components/CustomSelect/CustomSelect";
+import SummaryBarChartCard from "src/components/SummaryCard/SummaryBarChartCard";
+import SummaryLineChartCard from "src/components/SummaryCard/SummaryLineChartCard";
 /**
  * @typedef {import('types').Activation} Activation
  */
+
+const dataset = {
+  activeApproachedPerUser: {
+    title: "Active Approaches per User",
+    target: 5,
+    valueType: "number",
+    data: [
+      {
+        label: "User 1",
+        value: 3
+      },
+      {
+        label: "User 2",
+        value: 6
+      },
+      {
+        label: "User 3",
+        value: 7
+      },
+      {
+        label: "User 4",
+        value: 2
+      }
+    ]
+  },
+  closedRevenuePerUser: {
+    title: "Closed Revenue per User",
+    target: 75000,
+    valueType: "currency",
+    data: [
+      {
+        label: "User 1",
+        value: 100000
+      },
+      {
+        label: "User 2",
+        value: 43000
+      },
+      {
+        label: "User 3",
+        value: 23000
+      },
+      {
+        label: "User 4",
+        value: 123000
+      },
+    ]
+  },
+  totalPipelineValue: {
+    title: "Total Pipeline Value",
+    target: 200,
+    valueType: "currency",
+    data: [
+      {
+        label: "Mon",
+        value: 75
+      },
+      {
+        label: "Tue",
+        value: 112
+      },
+      {
+        label: "Wed",
+        value: 90
+      },
+      {
+        label: "Thu",
+        value: 400
+      },
+      {
+        label: "Fri",
+        value: 275
+      },
+      {
+        label: "Sat",
+        value: 275
+      },
+      {
+        label: "Sun",
+        value: 124
+      },
+    ]
+  },
+  activationsPerStatus: {
+    title: "Activations per Status",
+    target: 5,
+    valueType: "number",
+    data: [
+      {
+        label: "1. Activated",
+        value: 8
+      },
+      {
+        label: "2. Engaged",
+        value: 4
+      },
+      {
+        label: "3. Meeting Set",
+        value: 5
+      },
+      {
+        label: "4. Opportunity Created",
+        value: 6
+      },
+      {
+        label: "5. Unresponsive",
+        value: 4
+      },
+    ]
+  }
+}
 
 const Prospecting = () => {
   const [period, setPeriod] = useState("All");
@@ -666,81 +778,40 @@ const Prospecting = () => {
         {error ? (
           <Alert severity="error">{error}</Alert>
         ) : view === "Summary" ? (
-          <Grid container spacing={2}>
+          <Grid container spacing={3}>
             {summaryLoading ? (
               getLoadingComponent("Generating summary...")
             ) : (
               <>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Activations"
-                    value={summaryData.total_activations.toString()}
-                    subText=""
-                    tooltipTitle="The number of approached accounts in the selected period"
+                <Grid item xs={12} sm={4.5} md={4.5} lg={4.5}>
+                  <SummaryBarChartCard
+                    data={dataset.activeApproachedPerUser.data}
+                    target={dataset.activeApproachedPerUser.target}
+                    title={dataset.activeApproachedPerUser.title}
+                    direction={"vertical"}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Activations Today"
-                    value={summaryData.activations_today.toString()}
-                    subText=""
-                    tooltipTitle="The number of accounts which were approached today"
+                <Grid item xs={12} sm={7.5} md={7.5} lg={7.5}>
+                  <SummaryBarChartCard
+                    data={dataset.closedRevenuePerUser.data}
+                    target={dataset.closedRevenuePerUser.target}
+                    title={dataset.closedRevenuePerUser.title}
+                    direction={"vertical"}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Tasks"
-                    value={summaryData.total_tasks.toString()}
-                    subText=""
-                    tooltipTitle="The total number of prospecting Tasks created in the selected period"
+                <Grid item xs={12} sm={4.5} md={4.5} lg={4.5}>
+                  <SummaryLineChartCard
+                    data={dataset.totalPipelineValue.data}
+                    target={dataset.totalPipelineValue.target}
+                    title={dataset.totalPipelineValue.title}
                   />
                 </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Events"
-                    value={summaryData.total_events.toString()}
-                    subText=""
-                    tooltipTitle="The total number of meetings created in the selected period"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Avg Tasks Per Contact"
-                    value={summaryData.avg_tasks_per_contact.toFixed(2)}
-                    subText=""
-                    tooltipTitle="The average number of tasks per contact under each activated account"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Avg Contacts Per Account"
-                    value={summaryData.avg_contacts_per_account.toFixed(2)}
-                    subText=""
-                    tooltipTitle="The average number of tasks per activated account"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Deals"
-                    value={summaryData.total_deals.toString()}
-                    subText=""
-                    tooltipTitle="The total number of open opportunities related to any activated account in the selected period"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Total Pipeline Value"
-                    value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
-                    subText=""
-                    tooltipTitle="The total amount of open opportunities related to any activated account in the selected period"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6} md={4} lg={4}>
-                  <MetricCard
-                    title="Engaged Activations"
-                    value={summaryData.engaged_activations.toString()}
-                    subText=""
-                    tooltipTitle="The number of activated Accounts which have had inbound engagement"
+                <Grid item xs={12} sm={7.5} md={7.5} lg={7.5}>
+                  <SummaryBarChartCard
+                    data={dataset.activationsPerStatus.data}
+                    target={dataset.activationsPerStatus.target}
+                    title={dataset.activationsPerStatus.title}
+                    direction={"horizontal"}
                   />
                 </Grid>
               </>
@@ -818,33 +889,35 @@ const Prospecting = () => {
 
       </Box>
 
-      {loggedInUser.status === "not paid" && freeTrialDaysLeft > 0 && (
-        <Box
-          onClick={() => {
-            navigate("/app/account")
-          }}
-          sx={{
-            position: "absolute",
-            bottom: "60px",
-            right: "-75px",
-            transform: "rotate(-45deg)",
-            backgroundColor: "#1E242F",
-            color: "white",
-            fontWeight: "bold",
-            height: "56px",
-            width: "320px",
-            boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
-            zIndex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            cursor: "pointer"
-          }}
-        >
-          {freeTrialDaysLeft} days left in trial
-        </Box>
-      )}
+      {
+        loggedInUser.status === "not paid" && freeTrialDaysLeft > 0 && (
+          <Box
+            onClick={() => {
+              navigate("/app/account")
+            }}
+            sx={{
+              position: "absolute",
+              bottom: "60px",
+              right: "-75px",
+              transform: "rotate(-45deg)",
+              backgroundColor: "#1E242F",
+              color: "white",
+              fontWeight: "bold",
+              height: "56px",
+              width: "320px",
+              boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+              cursor: "pointer"
+            }}
+          >
+            {freeTrialDaysLeft} days left in trial
+          </Box>
+        )
+      }
     </Box>
   );
 };
