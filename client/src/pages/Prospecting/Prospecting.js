@@ -10,56 +10,42 @@ import { useNavigate } from "react-router-dom";
 import {
   Box,
   Alert,
-  Grid,
   FormControl,
   InputLabel,
   Select,
   MenuItem,
-  Card,
-  CardContent,
   LinearProgress,
   IconButton,
   Tooltip,
   Link,
-  List,
-  ListItem,
-  ListItemText,
   Typography,
 } from "@mui/material";
-import {
-  Timeline,
-  TimelineItem,
-  TimelineSeparator,
-  TimelineConnector,
-  TimelineContent,
-  TimelineDot,
-} from "@mui/lab";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "../../components/DataFilter/DataFilter";
+import { tableColumns } from "./tableColumns";
 import {
-  fetchSalesforceUsers,
   fetchProspectingActivities,
   fetchAndUpdateProspectingActivity,
   getInstanceUrl,
   generateActivationSummary,
 } from "src/components/Api/Api";
-import MetricCard from "../../components/MetricCard/MetricCard";
 import CustomTable from "../../components/CustomTable/CustomTable";
+import ProspectingMetadataOverview from "../../components/ProspectingMetadataOverview/ProspectingMetadataOverview";
+import ProspectingEffortTimeline from "../../components/ProspectingEffortTimeline/ProspectingEffortTimeline";
+import ProspectingMetrics from "../../components/ProspectingMetrics/ProspectingMetrics";
 
 /**
  * @typedef {import('types').Activation} Activation
  */
 
 const Prospecting = () => {
-  const [period, setPeriod] = useState("All");
+  const [period, setPeriod] = useState("7d");
   const [view, setView] = useState("Summary");
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [error, setError] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [rawData, setRawData] = useState([]);
-  const [activatedByUsers, setActivatedByUsers] = useState([]);
-  const [selectedActivatedBy, setSelectedActivatedBy] = useState("");
   const [instanceUrl, setInstanceUrl] = useState("");
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
@@ -67,22 +53,9 @@ const Prospecting = () => {
   const [dataFilter, setDataFilter] = useState(null);
   const [originalRawData, setOriginalRawData] = useState([]);
 
-  const accountFields = useMemo(() => {
-    if (rawData.length === 0) return [];
-    const firstAccount = rawData[0].account;
-    return Object.keys(firstAccount).filter(
-      (key) => typeof firstAccount[key] !== "object"
-    );
-  }, [rawData]);
-
-  const handleDataFilter = useCallback((filter) => {
-    setDataFilter(filter);
+  const handleDataFilter = useCallback((filters) => {
+    setDataFilter(filters);
   }, []);
-
-  const handleClearFilter = useCallback(() => {
-    setDataFilter(null);
-    setRawData(originalRawData); // Reset to original data
-  }, [originalRawData]);
 
   const fetchData = useCallback(
     async (isRefresh = false) => {
@@ -140,27 +113,6 @@ const Prospecting = () => {
     fetchInitialData();
   }, [fetchData]);
 
-  useEffect(() => {
-    const fetchAndSetActivatedByUsers = async () => {
-      if (summaryData && rawData.length > 0) {
-        const activatedByIds = new Set(
-          rawData.map((item) => item.activated_by_id)
-        );
-        const response = await fetchSalesforceUsers();
-        if (response.success) {
-          const filteredUsers = response.data.filter((user) =>
-            activatedByIds.has(user.id)
-          );
-          setActivatedByUsers(filteredUsers);
-        } else {
-          setError("Failed to fetch Salesforce users.");
-        }
-      }
-    };
-
-    fetchAndSetActivatedByUsers();
-  }, [summaryData, rawData]);
-
   const handleRefresh = () => {
     fetchData(true);
   };
@@ -171,10 +123,6 @@ const Prospecting = () => {
 
   const handleViewChange = (event) => {
     setView(event.target.value);
-  };
-
-  const handleActivatedByChange = (event) => {
-    setSelectedActivatedBy(event.target.value);
   };
 
   const filterDataByPeriod = useCallback((data, selectedPeriod) => {
@@ -203,105 +151,46 @@ const Prospecting = () => {
     setSelectedActivation(activation);
   };
 
-  const ProspectingMetadataOverview = ({ metadata }) => (
-    <Grid container spacing={2}>
-      {metadata.map((item, index) => (
-        <Grid item xs={12} key={index}>
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="h6" component="div" gutterBottom>
-                {item.name}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Total: {item.total}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                First: {new Date(item.first_occurrence).toLocaleDateString()}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                Last: {new Date(item.last_occurrence).toLocaleDateString()}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      ))}
-    </Grid>
-  );
-
-  const ProspectingEffortTimeline = ({ efforts }) => (
-    <Timeline sx={{ padding: 0, margin: 0 }}>
-      {efforts.map((effort, index) => (
-        <TimelineItem key={index}>
-          <TimelineSeparator>
-            <TimelineDot color={getStatusColor(effort.status)} />
-            {index < efforts.length - 1 && <TimelineConnector />}
-          </TimelineSeparator>
-          <TimelineContent>
-            <Typography variant="h6" component="span">
-              {effort.status}
-            </Typography>
-            <Typography>
-              {new Date(effort.date_entered).toLocaleDateString()}
-            </Typography>
-            <Typography>Tasks: {effort.task_ids.length}</Typography>
-            {effort.prospecting_metadata.length > 0 && (
-              <List dense>
-                {effort.prospecting_metadata.map((item, metaIndex) => (
-                  <ListItem key={metaIndex}>
-                    <ListItemText
-                      primary={`${item.name}: ${item.total}`}
-                      secondary={`${new Date(
-                        item.first_occurrence
-                      ).toLocaleDateString()} - ${new Date(
-                        item.last_occurrence
-                      ).toLocaleDateString()}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </TimelineContent>
-        </TimelineItem>
-      ))}
-    </Timeline>
-  );
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "Activated":
-        return "primary";
-      case "Meeting Set":
-        return "secondary";
-      case "Opportunity Created":
-        return "success";
-      default:
-        return "grey";
-    }
-  };
-
   const filteredData = useMemo(() => {
-    /** @type {Activation[]} */
-    let filtered = rawData;
-    if (selectedActivatedBy) {
-      filtered = filtered.filter(
-        (item) => item.activated_by_id === selectedActivatedBy
-      );
-    }
+    let filtered = originalRawData;
     if (dataFilter) {
       filtered = filtered.filter((item) => {
-        const accountValue = item.account[dataFilter.field];
-        if (dataFilter.operator === "equals") {
-          return accountValue === dataFilter.value;
-        } else if (dataFilter.operator === "notEquals") {
-          return accountValue !== dataFilter.value;
-        }
+        if (
+          dataFilter.industry.length > 0 &&
+          !dataFilter.industry.includes(item.account.industry)
+        )
+          return false;
+        if (
+          item.account.annual_revenue < dataFilter.annualRevenue[0] ||
+          item.account.annual_revenue > dataFilter.annualRevenue[1]
+        )
+          return false;
+        if (
+          dataFilter.activatedBy &&
+          item.activated_by_id !== dataFilter.activatedBy
+        )
+          return false;
+        if (
+          item.account.number_of_employees < dataFilter.employeeCount[0] ||
+          item.account.number_of_employees > dataFilter.employeeCount[1]
+        )
+          return false;
+        const createdDate = new Date(item.account.created_date);
+        if (
+          dataFilter.createdDate.start &&
+          createdDate < new Date(dataFilter.createdDate.start)
+        )
+          return false;
+        if (
+          dataFilter.createdDate.end &&
+          createdDate > new Date(dataFilter.createdDate.end)
+        )
+          return false;
         return true;
       });
-    } else {
-      filtered = rawData;
     }
     return filterDataByPeriod(filtered, period);
-  }, [rawData, selectedActivatedBy, dataFilter, filterDataByPeriod, period]);
+  }, [originalRawData, dataFilter, filterDataByPeriod, period]);
 
   const getLoadingComponent = (message) => {
     return (
@@ -323,35 +212,6 @@ const Prospecting = () => {
       </Box>
     );
   };
-
-  const tableColumns = [
-    { id: "account.name", label: "Account Name", dataType: "component" },
-    {
-      id: "opportunity.name",
-      label: "Opportunity Name",
-      dataType: "component",
-    },
-    { id: "activated_date", label: "Activated Date", dataType: "date" },
-    { id: "status", label: "Status", dataType: "text" },
-    { id: "days_activated", label: "Days Activated", dataType: "number" },
-    { id: "days_engaged", label: "Days Engaged", dataType: "number" },
-    { id: "engaged_date", label: "Engaged Date", dataType: "date" },
-    {
-      id: "first_prospecting_activity",
-      label: "First Prospecting Activity",
-      dataType: "date",
-    },
-    {
-      id: "last_prospecting_activity",
-      label: "Last Prospecting Activity",
-      dataType: "date",
-    },
-    {
-      id: "last_outbound_engagement",
-      label: "Last Outbound Engagement",
-      dataType: "date",
-    },
-  ];
 
   useEffect(() => {
     const fetchFilteredSummary = async () => {
@@ -410,11 +270,7 @@ const Prospecting = () => {
           marginBottom: "16px",
         }}
       >
-        <DataFilter
-          fields={accountFields}
-          onFilter={handleDataFilter}
-          onClear={handleClearFilter}
-        />
+        <DataFilter onFilter={handleDataFilter} rawData={rawData} />
         <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
           <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
             <InputLabel id="period-label">Period</InputLabel>
@@ -425,12 +281,11 @@ const Prospecting = () => {
               onChange={handlePeriodChange}
               label="Period"
             >
-              <MenuItem value="All">All</MenuItem>
-              <MenuItem value="24h">24h</MenuItem>
-              <MenuItem value="48h">48h</MenuItem>
-              <MenuItem value="7d">7d</MenuItem>
-              <MenuItem value="30d">30d</MenuItem>
-              <MenuItem value="90d">90d</MenuItem>
+              <MenuItem value="24h">Last 24 hours</MenuItem>
+              <MenuItem value="48h">Last 48 hours</MenuItem>
+              <MenuItem value="7d">Last 7 days</MenuItem>
+              <MenuItem value="30d">Last 30 days</MenuItem>
+              <MenuItem value="90d">Last 90 days</MenuItem>
             </Select>
           </FormControl>
           <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
@@ -446,27 +301,6 @@ const Prospecting = () => {
               <MenuItem value="Detailed">Detailed</MenuItem>
             </Select>
           </FormControl>
-          {activatedByUsers.length > 0 && (
-            <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="activated-by-label">Activated By</InputLabel>
-              <Select
-                labelId="activated-by-label"
-                id="activated-by-select"
-                value={selectedActivatedBy}
-                onChange={handleActivatedByChange}
-                label="Activated By"
-              >
-                <MenuItem value="">
-                  <em>All</em>
-                </MenuItem>
-                {activatedByUsers.map((user) => (
-                  <MenuItem key={user.id} value={user.id}>
-                    {`${user.firstName} ${user.lastName}`}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-          )}
           <Tooltip title="Refresh data from org">
             <IconButton onClick={handleRefresh} color="primary" size="small">
               <RefreshIcon />
@@ -478,86 +312,11 @@ const Prospecting = () => {
       {error ? (
         <Alert severity="error">{error}</Alert>
       ) : view === "Summary" ? (
-        <Grid container spacing={2}>
-          {summaryLoading ? (
-            getLoadingComponent("Generating summary...")
-          ) : (
-            <>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Activations"
-                  value={summaryData.total_activations.toString()}
-                  subText=""
-                  tooltipTitle="The number of approached accounts in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Activations Today"
-                  value={summaryData.activations_today.toString()}
-                  subText=""
-                  tooltipTitle="The number of accounts which were approached today"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Tasks"
-                  value={summaryData.total_tasks.toString()}
-                  subText=""
-                  tooltipTitle="The total number of prospecting Tasks created in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Events"
-                  value={summaryData.total_events.toString()}
-                  subText=""
-                  tooltipTitle="The total number of meetings created in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Avg Tasks Per Contact"
-                  value={summaryData.avg_tasks_per_contact.toFixed(2)}
-                  subText=""
-                  tooltipTitle="The average number of tasks per contact under each activated account"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Avg Contacts Per Account"
-                  value={summaryData.avg_contacts_per_account.toFixed(2)}
-                  subText=""
-                  tooltipTitle="The average number of tasks per activated account"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Deals"
-                  value={summaryData.total_deals.toString()}
-                  subText=""
-                  tooltipTitle="The total number of open opportunities related to any activated account in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Pipeline Value"
-                  value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
-                  subText=""
-                  tooltipTitle="The total amount of open opportunities related to any activated account in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Engaged Activations"
-                  value={summaryData.engaged_activations.toString()}
-                  subText=""
-                  tooltipTitle="The number of activated Accounts which have had inbound engagement"
-                />
-              </Grid>
-            </>
-          )}
-        </Grid>
+        <ProspectingMetrics
+          summaryData={summaryData}
+          summaryLoading={summaryLoading}
+          getLoadingComponent={getLoadingComponent}
+        />
       ) : (
         <>
           <CustomTable

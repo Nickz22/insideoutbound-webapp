@@ -81,7 +81,7 @@ def group_by(arr: list, param: str) -> dict:
 
 
 # setting utils
-def get_team_member_salesforce_ids(settings):
+def get_team_member_salesforce_ids(settings) -> list[str]:
     salesforce_user_ids = [settings.salesforce_user_id] + (
         [id for id in settings.team_member_ids]
         if settings.team_member_ids is not None and len(settings.team_member_ids) > 0

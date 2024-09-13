@@ -35,7 +35,8 @@
         "-s",
         "-o",
         "asyncio_mode=auto",
-        "/Users/nzozaya/Salesforce/io-webapp/server/app/tests/test_should_parse_activations_async_test.py::TestActivationLogic"
+        "--disable-warnings",
+        "/Users/nzozaya/Salesforce/io-webapp/server/app/tests"
       ],
       "cwd": "${workspaceFolder}",
       "env": {

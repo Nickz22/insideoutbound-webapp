@@ -59,16 +59,16 @@ def update_activation_states():
         pluck(fetch_accounts_not_in_ids(active_account_ids).data, "id")
     )
 
-    outbound_prospecting_tasks_by_filter_name = fetch_criteria_tasks_by_account_ids_from_date(
+    prospecting_tasks_by_filter_name = fetch_criteria_tasks_by_account_ids_from_date(
         activatable_account_ids,
         f"{get_threshold_date_for_activatable_tasks(settings)}T00:00:00Z",
-        [criteria for criteria in settings.criteria if criteria.direction.lower() == "outbound"],
+        settings.criteria,
         salesforce_user_ids,
     ).data
 
     contact_ids = set()
-    for criteria_name in outbound_prospecting_tasks_by_filter_name:
-        contact_ids.update(pluck(outbound_prospecting_tasks_by_filter_name[criteria_name], WHO_ID))
+    for criteria_name in prospecting_tasks_by_filter_name:
+        contact_ids.update(pluck(prospecting_tasks_by_filter_name[criteria_name], WHO_ID))
 
     contacts = (
         fetch_contacts_by_ids_and_non_null_accounts(list(contact_ids)).data
@@ -77,7 +77,7 @@ def update_activation_states():
     )
 
     new_activations = compute_activated_accounts(
-        outbound_prospecting_tasks_by_filter_name, contacts, settings
+        prospecting_tasks_by_filter_name, contacts, settings
     ).data
 
     if len(new_activations) > 0:

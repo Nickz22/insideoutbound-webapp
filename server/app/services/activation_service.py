@@ -2,7 +2,6 @@ import os, sys
 from app.data_models import (
     Settings,
     Activation,
-    FilterContainer,
     ProspectingMetadata,
     ProspectingEffort,
     ApiResponse,
@@ -11,7 +10,6 @@ from app.data_models import (
 from typing import List, Dict
 from flask import current_app as app
 
-
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from app.salesforce_api import (
     fetch_opportunities_by_account_ids_from_date,
@@ -19,7 +17,6 @@ from app.salesforce_api import (
     fetch_salesforce_users,
 )
 from app.utils import (
-    generate_unique_id,
     add_days,
     is_model_date_field_within_window,
     group_by,
@@ -31,6 +28,21 @@ from app.utils import (
 )
 from datetime import datetime, date
 from app.mapper.mapper import convert_dict_to_opportunity
+from app.helpers.activation_helper import (
+    update_prospecting_metadata,
+    get_new_status,
+    is_inbound_criteria,
+    create_activation,
+    get_task_ids_by_criteria_name,
+    get_all_tasks_under_account,
+    get_first_prospecting_activity_date,
+    get_tasks_by_account_id,
+    get_qualifying_meeting,
+    get_qualifying_opportunity,
+    get_active_contact_ids,
+    get_filtered_tasks_under_account,
+    get_inbound_tasks_within_period,
+)
 
 
 def find_unresponsive_activations(
@@ -316,73 +328,6 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
     return response
 
 
-def is_inbound_criteria(task, criteria):
-    for criterion in criteria:
-        if criterion.direction.lower() == "inbound":
-            return True
-    return False
-
-
-def get_new_status(
-    activation: Activation,
-    task: Dict,
-    criteria: List[FilterContainer],
-    opportunities: List[Dict],
-    events: List[Dict],
-):
-
-    if (
-        opportunities
-        and opportunities[0]
-        and activation.status != StatusEnum.opportunity_created
-    ):
-        return StatusEnum.opportunity_created
-    elif (
-        events
-        and events[0]
-        and activation.status != StatusEnum.meeting_set
-        and activation.status != StatusEnum.opportunity_created
-    ):
-        return StatusEnum.meeting_set
-    elif activation.status == StatusEnum.activated and is_inbound_criteria(
-        task, criteria
-    ):
-        return StatusEnum.engaged
-
-    return activation.status
-
-
-def update_prospecting_metadata(prospecting_effort, task, criteria_name):
-    metadata = next(
-        (m for m in prospecting_effort.prospecting_metadata if m.name == criteria_name),
-        None,
-    )
-    task_date = parse_datetime_string_with_timezone(task["CreatedDate"]).date()
-
-    if metadata:
-        metadata.last_occurrence = max(metadata.last_occurrence, task_date)
-        metadata.total += 1
-    else:
-        prospecting_effort.prospecting_metadata.append(
-            ProspectingMetadata(
-                name=criteria_name,
-                first_occurrence=task_date,
-                last_occurrence=task_date,
-                total=1,
-            )
-        )
-
-
-def has_any_inbound_task(
-    task_ids, task_ids_by_criteria_name, criteria_name_by_direction
-):
-    for criteria_name, task_id_set in task_ids_by_criteria_name.items():
-        if any(task_id in task_id_set for task_id in task_ids):
-            if criteria_name_by_direction.get(criteria_name).lower() == "inbound":
-                return True
-    return False
-
-
 def compute_activated_accounts(tasks_by_criteria, contacts, settings):
     """
     This function, `compute_activated_accounts`, is designed to process a collection of tasks, contacts, and settings to identify and construct activations for accounts.
@@ -401,6 +346,10 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
         salesforce_user_by_id = group_by(
             fetch_salesforce_users(salesforce_user_ids).data, "id"
+        )
+        tasks_by_account_id = get_tasks_by_account_id(tasks_by_criteria, contacts)
+        first_prospecting_activity = get_first_prospecting_activity_date(
+            tasks_by_criteria
         )
         opportunity_by_account_id = group_by(
             fetch_opportunities_by_account_ids_from_date(
@@ -440,26 +389,42 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 tasks_by_criteria_by_who_id
             )
 
-            if len(all_tasks_under_account) == 0:
+            all_outbound_tasks_under_account = get_filtered_tasks_under_account(
+                tasks_by_criteria_by_who_id, settings.criteria, "outbound"
+            )
+
+            if len(all_outbound_tasks_under_account) == 0:
                 continue
+
+            # Get all inbound tasks for this account
+            all_inbound_tasks = get_filtered_tasks_under_account(
+                tasks_by_criteria_by_who_id, settings.criteria, "inbound"
+            )
 
             activations = []
 
-            # although the Task API query is sorted already, grouping them potentially breaks a perfect sort
-            ## so we'll sort again here to be safe...opportunity for optimization via merge sort
+            # although the Task API query is sorted already,
+            ## grouping them potentially breaks a perfect sort
+            ### so we'll sort again here to be safe...opportunity for optimization via merge sort
             all_tasks_under_account = sorted(
                 all_tasks_under_account, key=lambda x: x.get("CreatedDate")
             )
+            all_outbound_tasks_under_account = sorted(
+                all_outbound_tasks_under_account, key=lambda x: x.get("CreatedDate")
+            )
+            all_inbound_tasks = sorted(
+                all_inbound_tasks, key=lambda x: x.get("CreatedDate")
+            )
 
             start_tracking_period = parse_datetime_string_with_timezone(
-                all_tasks_under_account[0].get("CreatedDate")
+                all_outbound_tasks_under_account[0].get("CreatedDate")
             )
 
             valid_task_ids_by_who_id = {}
             task_ids = []
             last_valid_task_creator_id = None
 
-            for task in all_tasks_under_account:
+            for task in all_outbound_tasks_under_account:
                 qualifying_event = get_qualifying_meeting(
                     meetings_by_account_id.get(account_id, []),
                     start_tracking_period,
@@ -534,6 +499,21 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         if is_active_via_meeting_or_opportunity
                         else active_contact_ids
                     )
+
+                    # Get inbound tasks within the current tracking period
+                    inbound_tasks_in_period = get_inbound_tasks_within_period(
+                        all_inbound_tasks,
+                        start_tracking_period,
+                        settings.tracking_period,
+                    )
+                    engaged_date = (
+                        parse_datetime_string_with_timezone(
+                            inbound_tasks_in_period[0].get("CreatedDate")
+                        )
+                        if len(inbound_tasks_in_period) > 0
+                        else None
+                    )
+
                     activation = create_activation(
                         contact_by_id=contact_by_id,
                         account_first_prospecting_activity=account_first_prospecting_activity,
@@ -542,13 +522,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                             last_valid_task_creator_id
                         )[0],
                         last_prospecting_activity=last_prospecting_activity,
-                        task_ids=task_ids,
+                        outbound_task_ids=task_ids,
                         qualifying_opportunity=qualifying_opportunity,
                         qualifying_event=qualifying_event,
                         task_ids_by_criteria_name=task_ids_by_criteria_name,
-                        criteria_name_by_direction=criteria_name_by_direction,
                         settings=settings,
                         all_tasks_under_account=all_tasks_under_account,
+                        engaged_date=engaged_date,
                     )
                     activations.append(activation)
                     ## reset tracking period
@@ -565,6 +545,18 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 valid_task_ids_by_who_id, settings.activities_per_contact
             )
             
+            qualifying_event = get_qualifying_meeting(
+                meetings_by_account_id.get(account_id, []),
+                start_tracking_period,
+                settings.tracking_period,
+            )
+
+            qualifying_opportunity = get_qualifying_opportunity(
+                opportunity_by_account_id.get(account_id, []),
+                start_tracking_period,
+                settings.tracking_period,
+            )
+
             qualifying_event = get_qualifying_meeting(
                 meetings_by_account_id.get(account_id, []),
                 start_tracking_period,
@@ -597,6 +589,17 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 if is_active_via_meeting_or_opportunity
                 else active_contact_ids
             )
+
+            inbound_tasks_in_period = get_inbound_tasks_within_period(
+                all_inbound_tasks, start_tracking_period, settings.tracking_period
+            )
+            engaged_date = (
+                parse_datetime_string_with_timezone(
+                    inbound_tasks_in_period[0].get("CreatedDate")
+                )
+                if len(inbound_tasks_in_period) > 0
+                else None
+            )
             activation = create_activation(
                 contact_by_id=contact_by_id,
                 account_first_prospecting_activity=account_first_prospecting_activity,
@@ -605,13 +608,13 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     last_valid_task_creator_id
                 )[0],
                 last_prospecting_activity=last_prospecting_activity,
-                task_ids=task_ids,
+                outbound_task_ids=task_ids,
                 qualifying_opportunity=qualifying_opportunity,
                 qualifying_event=qualifying_event,
                 task_ids_by_criteria_name=task_ids_by_criteria_name,
-                criteria_name_by_direction=criteria_name_by_direction,
                 settings=settings,
                 all_tasks_under_account=all_tasks_under_account,
+                engaged_date=engaged_date,
             )
             activations.append(activation)
             response.data.extend(activations)
@@ -620,271 +623,6 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
         raise Exception(format_error_message(e))
 
     return response
-
-
-def create_activation(
-    contact_by_id,
-    account_first_prospecting_activity,
-    active_contact_ids,
-    last_valid_task_creator_id,
-    last_prospecting_activity,
-    task_ids,
-    qualifying_opportunity,
-    qualifying_event,
-    task_ids_by_criteria_name,
-    criteria_name_by_direction,
-    settings,
-    all_tasks_under_account,
-):
-    today = date.today()
-
-    # Find the first inbound task
-    first_inbound_task = next(
-        (
-            task
-            for task in all_tasks_under_account
-            if task["Id"] in task_ids
-            and any(
-                task["Id"] in task_set
-                for criteria_name, task_set in task_ids_by_criteria_name.items()
-                if criteria_name_by_direction.get(criteria_name, "").lower()
-                == "inbound"
-            )
-        ),
-        None,
-    )
-
-    engaged_date = (
-        parse_datetime_string_with_timezone(first_inbound_task["CreatedDate"])
-        if first_inbound_task
-        else None
-    )
-
-    # Determine the activated_date based on the activation condition
-    if qualifying_opportunity:
-        activated_date = parse_datetime_string_with_timezone(
-            qualifying_opportunity["CreatedDate"]
-        ).date()
-    elif qualifying_event:
-        activated_date = parse_datetime_string_with_timezone(
-            qualifying_event["CreatedDate"]
-        ).date()
-    else:
-        # Find the task that caused the account to meet the activation criteria
-        activating_task = next(
-            (
-                task
-                for task in reversed(all_tasks_under_account)
-                if task["Id"] in task_ids
-                and len(
-                    [
-                        t
-                        for t in all_tasks_under_account
-                        if t["CreatedDate"] <= task["CreatedDate"]
-                        and t["Id"] in task_ids
-                    ]
-                )
-                >= settings.activities_per_contact * settings.contacts_per_account
-            ),
-            None,
-        )
-        activated_date = (
-            parse_datetime_string_with_timezone(activating_task["CreatedDate"]).date()
-            if activating_task
-            else account_first_prospecting_activity
-        )
-
-    activation = Activation(
-        id=generate_unique_id(),
-        account=(
-            contact_by_id[active_contact_ids[0]].account
-            if active_contact_ids
-            else next(iter(contact_by_id.values())).account
-        ),
-        activated_date=activated_date,
-        days_activated=(today - activated_date).days,
-        engaged_date=engaged_date.date() if engaged_date else None,
-        days_engaged=(today - engaged_date.date()).days if engaged_date else None,
-        active_contact_ids=active_contact_ids,
-        activated_by_id=last_valid_task_creator_id,
-        first_prospecting_activity=account_first_prospecting_activity,
-        last_prospecting_activity=last_prospecting_activity,
-        opportunity=(
-            convert_dict_to_opportunity(qualifying_opportunity)
-            if qualifying_opportunity
-            else None
-        ),
-        event_ids=[qualifying_event["Id"]] if qualifying_event else None,
-        task_ids=task_ids,
-        status=(
-            StatusEnum.opportunity_created
-            if qualifying_opportunity
-            else (
-                StatusEnum.meeting_set
-                if qualifying_event
-                else (
-                    StatusEnum.engaged
-                    if has_any_inbound_task(
-                        task_ids, task_ids_by_criteria_name, criteria_name_by_direction
-                    )
-                    else StatusEnum.activated
-                )
-            )
-        ),
-        prospecting_metadata=create_prospecting_metadata(
-            task_ids, task_ids_by_criteria_name, all_tasks_under_account
-        ),
-    )
-
-    is_last_prospecting_activity_outside_of_inactivity_threshold = (
-        add_days(last_prospecting_activity, settings.inactivity_threshold) < today
-    )
-    if is_last_prospecting_activity_outside_of_inactivity_threshold:
-        activation.status = StatusEnum.unresponsive
-
-    # Create ProspectingEfforts
-    prospecting_efforts = []
-    current_status = StatusEnum.activated
-    current_status_date = activated_date
-    current_tasks = []
-
-    for task in all_tasks_under_account:
-        if task["Id"] not in task_ids:
-            continue
-
-        task_date = parse_datetime_string_with_timezone(task["CreatedDate"])
-
-        if qualifying_opportunity and task_date >= parse_datetime_string_with_timezone(
-            qualifying_opportunity["CreatedDate"]
-        ):
-            if current_status != StatusEnum.opportunity_created:
-                prospecting_efforts.append(
-                    create_prospecting_effort(
-                        activation.id,
-                        current_status,
-                        current_status_date,
-                        current_tasks,
-                        task_ids_by_criteria_name,
-                    )
-                )
-                current_status = StatusEnum.opportunity_created
-                current_status_date = parse_datetime_string_with_timezone(
-                    qualifying_opportunity["CreatedDate"]
-                ).date()
-                current_tasks = []
-
-        elif qualifying_event and task_date >= parse_datetime_string_with_timezone(
-            qualifying_event["CreatedDate"]
-        ):
-            if current_status != StatusEnum.meeting_set:
-                prospecting_efforts.append(
-                    create_prospecting_effort(
-                        activation.id,
-                        current_status,
-                        current_status_date,
-                        current_tasks,
-                        task_ids_by_criteria_name,
-                    )
-                )
-                current_status = StatusEnum.meeting_set
-                current_status_date = parse_datetime_string_with_timezone(
-                    qualifying_event["CreatedDate"]
-                ).date()
-                current_tasks = []
-
-        elif (
-            engaged_date
-            and task_date >= engaged_date
-            and current_status == StatusEnum.activated
-        ):
-            prospecting_efforts.append(
-                create_prospecting_effort(
-                    activation.id,
-                    current_status,
-                    current_status_date,
-                    current_tasks,
-                    task_ids_by_criteria_name,
-                )
-            )
-            current_status = StatusEnum.engaged
-            current_status_date = engaged_date
-            current_tasks = []
-
-        current_tasks.append(task)
-
-    # Add the final ProspectingEffort
-    prospecting_efforts.append(
-        create_prospecting_effort(
-            activation.id,
-            current_status,
-            current_status_date,
-            current_tasks,
-            task_ids_by_criteria_name,
-        )
-    )
-
-    if not any(pe.status == activation.status for pe in prospecting_efforts):
-        prospecting_efforts.append(
-            create_prospecting_effort(
-                activation.id, activation.status, activation.activated_date, [], {}
-            )
-        )
-
-    activation.prospecting_effort = prospecting_efforts
-
-    return activation
-
-
-def create_prospecting_effort(
-    activation_id, status, date_entered, tasks, task_ids_by_criteria_name
-):
-    date_value_date_entered = None
-    if isinstance(date_entered, datetime):
-        date_value_date_entered = date_entered.date()
-    else:
-        date_value_date_entered = date_entered
-    return ProspectingEffort(
-        activation_id=activation_id,
-        prospecting_metadata=create_prospecting_metadata(
-            [task["Id"] for task in tasks], task_ids_by_criteria_name, tasks
-        ),
-        status=status,
-        date_entered=date_value_date_entered,
-        task_ids=[task["Id"] for task in tasks],
-    )
-
-
-def create_prospecting_metadata(
-    task_ids: List[str],
-    task_ids_by_criteria_name: Dict[str, List[str]],
-    all_tasks_under_account: List[Dict],
-) -> List[ProspectingMetadata]:
-    metadata_list = []
-    for criteria_name, criteria_task_ids in task_ids_by_criteria_name.items():
-        matching_task_ids = set(task_ids) & set(criteria_task_ids)
-        if matching_task_ids:
-            matching_tasks = [
-                task
-                for task in all_tasks_under_account
-                if task["Id"] in matching_task_ids
-            ]
-            first_occurrence = min(
-                datetime.strptime(task["CreatedDate"], "%Y-%m-%dT%H:%M:%S.%f%z").date()
-                for task in matching_tasks
-            )
-            last_occurrence = max(
-                datetime.strptime(task["CreatedDate"], "%Y-%m-%dT%H:%M:%S.%f%z").date()
-                for task in matching_tasks
-            )
-            metadata_list.append(
-                ProspectingMetadata(
-                    name=criteria_name,
-                    first_occurrence=first_occurrence,
-                    last_occurrence=last_occurrence,
-                    total=len(matching_task_ids),
-                )
-            )
-    return metadata_list
 
 
 # helpers with side effects
@@ -921,103 +659,3 @@ def get_meetings_by_account_id(
             for criteria, meetings in meetings_by_criteria.items():
                 meetings_by_account_id[account_id].extend(meetings)
     return meetings_by_account_id
-
-
-# helpers
-
-
-def get_task_ids_by_criteria_name(tasks_by_account_id):
-    task_ids_by_criteria_name = {}
-    for account_id, tasks_by_criteria_by_who_id in tasks_by_account_id.items():
-        for contact_id, tasks_by_criteria in tasks_by_criteria_by_who_id.items():
-            for criteria, tasks in tasks_by_criteria.items():
-                if criteria not in task_ids_by_criteria_name:
-                    task_ids_by_criteria_name[criteria] = set()
-                task_ids_by_criteria_name[criteria].update(
-                    [task.get("Id") for task in tasks]
-                )
-
-    return task_ids_by_criteria_name
-
-
-def get_all_tasks_under_account(tasks_by_criteria_by_who_id) -> List[Dict]:
-    all_tasks_under_account = []
-    for contact_id, tasks_by_criteria in tasks_by_criteria_by_who_id.items():
-        for criteria, tasks in tasks_by_criteria.items():
-            all_tasks_under_account.extend(tasks)
-    return all_tasks_under_account
-
-
-def get_first_prospecting_activity_date(tasks_by_criteria):
-    first_prospecting_activity = None
-    for criteria_key, tasks in tasks_by_criteria.items():
-        for task in tasks:
-            task_created_date = parse_datetime_string_with_timezone(
-                task.get("CreatedDate")
-            )
-            first_prospecting_activity = (
-                task_created_date
-                if not first_prospecting_activity
-                else min(first_prospecting_activity, task_created_date)
-            )
-    if not first_prospecting_activity:
-        first_prospecting_activity = datetime.now()
-    return convert_date_to_salesforce_datetime_format(first_prospecting_activity.date())
-
-
-def get_tasks_by_account_id(tasks_by_criteria, contacts):
-    tasks_by_account_id = {}
-    contact_by_id = {contact.id: contact for contact in contacts}
-    for criteria_key, tasks in tasks_by_criteria.items():
-        for task in tasks:
-            contact = contact_by_id.get(task.get("WhoId"))
-            if not contact:
-                continue
-            account_id = contact.account_id
-            if account_id not in tasks_by_account_id.keys():
-                tasks_by_account_id[account_id] = {}
-            if task.get("WhoId") not in tasks_by_account_id[account_id]:
-                tasks_by_account_id[account_id][task.get("WhoId")] = {}
-            if criteria_key not in tasks_by_account_id[account_id][task.get("WhoId")]:
-                tasks_by_account_id[account_id][task.get("WhoId")][criteria_key] = []
-            tasks_by_account_id[account_id][task.get("WhoId")][criteria_key].append(
-                task
-            )
-    return tasks_by_account_id
-
-
-def get_qualifying_meeting(meetings, start_date, tracking_period):
-    qualifying_meeting = None
-    if len(meetings) == 0:
-        return qualifying_meeting
-    is_task = meetings[0].get("Id").startswith("00T")
-    for meeting in meetings:
-        if is_model_date_field_within_window(
-            meeting,
-            start_date,
-            tracking_period,
-            "StartDateTime" if not is_task else "CreatedDate",
-        ):
-            qualifying_meeting = meeting
-            break
-    return qualifying_meeting
-
-
-def get_qualifying_opportunity(opportunities, start_date, tracking_period):
-    qualifying_opportunity = None
-    for opportunity in opportunities:
-        if is_model_date_field_within_window(
-            opportunity, start_date, tracking_period, date_field="CreatedDate"
-        ):
-            qualifying_opportunity = opportunity
-            break
-    return qualifying_opportunity
-
-
-def get_active_contact_ids(task_ids_by_who_id, activities_per_contact):
-    active_contact_ids = []
-    for who_id, valid_task_ids in task_ids_by_who_id.items():
-        is_contact_active = len(valid_task_ids) >= activities_per_contact
-        if is_contact_active:
-            active_contact_ids.append(who_id)
-    return active_contact_ids

@@ -81,11 +81,17 @@ def fetch_accounts_not_in_ids(account_ids):
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        soql_query = "SELECT Id,Name FROM Account"
+        soql_query = "SELECT Id,Name,Industry,AnnualRevenue,NumberOfEmployees,CreatedDate FROM Account"
 
         response = _fetch_sobjects(soql_query, get_credentials())
         accounts = [
-            Account(id=account.get("Id"), name=account.get("Name"))
+            Account(
+                id=account.get("Id"),
+                name=account.get("Name"),
+                owner_id=account.get("OwnerId"),
+                industry=account.get("Industry"),
+                annual_revenue=account.get("AnnualRevenue"),
+            )
             for account in response.data
             if account.get("Id") not in account_ids
         ]
@@ -97,6 +103,7 @@ def fetch_accounts_not_in_ids(account_ids):
         raise Exception(format_error_message(e))
 
     return api_response
+
 
 def fetch_criteria_tasks_by_account_ids_from_date(
     account_ids: list[str],
@@ -156,7 +163,7 @@ def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
         soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User WHERE IsActive = true"
 
         if ids:
-            soql_query += f" AND Id IN ('{','.join(ids)}')"
+            soql_query += " AND Id IN ({})".format(",".join(f"'{id}'" for id in ids))
 
         response = _fetch_sobjects(soql_query, get_credentials())
         for entry in response.data:
@@ -164,8 +171,10 @@ def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
             entry["Role"] = (
                 entry["UserRole"]["Name"] if entry.get("UserRole") is not None else None
             )
-            del entry["UserRole"]
-            del entry["attributes"]
+            if "UserRole" in entry:
+                del entry["UserRole"]
+            if "attributes" in entry:
+                del entry["attributes"]
 
         users = [
             UserModel.from_sobject(
@@ -642,8 +651,7 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
         filtered_account_fields = [
             field["name"]
             for field in account_fields
-            if "date" not in field["type"].lower()
-            and "reference" not in field["type"].lower()
+            if "reference" not in field["type"].lower()
             and field["name"].lower() not in blacklist
         ]
 
@@ -672,7 +680,12 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
                             id=contact.get("AccountId"),
                             name=contact.get("Account").get("Name"),
                             owner_id=contact.get("Account").get("OwnerId"),
-                            **contact.get("Account"),
+                            industry=contact.get("Account").get("Industry"),
+                            annual_revenue=contact.get("Account").get("AnnualRevenue"),
+                            number_of_employees=contact.get("Account").get(
+                                "NumberOfEmployees"
+                            ),
+                            created_date=contact.get("Account").get("CreatedDate"),
                         ),
                     )
                 )
