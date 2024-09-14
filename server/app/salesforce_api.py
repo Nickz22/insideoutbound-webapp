@@ -654,6 +654,7 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
             if "reference" not in field["type"].lower()
             and field["name"].lower() not in blacklist
         ]
+        filtered_account_fields.extend(["Owner.FirstName", "Owner.LastName", "Owner.Id"])
 
         account_fields_str = ", ".join(
             [f"Account.{field}" for field in filtered_account_fields]
@@ -679,7 +680,16 @@ def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
                         account=Account(
                             id=contact.get("AccountId"),
                             name=contact.get("Account").get("Name"),
-                            owner_id=contact.get("Account").get("OwnerId"),
+                            owner_id=contact.get("Account").get("Owner").get("Id"),
+                            owner=UserModel(
+                                id=contact.get("Account").get("Owner").get("Id"),
+                                firstName=contact.get("Account").get("Owner").get(
+                                    "FirstName"
+                                ),
+                                lastName=contact.get("Account").get("Owner").get(
+                                    "LastName"
+                                ),
+                            ),
                             industry=contact.get("Account").get("Industry"),
                             annual_revenue=contact.get("Account").get("AnnualRevenue"),
                             number_of_employees=contact.get("Account").get(

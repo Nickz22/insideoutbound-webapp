@@ -2,35 +2,33 @@ import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
-  Slider,
-  TextField,
   Select,
   MenuItem,
   Chip,
   IconButton,
   Typography,
+  OutlinedInput,
+  InputLabel,
+  FormControl,
 } from "@mui/material";
 import FilterListIcon from "@mui/icons-material/FilterList";
 import CloseIcon from "@mui/icons-material/Close";
+import CancelIcon from "@mui/icons-material/Cancel";
 
 const DataFilter = ({ onFilter, rawData }) => {
   const [open, setOpen] = useState(false);
   const [filters, setFilters] = useState({
-    industry: [],
-    annualRevenue: [0, 1000000],
-    activatedBy: "",
-    employeeCount: [0, 1000],
-    createdDate: { start: "", end: "" },
+    activatedBy: [],
+    accountOwner: [],
+    activatedByTeam: [],
   });
   const [tempFilters, setTempFilters] = useState(filters);
 
   useEffect(() => {
     const initialFilters = {
-      industry: [], // This should be an empty array, not all industries
-      annualRevenue: [0, 1000000],
-      activatedBy: "",
-      employeeCount: [0, 1000],
-      createdDate: { start: "", end: "" },
+      activatedBy: [],
+      accountOwner: [],
+      activatedByTeam: [],
     };
 
     setFilters(initialFilters);
@@ -49,11 +47,9 @@ const DataFilter = ({ onFilter, rawData }) => {
 
   const handleClearFilters = () => {
     const clearedFilters = {
-      industry: [],
-      annualRevenue: [0, 100000000],
-      activatedBy: "",
-      employeeCount: [0, 100000],
-      createdDate: { start: "", end: "" },
+      activatedBy: [],
+      accountOwner: [],
+      activatedByTeam: [],
     };
     setTempFilters(clearedFilters);
     setFilters(clearedFilters);
@@ -61,19 +57,37 @@ const DataFilter = ({ onFilter, rawData }) => {
     setOpen(false);
   };
 
-  const uniqueIndustries = [
-    ...new Set(rawData.map((item) => item.account.industry)),
-  ];
-  const uniqueActivatedBy = [
+  const handleDeleteChip = (filterKey, valueToDelete) => {
+    setTempFilters((prev) => ({
+      ...prev,
+      [filterKey]: prev[filterKey].filter((value) => value !== valueToDelete),
+    }));
+  };
+
+  const uniqueActivatedBy = Array.from(
+    new Set(rawData.map((item) => item.activated_by_id))
+  ).map((id) => {
+    const item = rawData.find((data) => data.activated_by_id === id);
+    return {
+      id: item.activated_by_id,
+      name: `${item.activated_by.firstName} ${item.activated_by.lastName}`,
+    };
+  });
+
+  const uniqueAccountOwners = [
     ...new Map(
       rawData.map((item) => [
-        item.activated_by_id,
+        item.account.owner.id,
         {
-          id: item.activated_by_id,
-          name: `${item.activated_by.firstName} ${item.activated_by.lastName}`,
+          id: item.account.owner.id,
+          name: `${item.account.owner.firstName} ${item.account.owner.lastName}`,
         },
       ])
     ).values(),
+  ];
+
+  const uniqueActivatedByTeams = [
+    ...new Set(rawData.map((item) => item.activated_by.role)),
   ];
 
   return (
@@ -85,11 +99,9 @@ const DataFilter = ({ onFilter, rawData }) => {
         sx={{ color: "blue" }}
       >
         Filters
-        {Object.values(filters).some((v) => v.length || v !== "") && (
+        {Object.values(filters).some((v) => v.length > 0) && (
           <Chip
-            label={
-              Object.values(filters).filter((v) => v.length || v !== "").length
-            }
+            label={Object.values(filters).filter((v) => v.length > 0).length}
             size="small"
             color="primary"
             sx={{ ml: 1 }}
@@ -120,91 +132,122 @@ const DataFilter = ({ onFilter, rawData }) => {
           Filters
         </Typography>
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Select
-            multiple
-            value={tempFilters.industry}
-            onChange={(e) => handleFilterChange("industry", e.target.value)}
-            renderValue={(selected) =>
-              selected.length === 0 ? "Select Industries" : selected.join(", ")
-            }
-            displayEmpty
-            fullWidth
-          >
-            <MenuItem disabled value="">
-              <em>Select Industries</em>
-            </MenuItem>
-            {uniqueIndustries.map((ind) => (
-              <MenuItem key={ind} value={ind}>
-                {ind}
-              </MenuItem>
-            ))}
-          </Select>
-          <Box>
-            <Typography gutterBottom>Annual Revenue</Typography>
-            <Slider
-              value={tempFilters.annualRevenue}
-              onChange={(_, newValue) =>
-                handleFilterChange("annualRevenue", newValue)
+          <FormControl fullWidth>
+            <InputLabel id="activated-by-label">Activated By</InputLabel>
+            <Select
+              labelId="activated-by-label"
+              multiple
+              value={tempFilters.activatedBy}
+              onChange={(e) =>
+                handleFilterChange("activatedBy", e.target.value)
               }
-              valueLabelDisplay="auto"
-              min={0}
-              max={1000000}
-              step={10000}
-            />
-          </Box>
-          <Select
-            value={tempFilters.activatedBy}
-            onChange={(e) => handleFilterChange("activatedBy", e.target.value)}
-            displayEmpty
-            fullWidth
-          >
-            <MenuItem value="">
-              <em>Any Activated By</em>
-            </MenuItem>
-            {uniqueActivatedBy.map((user) => (
-              <MenuItem key={user.id} value={user.id}>
-                {user.name}
-              </MenuItem>
-            ))}
-          </Select>
-          <Box>
-            <Typography gutterBottom>Employee Count</Typography>
-            <Slider
-              value={tempFilters.employeeCount}
-              onChange={(_, newValue) =>
-                handleFilterChange("employeeCount", newValue)
+              input={<OutlinedInput label="Activated By" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip
+                      key={value}
+                      label={
+                        uniqueActivatedBy.find((u) => u.id === value)?.name
+                      }
+                      onDelete={() => handleDeleteChip("activatedBy", value)}
+                      deleteIcon={
+                        <CancelIcon
+                          onMouseDown={(event) => event.stopPropagation()}
+                        />
+                      }
+                    />
+                  ))}
+                </Box>
+              )}
+              displayEmpty
+            >
+              {uniqueActivatedBy.map((user) => (
+                <MenuItem key={user.id} value={user.id}>
+                  {user.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel id="account-owner-label">Account Owner</InputLabel>
+            <Select
+              labelId="account-owner-label"
+              multiple
+              value={tempFilters.accountOwner}
+              onChange={(e) =>
+                handleFilterChange("accountOwner", e.target.value)
               }
-              valueLabelDisplay="auto"
-              min={0}
-              max={1000}
-            />
-          </Box>
-          <TextField
-            label="Created After"
-            type="date"
-            value={tempFilters.createdDate.start}
-            onChange={(e) =>
-              handleFilterChange("createdDate", {
-                ...tempFilters.createdDate,
-                start: e.target.value,
-              })
-            }
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField
-            label="Created Before"
-            type="date"
-            value={tempFilters.createdDate.end}
-            onChange={(e) =>
-              handleFilterChange("createdDate", {
-                ...tempFilters.createdDate,
-                end: e.target.value,
-              })
-            }
-            fullWidth
-            InputLabelProps={{ shrink: true }}
-          />
+              input={<OutlinedInput label="Account Owner" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip
+                      key={value}
+                      label={
+                        uniqueAccountOwners.find((o) => o.id === value)?.name
+                      }
+                      onDelete={() => handleDeleteChip("accountOwner", value)}
+                      deleteIcon={
+                        <CancelIcon
+                          onMouseDown={(event) => event.stopPropagation()}
+                        />
+                      }
+                    />
+                  ))}
+                </Box>
+              )}
+              displayEmpty
+            >
+              {uniqueAccountOwners.map((owner) => (
+                <MenuItem key={owner.id} value={owner.id}>
+                  {owner.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl fullWidth>
+            <InputLabel id="activated-by-team-label">
+              Activated By Team
+            </InputLabel>
+            <Select
+              labelId="activated-by-team-label"
+              multiple
+              value={tempFilters.activatedByTeam}
+              onChange={(e) =>
+                handleFilterChange("activatedByTeam", e.target.value)
+              }
+              input={<OutlinedInput label="Activated By Team" />}
+              renderValue={(selected) => (
+                <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+                  {selected.map((value) => (
+                    <Chip
+                      key={value}
+                      label={value}
+                      onDelete={() =>
+                        handleDeleteChip("activatedByTeam", value)
+                      }
+                      deleteIcon={
+                        <CancelIcon
+                          onMouseDown={(event) => event.stopPropagation()}
+                        />
+                      }
+                    />
+                  ))}
+                </Box>
+              )}
+              displayEmpty
+            >
+              {uniqueActivatedByTeams.map((team) => (
+                <MenuItem key={team} value={team}>
+                  {team}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
           <Box sx={{ display: "flex", justifyContent: "space-between", mt: 2 }}>
             <Button onClick={handleClearFilters} color="secondary">
               Clear Filters

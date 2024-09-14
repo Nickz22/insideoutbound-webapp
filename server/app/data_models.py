@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, validator, field_validator
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Set, Any, Dict
 from datetime import date, datetime
 from enum import Enum
@@ -25,8 +25,39 @@ class SerializableModel(BaseModel):
             key: serialize_complex_types(value)
             for key, value in self.model_dump().items()
         }
+        
+class UserSObject(SerializableModel):
+    Id: str
+    Email: Optional[str] = None
+    Username: Optional[str] = None
+    LastName: Optional[str] = None
+    FullPhotoUrl: Optional[str] = None
+    FirstName: Optional[str] = None
+    Role: Optional[str] = None
 
+class UserModel(SerializableModel):
+    id: str
+    email: Optional[str] = None
+    username: Optional[str] = None
+    lastName: Optional[str] = None
+    photoUrl: Optional[str] = None
+    orgId: Optional[str] = None
+    firstName: Optional[str] = None
+    role: Optional[str] = None
+    status: Optional[str] = "not paid"
+    created_at: Optional[datetime] = None
 
+    @classmethod
+    def from_sobject(cls, sobject: UserSObject):
+        return cls(
+            id=sobject.Id,
+            email=sobject.Email,
+            username=sobject.Username,
+            firstName=sobject.FirstName,
+            lastName=sobject.LastName,
+            photoUrl=sobject.FullPhotoUrl,
+            role=sobject.Role,
+        )
 class ApiResponse:
     def __init__(self, data=None, message="", success=False, status_code=None):
         self.data = data
@@ -65,6 +96,7 @@ class Account(SerializableModel):
     annual_revenue: Optional[float] = None
     number_of_employees: Optional[int] = None
     created_date: Optional[datetime] = None
+    owner: Optional[UserModel] = None
 
 
 class Task(SerializableModel):
@@ -153,47 +185,13 @@ class ProspectingEffort(SerializableModel):
     status: str
     date_entered: date
     task_ids: Set[str]
-
-class UserSObject(SerializableModel):
-    Id: str
-    Email: Optional[str] = None
-    Username: Optional[str] = None
-    LastName: Optional[str] = None
-    FullPhotoUrl: Optional[str] = None
-    FirstName: Optional[str] = None
-    Role: Optional[str] = None
-
-class UserModel(SerializableModel):
-    id: str
-    email: Optional[str] = None
-    username: Optional[str] = None
-    lastName: Optional[str] = None
-    photoUrl: Optional[str] = None
-    orgId: Optional[str] = None
-    firstName: Optional[str] = None
-    role: Optional[str] = None
-    status: Optional[str] = "not paid"
-    created_at: Optional[datetime] = None
-
-    @classmethod
-    def from_sobject(cls, sobject: UserSObject):
-        return cls(
-            id=sobject.Id,
-            email=sobject.Email,
-            username=sobject.Username,
-            firstName=sobject.FirstName,
-            lastName=sobject.LastName,
-            photoUrl=sobject.FullPhotoUrl,
-            role=sobject.Role,
-        )
-
 class Activation(SerializableModel):
     id: str
     account: Account
-    activated_by_id: str
     activated_by: UserModel
     active_contact_ids: Set[str]
     task_ids: Set[str]
+    activated_by_id: Optional[str] = None
     activated_date: Optional[date] = None
     first_prospecting_activity: Optional[date] = None
     last_prospecting_activity: Optional[date] = None
@@ -206,6 +204,11 @@ class Activation(SerializableModel):
     last_outbound_engagement: Optional[date] = None
     opportunity: Optional[Opportunity] = None
     status: StatusEnum = Field(default=StatusEnum.activated)
+
+    def __init__(self, **data):
+        if 'activated_by' in data and isinstance(data['activated_by'], UserModel):
+            data['activated_by_id'] = data['activated_by'].id
+        super().__init__(**data)
 
 
 class Filter(SerializableModel):

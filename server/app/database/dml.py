@@ -77,11 +77,9 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool) -> str:
 def upsert_activations(new_activations: list[Activation]):
     api_response = ApiResponse(data=[], message="", success=False)
     supabase = get_supabase_admin_client()
-    session_state = get_session_state()
     supabase_activations = [
         {
             **python_activation_to_supabase_dict(activation),
-            "activated_by_id": session_state["salesforce_id"],
         }
         for activation in new_activations
     ]

@@ -17,7 +17,7 @@ import {
   Typography,
   Button,
   Paper,
-  Grid
+  Grid,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "../../components/DataFilter/DataFilter";
@@ -35,7 +35,7 @@ import ProspectingEffortTimeline from "../../components/ProspectingEffortTimelin
 import ProspectingMetrics from "../../components/ProspectingMetrics/ProspectingMetrics";
 
 import Lottie from "lottie-react";
-import ProspectingLoadingAnimation from "../../assets/lottie/prospecting-loading-animation.json"
+import ProspectingLoadingAnimation from "../../assets/lottie/prospecting-loading-animation.json";
 import HintsShowOnLoading from "src/components/HintsShowOnLoading/HintsShowOnLoading";
 import CustomSelect from "src/components/CustomSelect/CustomSelect";
 import SummaryBarChartCard from "src/components/SummaryCard/SummaryBarChartCard";
@@ -44,7 +44,7 @@ import SummaryLineChartCard from "src/components/SummaryCard/SummaryLineChartCar
  * @typedef {import('types').Activation} Activation
  */
 
-import {dataset} from "./mockDataset";
+import { dataset } from "./mockDataset";
 
 const Prospecting = () => {
   const [period, setPeriod] = useState("7d");
@@ -69,7 +69,7 @@ const Prospecting = () => {
     email: "",
     username: "",
     photoUrl: "",
-    status: ""
+    status: "",
   });
 
   const freeTrialDaysLeft = useMemo(() => {
@@ -95,8 +95,7 @@ const Prospecting = () => {
 
     // If days left is less than 0, return 0
     return trialDaysLeft > 0 && trialDaysLeft < 4 ? trialDaysLeft : 0;
-  }, [loggedInUser])
-
+  }, [loggedInUser]);
 
   const handleDataFilter = useCallback((filters) => {
     setDataFilter(filters);
@@ -142,10 +141,9 @@ const Prospecting = () => {
 
   useEffect(() => {
     const fetchInitialData = async () => {
-
       await fetchData();
       try {
-        setInitialDataLoading(true)
+        setInitialDataLoading(true);
         const [userResponse, instanceUrlResponse] = await Promise.all([
           getLoggedInUser(),
           getInstanceUrl(),
@@ -158,12 +156,15 @@ const Prospecting = () => {
         if (instanceUrlResponse.success) {
           setInstanceUrl(instanceUrlResponse.data[0]);
         } else {
-          console.error("Failed to fetch instance URL:", instanceUrlResponse.message);
+          console.error(
+            "Failed to fetch instance URL:",
+            instanceUrlResponse.message
+          );
         }
       } catch (error) {
         console.error("Error fetching instance URL:", error);
       } finally {
-        setInitialDataLoading(false)
+        setInitialDataLoading(false);
       }
     };
 
@@ -213,34 +214,18 @@ const Prospecting = () => {
     if (dataFilter) {
       filtered = filtered.filter((item) => {
         if (
-          dataFilter.industry.length > 0 &&
-          !dataFilter.industry.includes(item.account.industry)
+          dataFilter.activatedBy.length > 0 &&
+          !dataFilter.activatedBy.includes(item.activated_by_id)
         )
           return false;
         if (
-          item.account.annual_revenue < dataFilter.annualRevenue[0] ||
-          item.account.annual_revenue > dataFilter.annualRevenue[1]
+          dataFilter.accountOwner.length > 0 &&
+          !dataFilter.accountOwner.includes(item.account.owner.id)
         )
           return false;
         if (
-          dataFilter.activatedBy &&
-          item.activated_by_id !== dataFilter.activatedBy
-        )
-          return false;
-        if (
-          item.account.number_of_employees < dataFilter.employeeCount[0] ||
-          item.account.number_of_employees > dataFilter.employeeCount[1]
-        )
-          return false;
-        const createdDate = new Date(item.account.created_date);
-        if (
-          dataFilter.createdDate.start &&
-          createdDate < new Date(dataFilter.createdDate.start)
-        )
-          return false;
-        if (
-          dataFilter.createdDate.end &&
-          createdDate > new Date(dataFilter.createdDate.end)
+          dataFilter.activatedByTeam.length > 0 &&
+          !dataFilter.activatedByTeam.includes(item.activated_by.role)
         )
           return false;
         return true;
@@ -260,16 +245,53 @@ const Prospecting = () => {
           width: "100%",
         }}
       >
-        <Box sx={{ position: "relative", width: "100%", maxWidth: 852, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <Typography variant="h6" gutterBottom sx={{ fontWeight: "700", fontSize: "54px", letterSpacing: "-1.62px", lineHeight: "1" }}>
+        <Box
+          sx={{
+            position: "relative",
+            width: "100%",
+            maxWidth: 852,
+            textAlign: "center",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
+          <Typography
+            variant="h6"
+            gutterBottom
+            sx={{
+              fontWeight: "700",
+              fontSize: "54px",
+              letterSpacing: "-1.62px",
+              lineHeight: "1",
+            }}
+          >
             {message}
           </Typography>
-          <Box sx={{ width: "271px", height: "271px", position: "relative", top: "-75px" }}>
+          <Box
+            sx={{
+              width: "271px",
+              height: "271px",
+              position: "relative",
+              top: "-75px",
+            }}
+          >
             <Lottie animationData={ProspectingLoadingAnimation} loop={true} />
           </Box>
 
-          <Typography variant="caption" gutterBottom sx={{ marginTop: "-130px", marginBottom: "20px", width: "586px", fontSize: "18px", lineHeight: "1.78" }}>
-            While the magic runs behind the scenes, here are some helpful hints to get the best use case from the app:
+          <Typography
+            variant="caption"
+            gutterBottom
+            sx={{
+              marginTop: "-130px",
+              marginBottom: "20px",
+              width: "586px",
+              fontSize: "18px",
+              lineHeight: "1.78",
+            }}
+          >
+            While the magic runs behind the scenes, here are some helpful hints
+            to get the best use case from the app:
           </Typography>
 
           <HintsShowOnLoading />
@@ -341,7 +363,7 @@ const Prospecting = () => {
           margin: 0,
           display: "flex",
           alignItems: "center",
-          justifyContent: "center"
+          justifyContent: "center",
         }}
       >
         <Paper
@@ -354,21 +376,54 @@ const Prospecting = () => {
             justifyContent: "center",
             alignItems: "center",
             padding: "34px 67px 47px",
-            boxShadow: "2px 13px 20.5px 1px #0000001A"
+            boxShadow: "2px 13px 20.5px 1px #0000001A",
           }}
         >
-          <Typography sx={{ marginBottom: "14px", fontSize: "14px", lineHeight: "1", letterSpacing: "4.76px", fontWeight: "500", textAlign: "center" }}>HEADS UP!</Typography>
-          <Typography sx={{
-            marginBottom: "28px", fontSize: "54px", lineHeight: "1", letterSpacing: "-1.62px", fontWeight: "700", textAlign: "center"
-          }}>You’re free trial is over</Typography>
-          <Typography sx={{ marginBottom: "40px", fontSize: "18px", lineHeight: "1.78", fontWeight: "400", textAlign: "center" }}>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque aliquam sapien a lorem auctor, a varius lectus bibendum. Aenean non est at quam commodo.</Typography>
+          <Typography
+            sx={{
+              marginBottom: "14px",
+              fontSize: "14px",
+              lineHeight: "1",
+              letterSpacing: "4.76px",
+              fontWeight: "500",
+              textAlign: "center",
+            }}
+          >
+            HEADS UP!
+          </Typography>
+          <Typography
+            sx={{
+              marginBottom: "28px",
+              fontSize: "54px",
+              lineHeight: "1",
+              letterSpacing: "-1.62px",
+              fontWeight: "700",
+              textAlign: "center",
+            }}
+          >
+            Your free trial is over
+          </Typography>
+          <Typography
+            sx={{
+              marginBottom: "40px",
+              fontSize: "18px",
+              lineHeight: "1.78",
+              fontWeight: "400",
+              textAlign: "center",
+            }}
+          >
+            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque
+            aliquam sapien a lorem auctor, a varius lectus bibendum. Aenean non
+            est at quam commodo.
+          </Typography>
 
           <Button
             onClick={() => {
-              navigate("/app/account")
+              navigate("/app/account");
             }}
             sx={{
-              background: "linear-gradient(168deg, #FF7D2F 24.98%, #491EFF 97.93%)",
+              background:
+                "linear-gradient(168deg, #FF7D2F 24.98%, #491EFF 97.93%)",
               height: "57px",
               width: "388px",
               borderRadius: "40px",
@@ -378,7 +433,7 @@ const Prospecting = () => {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              textTransform: "none"
+              textTransform: "none",
             }}
           >
             Upgrade to Paid
@@ -411,7 +466,7 @@ const Prospecting = () => {
           height: "100%",
           maxWidth: "100%",
           boxSizing: "border-box",
-          backgroundColor: "#FFFFFF"
+          backgroundColor: "#FFFFFF",
         }}
       >
         <Box
@@ -424,7 +479,11 @@ const Prospecting = () => {
         >
           <DataFilter onFilter={handleDataFilter} rawData={rawData} />
           <Box sx={{ display: "flex", alignItems: "center", gap: "24px" }}>
-            <FormControl variant="outlined" size="small" sx={{ minWidth: "64px", marginTop: "-12px", }}>
+            <FormControl
+              variant="outlined"
+              size="small"
+              sx={{ minWidth: "64px", marginTop: "-12px" }}
+            >
               <CustomSelect
                 value={period}
                 label="Period"
@@ -435,28 +494,24 @@ const Prospecting = () => {
                   fontSize: "16px",
                   lineHeight: "1.78",
                   letterSpacing: "-0.48px",
-                  paddingBottom: "0px"
+                  paddingBottom: "0px",
                 }}
                 labelSx={{
                   fontSize: "12px",
                   top: "13px",
                   left: "-14px",
                   "&.Mui-focused": {
-                    top: "0px"
+                    top: "0px",
                   },
                 }}
-                options={[
-                  "All",
-                  "24h",
-                  "48h",
-                  "7d",
-                  "30d",
-                  "90d",
-                ]}
+                options={["All", "24h", "48h", "7d", "30d", "90d"]}
               />
-
             </FormControl>
-            <FormControl variant="outlined" size="small" sx={{ minWidth: "93px", marginTop: "-12px" }}>
+            <FormControl
+              variant="outlined"
+              size="small"
+              sx={{ minWidth: "93px", marginTop: "-12px" }}
+            >
               <CustomSelect
                 value={view}
                 label="View"
@@ -467,30 +522,35 @@ const Prospecting = () => {
                   fontSize: "16px",
                   lineHeight: "1.78",
                   letterSpacing: "-0.48px",
-                  paddingBottom: "0px"
+                  paddingBottom: "0px",
                 }}
                 labelSx={{
                   fontSize: "12px",
                   top: "13px",
                   left: "-14px",
                   "&.Mui-focused": {
-                    top: "0px"
+                    top: "0px",
                   },
                 }}
-                options={[
-                  "Summary",
-                  "Detailed",
-                ]}
+                options={["Summary", "Detailed"]}
               />
             </FormControl>
             <Tooltip
-              title={loggedInUser.status === "not paid" && freeTrialDaysLeft === 0 ? "please upgrade to continue fetching your prospecting data" : "Refresh data from org"}>
+              title={
+                loggedInUser.status === "not paid" && freeTrialDaysLeft === 0
+                  ? "please upgrade to continue fetching your prospecting data"
+                  : "Refresh data from org"
+              }
+            >
               <IconButton
                 onClick={() => {
-                  if (loggedInUser.status === "not paid" && freeTrialDaysLeft === 0) {
+                  if (
+                    loggedInUser.status === "not paid" &&
+                    freeTrialDaysLeft === 0
+                  ) {
                     return;
                   }
-                  handleRefresh()
+                  handleRefresh();
                 }}
                 color="primary"
                 size="small"
@@ -616,39 +676,35 @@ const Prospecting = () => {
             )}
           </>
         )}
-
-
       </Box>
 
-      {
-        loggedInUser.status === "not paid" && freeTrialDaysLeft > 0 && (
-          <Box
-            onClick={() => {
-              navigate("/app/account")
-            }}
-            sx={{
-              position: "absolute",
-              bottom: "60px",
-              right: "-75px",
-              transform: "rotate(-45deg)",
-              backgroundColor: "#1E242F",
-              color: "white",
-              fontWeight: "bold",
-              height: "56px",
-              width: "320px",
-              boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
-              zIndex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              overflow: "hidden",
-              cursor: "pointer"
-            }}
-          >
-            {freeTrialDaysLeft} days left in trial
-          </Box>
-        )
-      }
+      {loggedInUser.status === "not paid" && freeTrialDaysLeft > 0 && (
+        <Box
+          onClick={() => {
+            navigate("/app/account");
+          }}
+          sx={{
+            position: "absolute",
+            bottom: "60px",
+            right: "-75px",
+            transform: "rotate(-45deg)",
+            backgroundColor: "#1E242F",
+            color: "white",
+            fontWeight: "bold",
+            height: "56px",
+            width: "320px",
+            boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
+            zIndex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+            cursor: "pointer",
+          }}
+        >
+          {freeTrialDaysLeft} days left in trial
+        </Box>
+      )}
     </Box>
   );
 };
