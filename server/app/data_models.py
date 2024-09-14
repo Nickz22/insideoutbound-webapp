@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, validator, field_validator
 from typing import List, Optional, Set, Any, Dict
 from datetime import date, datetime
 from enum import Enum
@@ -291,7 +291,6 @@ class TableColumn(SerializableModel):
     id: str
     dataType: DataType
     label: str
-
 
 class TokenData(SerializableModel):
     access_token: str

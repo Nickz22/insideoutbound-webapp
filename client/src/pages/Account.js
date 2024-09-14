@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   getInstanceUrl,
   getLoggedInUser,
@@ -25,18 +25,32 @@ import {
   DialogContent,
   DialogActions,
   Snackbar,
+  Paper,
+  Divider,
 } from "@mui/material";
 
 /**
  * @typedef {import('types').User} User
  */
 
+/**
+ * @param {object} props
+ * @param {() => void} props.onSubscriptionComplete
+ * @param {string} props.userEmail
+ */
 const CheckoutForm = ({ onSubscriptionComplete, userEmail }) => {
   const stripe = useStripe();
   const elements = useElements();
-  const [error, setError] = useState(null);
+
+  /**
+   * @type {[string | undefined, React.Dispatch<React.SetStateAction<string | undefined>>]}
+   */
+  const [error, setError] = useState(/** @type {string | undefined} */(undefined));
   const [processing, setProcessing] = useState(false);
 
+  /**
+   * @param {React.FormEvent<HTMLFormElement>} event
+   */
   const handleSubmit = async (event) => {
     event.preventDefault();
     if (!stripe || !elements) {
@@ -67,10 +81,13 @@ const CheckoutForm = ({ onSubscriptionComplete, userEmail }) => {
           result.paymentIntent &&
           result.paymentIntent.status === "succeeded"
         ) {
+          // TODO: is await needed in here?
           await onSubscriptionComplete();
           // Handle successful payment here without redirecting
           // For example, update UI, show a success message, etc.
-          setSuccess(true);
+
+          // commented temporary
+          // setSuccess(true);
         }
       } else {
         setError(response.message);
@@ -98,21 +115,107 @@ const CheckoutForm = ({ onSubscriptionComplete, userEmail }) => {
   );
 };
 
+/**
+ * @param {object} props
+ * @param {string} props.subtitle
+ * @param {string} props.title
+ * @param {string} props.description
+ * @param {string} [props.buttonText = ""]
+ * @param {(event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void} props.onButtonClick
+ */
+const SubscriptionAlertCard = ({ subtitle, title, description, buttonText = "", onButtonClick }) => {
+  return (
+    <Box sx={{ marginTop: "24px", width: "100%", display: "flex", justifyContent: "center" }}>
+      <Paper
+        elevation={3}
+        sx={{
+          width: "852px",
+          borderRadius: "50px",
+          display: "flex",
+          flexDirection: "column",
+          justifyContent: "center",
+          alignItems: "center",
+          padding: "34px 67px 47px",
+          boxShadow: "2px 13px 20.5px 1px #0000001A"
+        }}
+      >
+        <Typography
+          variant="body1"
+          sx={{
+            marginBottom: "14px",
+            lineHeight: "1",
+            letterSpacing: "4.76px",
+            fontWeight: "500",
+            textAlign: "center",
+            color: "#1E242F"
+          }}
+        >{subtitle}</Typography>
+        <Typography
+          variant="h1"
+          sx={{
+            color: "#1E242F",
+            marginBottom: "28px",
+            letterSpacing: "-1.62px",
+            textAlign: "center"
+          }}
+        >{title}</Typography>
+        <Typography variant="body2"
+          sx={{
+            marginBottom: "40px",
+            textAlign: "center",
+            color: "#4C4C4C"
+          }}
+        >
+          {description}
+        </Typography>
+
+        <Button
+          onClick={onButtonClick}
+          sx={{
+            background: "linear-gradient(168deg, #FF7D2F 24.98%, #491EFF 97.93%)",
+            height: "57px",
+            width: "388px",
+            borderRadius: "40px",
+            color: "white",
+            fontSize: "32px",
+            letterSpacing: "-0.96px",
+            display: "flex",
+            justifyContent: "center",
+            alignItems: "center",
+            textTransform: "none"
+          }}
+        >
+          {buttonText}
+        </Button>
+      </Paper>
+    </Box>
+  )
+}
+
 const Account = () => {
   const [clientSecret, setClientSecret] = useState(null);
-  /** @type {[User, Function]} */
+
+  /**
+   * @type {[User, React.Dispatch<React.SetStateAction<User>>]}
+   */
   const [user, setUser] = useState({
-    id: 0,
+    id: "0",
     firstName: "",
     lastName: "",
     email: "",
     username: "",
     photoUrl: "",
+    status: "not paid"
   });
   const [userStatus, setUserStatus] = useState("not paid");
+  const [userCreatedAt, setUserCreatedAt] = useState("");
   const [instanceUrl, setInstanceUrl] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+
+  /**
+   * @type {[string | null, React.Dispatch<React.SetStateAction<string | null>>]}
+   */
+  const [error, setError] = useState(/** @type{string | null} */(null));
   const [openUpgradeDialog, setOpenUpgradeDialog] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
@@ -128,6 +231,7 @@ const Account = () => {
           setUser(userResponse.data[0]);
           setInstanceUrl(instanceUrlResponse.data[0]);
           setUserStatus(userResponse.data[0].status);
+          setUserCreatedAt(userResponse.data[0].created_at);
         } else {
           setError("Failed to fetch user data or instance URL");
         }
@@ -189,6 +293,31 @@ const Account = () => {
     setSupabaseUserStatusToPaid(user.id);
   };
 
+  const freeTrialDaysLeft = useMemo(() => {
+    if (userCreatedAt.length === 0) {
+      return 0; // No creation date, no trial left
+    }
+
+    const createdAtDate = new Date(userCreatedAt); // Convert to Date object
+    const currentDate = new Date(); // Current date
+
+    // Set both dates to midnight (00:00:00) to ignore time
+    createdAtDate.setHours(0, 0, 0, 0);
+    currentDate.setHours(0, 0, 0, 0);
+
+    // Calculate difference in milliseconds
+    const timeDifference = currentDate.getTime() - createdAtDate.getTime();
+
+    // Convert milliseconds to days
+    const daysPassed = Math.floor(timeDifference / (1000 * 60 * 60 * 24));
+
+    // Free trial is 3 days, so calculate days left
+    const trialDaysLeft = 3 - daysPassed;
+
+    // If days left is less than 0, return 0
+    return trialDaysLeft > 0 && trialDaysLeft < 4 ? trialDaysLeft : 0;
+  }, [userCreatedAt])
+
   if (loading) {
     return <CircularProgress />;
   }
@@ -198,60 +327,105 @@ const Account = () => {
   }
 
   return (
-    <Box display="flex" flexDirection="column" alignItems="center">
-      <Avatar
-        src={user.photoUrl}
-        alt={`${user.firstName} ${user.lastName}`}
-        sx={{ width: 100, height: 100, marginBottom: 2 }}
-      />
-      <Typography variant="h4" gutterBottom>
-        Account Information
-      </Typography>
-      <Typography variant="body1">
-        Name:{" "}
-        <Link
-          href={`${instanceUrl}/${user.id}`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {user.firstName} {user.lastName}
-        </Link>
-      </Typography>
-      <Typography variant="body1">Email: {user.email}</Typography>
-      <Typography variant="body1">Username: {user.username}</Typography>
+    <Box display="flex" flexDirection="column">
+      <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "start", padding: "34px 44px" }}>
+        <Box sx={{ display: "flex", flexDirection: "row", gap: "20px", alignItems: "center", justifyContent: "start", }}>
+          <Avatar
+            src={user.photoUrl}
+            alt={`${user.firstName} ${user.lastName}`}
+            sx={{ width: 80, height: 80, marginBottom: 2 }}
+          />
+          <Typography variant="h4" gutterBottom sx={{ fontSize: "24px", fontWeight: "400", lineHeight: "1.48", letterSpacing: "-0.72px" }}>
+            Account Information
+          </Typography>
+        </Box>
+
+        <Divider
+          sx={{
+            marginLeft: "34px",
+            marginRight: "54px",
+            height: "68px",
+            width: "1px",
+            border: "none",
+            backgroundColor: "#DDDDDD"
+          }}
+        />
+
+        <Box sx={{ display: "flex", flexDirection: "row", gap: "68px", alignItems: "center", justifyContent: "start", }}>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: "0px" }}>
+            <Typography variant="body1" sx={{ fontWeight: "500", fontSize: "12px", lineHeight: "1.78", color: "#4C4C4C" }}>
+              NAME:{" "}
+            </Typography>
+            <Link
+              href={`${instanceUrl}/${user.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              sx={{ fontSize: "18px", lineHeight: "1.78", color: "#533AF3" }}
+            >
+              {user.firstName} {user.lastName}
+            </Link>
+          </Box>
+
+          <Box sx={{ display: "flex", flexDirection: "column", }}>
+            <Typography variant="body1" sx={{ fontWeight: "500", fontSize: "12px", lineHeight: "1.78", color: "#4C4C4C" }}>
+              EMAIL:
+            </Typography>
+            <Typography sx={{ fontSize: "18px", lineHeight: "1.78", color: "#533AF3" }}>{user.email}</Typography>
+          </Box>
+
+          <Box sx={{ display: "flex", flexDirection: "column", }}>
+            <Typography variant="body1" sx={{ fontWeight: "500", fontSize: "12px", lineHeight: "1.78", color: "#4C4C4C" }}>USERNAME:</Typography>
+            <Typography sx={{ fontSize: "18px", lineHeight: "1.78", color: "#533AF3" }}>{user.username}</Typography>
+          </Box>
+        </Box>
+      </Box>
+
+
 
       {userStatus === "paid" && (
-        <Button
-          variant="contained"
-          color="info"
-          onClick={handlePauseMembership}
-          sx={{ marginTop: 2, backgroundColor: "grey.500", color: "white" }}
-        >
-          Pause Membership
-        </Button>
+        <SubscriptionAlertCard
+          title="You are upgraded!"
+          subtitle="Awesome"
+          description="Your membership has been upgraded! Enjoy unlimited access to all premium features and exclusive benefits. Dive in and make the most of your enhanced experience."
+          buttonText="Pause Membership"
+          onButtonClick={handlePauseMembership}
+        />
       )}
 
       {userStatus === "paused" && (
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleUpgradeClick}
-          sx={{ marginTop: 2 }}
-        >
-          Resume Membership
-        </Button>
+        <SubscriptionAlertCard
+          title="Your Membership on Paused!"
+          subtitle="Don't Miss Out!"
+          description="Your membership is on hold, but don't worry — you can resume anytime to unlock all the perks again. We're here when you're ready!"
+          buttonText="Resume Membership"
+          onButtonClick={handleUpgradeClick}
+        />
       )}
 
-      {(userStatus === "not paid" || !userStatus) && (
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleUpgradeClick}
-          sx={{ marginTop: 2 }}
-        >
-          Upgrade to Paid
-        </Button>
-      )}
+      {
+        ((userStatus === "not paid" && freeTrialDaysLeft > 0)) && (
+          <SubscriptionAlertCard
+            title="Your free trial is ending soon"
+            subtitle="Reminder"
+            description="Don't miss out on all the premium features you've been enjoying. Upgrade to a paid plan now to continue accessing the full range of benefits."
+            buttonText="Upgrade Now"
+            onButtonClick={handleUpgradeClick}
+          />
+        )
+      }
+
+      {
+        ((userStatus === "not paid" && freeTrialDaysLeft === 0) || !userStatus) && (
+          <SubscriptionAlertCard
+            title="Your free trial is over"
+            subtitle="HEADS UP!"
+            description="Your free trial has ended, but the perks don't have to stop! Upgrade now to keep enjoying all the premium features and exclusive benefits."
+            buttonText="Upgrade to Paid"
+            onButtonClick={handleUpgradeClick}
+          />
+
+        )
+      }
 
       <Dialog open={openUpgradeDialog} onClose={handleCloseUpgradeDialog}>
         <DialogTitle>Upgrade to Paid Plan</DialogTitle>
@@ -279,7 +453,7 @@ const Account = () => {
         onClose={() => setSnackbarOpen(false)}
         message="Successfully subscribed to premium plan!"
       />
-    </Box>
+    </Box >
   );
 };
 

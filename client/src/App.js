@@ -6,7 +6,7 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
-import { Box } from "@mui/material";
+import { Box, createTheme, ThemeProvider } from "@mui/material";
 import Sidebar from "./components/Sidebar/Sidebar";
 import MainContent from "./components/MainContent";
 import Login from "./pages/Login";
@@ -50,10 +50,53 @@ const AppRoutes = () => {
 };
 
 function App() {
+  const theme = createTheme({
+    typography: {
+      fontFamily: `"Albert Sans", system-ui, sans-serif`,
+      display1: {
+        fontSize: "88px",
+        fontWeight: "700",
+        lineHeight: "1.2",
+      },
+      "body1": {
+        fontSize: "16px",
+        lineHeight: "1.78",
+        fontWeight: "400",
+      },
+      "body2": {
+        fontSize: "18px",
+        lineHeight: "1.78",
+        fontWeight: "400",
+      },
+      subtitle1: {
+        fontSize: "14px",
+        lineHeight: "1.78",
+        fontWeight: "500",
+      },
+      h1: {
+        fontWeight: "700",
+        fontSize: "54px",
+        lineHeight: "0.93"
+      },
+      h2: {
+        fontWeight: "500",
+        fontSize: "40px",
+        lineHeight: "1.78"
+      },
+      h3: {
+        fontWeight: "500",
+        fontSize: "32px",
+        lineHeight: "1.78"
+      }
+    }
+  });
+
   return (
-    <Router>
-      <AppRoutes />
-    </Router>
+    <ThemeProvider theme={theme}>
+      <Router>
+        <AppRoutes />
+      </Router>
+    </ThemeProvider>
   );
 }
 
