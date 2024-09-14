@@ -92,7 +92,6 @@ def update_prospecting_metadata(prospecting_effort, task, criteria_name):
 
 def get_new_status(
     activation: Activation,
-    task: Dict,
     criterion: FilterContainer,
     opportunities: List[Dict],
     events: List[Dict],
@@ -115,13 +114,6 @@ def get_new_status(
         return StatusEnum.engaged
 
     return activation.status
-
-
-def is_inbound_criteria(task, criteria):
-    for criterion in criteria:
-        if criterion.direction.lower() == "inbound":
-            return True
-    return False
 
 
 def create_activation(

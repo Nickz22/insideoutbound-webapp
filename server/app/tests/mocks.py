@@ -241,7 +241,6 @@ def get_mock_opportunity_for_account(account_id):
         "CloseDate": datetime.today().date().isoformat(),
     }
 
-
 def get_mock_event_for_contact(contact_id):
     return {
         "Id": f"mock_event_id_{random.randint(1000, 9999)}",

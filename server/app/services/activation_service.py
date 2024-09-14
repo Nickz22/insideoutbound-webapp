@@ -232,7 +232,6 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                 new_status = get_new_status(
                     activation=activation,
                     criterion=criterion_by_name.get(criteria_name),
-                    task=task,
                     opportunities=opportunities,
                     events=meetings,
                 )
@@ -432,6 +431,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                     start_tracking_period,
                     settings.tracking_period,
                 )
+                
                 is_task_in_tracking_period = is_model_date_field_within_window(
                     sobject_model=task,
                     start_date=start_tracking_period,
@@ -456,8 +456,8 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 
                     is_account_active_for_tracking_period = (
                         len(active_contact_ids) >= settings.contacts_per_account
-                        or qualifying_event
-                        or qualifying_opportunity
+                        or (qualifying_event and settings.activate_by_meeting)
+                        or (qualifying_opportunity and settings.activate_by_opportunity)
                     )
                     if not is_account_active_for_tracking_period:
                         ## reset tracking
@@ -553,22 +553,10 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 settings.tracking_period,
             )
 
-            qualifying_event = get_qualifying_meeting(
-                meetings_by_account_id.get(account_id, []),
-                start_tracking_period,
-                settings.tracking_period,
-            )
-
-            qualifying_opportunity = get_qualifying_opportunity(
-                opportunity_by_account_id.get(account_id, []),
-                start_tracking_period,
-                settings.tracking_period,
-            )
-
             is_account_active_for_tracking_period = (
                 len(active_contact_ids) >= settings.contacts_per_account
-                or bool(qualifying_event)
-                or bool(qualifying_opportunity)
+                or (qualifying_event and settings.activate_by_meeting)
+                or (qualifying_opportunity and settings.activate_by_opportunity)
             )
             if not is_account_active_for_tracking_period:
                 continue
