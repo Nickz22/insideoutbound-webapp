@@ -417,7 +417,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
 
             valid_task_ids_by_who_id = {}
             task_ids = []
-            last_valid_task_creator_id = None
+            last_valid_task_assignee_id = None
 
             for task in all_outbound_tasks_under_account:
                 qualifying_event = get_qualifying_meeting(
@@ -446,7 +446,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                             ).date()
                         )
                     valid_task_ids_by_who_id[task.get("WhoId")].append(task.get("Id"))
-                    last_valid_task_creator_id = task.get("OwnerId")
+                    last_valid_task_assignee_id = task.get("OwnerId")
                     task_ids.append(task.get("Id"))
 
                 if not is_task_in_tracking_period:
@@ -480,7 +480,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                                 ).date()
                             )
                             task_ids = [task.get("Id")]
-                            last_valid_task_creator_id = task.get("OwnerId")
+                            last_valid_task_assignee_id = task.get("OwnerId")
                         continue
 
                     last_prospecting_activity = parse_datetime_string_with_timezone(
@@ -515,7 +515,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                         account_first_prospecting_activity=account_first_prospecting_activity,
                         active_contact_ids=active_contact_ids,
                         last_valid_task_creator=salesforce_user_by_id.get(
-                            last_valid_task_creator_id
+                            last_valid_task_assignee_id
                         )[0],
                         last_prospecting_activity=last_prospecting_activity,
                         outbound_task_ids=task_ids,
@@ -589,7 +589,7 @@ def compute_activated_accounts(tasks_by_criteria, contacts, settings):
                 account_first_prospecting_activity=account_first_prospecting_activity,
                 active_contact_ids=active_contact_ids,
                 last_valid_task_creator=salesforce_user_by_id.get(
-                    last_valid_task_creator_id
+                    last_valid_task_assignee_id
                 )[0],
                 last_prospecting_activity=last_prospecting_activity,
                 outbound_task_ids=task_ids,

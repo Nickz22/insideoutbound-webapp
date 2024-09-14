@@ -1,5 +1,4 @@
-import random, copy, re
-from aiohttp import web
+import random, copy
 from app.tests.utils import is_valid_salesforce_query
 from unittest.mock import MagicMock
 from app.tests.c import (
@@ -14,10 +13,10 @@ MOCK_ACCOUNT_IDS = [f"mock_account_id{i}" for i in range(1, 6)]
 MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT = {
     "fields": [
         {"name": "Id", "label": "Account ID", "type": "id"},
-            {"name": "Name", "label": "Account Name", "type": "string"},
-            {"name": "BillingStreet", "label": "Billing Street", "type": "textarea"},
-            {"name": "Phone", "label": "Phone", "type": "phone"},
-            {"name": "Industry", "label": "Industry", "type": "picklist"},
+        {"name": "Name", "label": "Account Name", "type": "string"},
+        {"name": "BillingStreet", "label": "Billing Street", "type": "textarea"},
+        {"name": "Phone", "label": "Phone", "type": "phone"},
+        {"name": "Industry", "label": "Industry", "type": "picklist"},
     ]
 }
 
@@ -41,6 +40,7 @@ sobject_api_mock_response_by_request_key: Dict[str, List[Dict]] = {
 permanent_mock_responses = {
     "fetch_sobject_fields__account": MOCK_ACCOUNT_FIELD_DESCRIBE_RESULT
 }
+
 
 def add_mock_response(request_key, response):
     """
@@ -123,16 +123,16 @@ def response_based_on_query(url, **kwargs):
 
         # Determine which mock response to use based on the query characteristics
         for condition, key in query_to_key_map.items():
-            if not condition: 
+            if not condition:
                 continue
-            
+
             mock_response = None
             if key in permanent_mock_responses:
                 mock_response = permanent_mock_responses[key]
             else:
                 mock_responses = sobject_api_mock_response_by_request_key.get(key)
                 mock_response = mock_responses.pop(0) if mock_responses else None
-                
+
             if mock_response and not return_raw_data:
                 return MagicMock(status_code=200, json=lambda: mock_response)
             elif mock_response and return_raw_data:
@@ -197,7 +197,14 @@ def get_n_mock_contacts_for_account(n, account_id):
             "FirstName": f"MockFirstName{range_index}",
             "LastName": f"MockLastName{range_index}",
             "AccountId": account_id,
-            "Account": {"Name": f"MockAccountName_{range_index + 1}"},
+            "Account": {
+                "Name": f"MockAccountName_{range_index + 1}",
+                "Owner": {
+                    "Id": "mock_owner_id",
+                    "FirstName": "Mock",
+                    "LastName": "Owner",
+                },
+            },
         }
         contacts.append(contact)
     return contacts
@@ -212,7 +219,15 @@ def get_two_mock_contacts_per_account(accounts):
                 "FirstName": f"MockFirstName_{account['Id']}_{i}",
                 "LastName": f"MockLastName_{account['Id']}_{i}",
                 "AccountId": account["Id"],
-                "Account": {"Id": account["Id"], "Name": account["Name"]},
+                "Account": {
+                    "Id": account["Id"],
+                    "Name": account["Name"],
+                    "Owner": {
+                        "Id": account["Owner"]["Id"],
+                        "FirstName": account["Owner"]["FirstName"],
+                        "LastName": account["Owner"]["LastName"],
+                    },
+                },
             }
             mock_contacts.append(contact)
 
@@ -225,6 +240,7 @@ def get_five_mock_accounts(owner_id="mock_owner_id"):
         account = {
             "Id": account_id,
             "Name": f"MockAccountName_{i + 1}",
+            "Owner": {"Id": owner_id, "FirstName": "Mock", "LastName": "Owner"},
         }
         accounts.append(account)
     return accounts
@@ -240,6 +256,7 @@ def get_mock_opportunity_for_account(account_id):
         "CreatedDate": today,
         "CloseDate": datetime.today().date().isoformat(),
     }
+
 
 def get_mock_event_for_contact(contact_id):
     return {

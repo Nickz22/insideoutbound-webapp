@@ -53,8 +53,8 @@ def validate_select_part(select_part: str) -> bool:
         # Check for valid characters (letters, numbers, underscore, dot)
         if not re.match(r"^[a-zA-Z0-9_\.]+$", field):
             return False
-        # Check for valid structure (e.g., allow one dot for relationship queries)
-        if "." in field and field.count(".") > 1:
+        # Check for valid structure (e.g., allow two dots for relationship queries because of the "Account.Owner.FirstName" format)
+        if "." in field and field.count(".") > 2:
             return False
 
     return True
