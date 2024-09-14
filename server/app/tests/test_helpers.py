@@ -18,6 +18,7 @@ from app.tests.mocks import (
     add_mock_response,
     get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query,
 )
+from app.mapper.mapper import convert_settings_model_to_settings
 import json
 from typing import List
 
@@ -93,7 +94,7 @@ def do_onboarding_flow(client, api_header):
         unique_values_content_filter_model,
     ]
 
-    post_data = SettingsModel(
+    settings_model = SettingsModel(
         activateByMeeting=True,
         activateByOpportunity=True,
         activitiesPerContact=3,
@@ -114,17 +115,18 @@ def do_onboarding_flow(client, api_header):
             filterLogic="1",
         ),
         trackingPeriod=5,
-    ).to_dict()
+    )
 
     response = client.post(
         "/save_settings",
-        data=json.dumps(post_data),
+        data=json.dumps(settings_model.to_dict()),
         content_type="application/json",
         headers=api_header,
     )
 
     # assert response status code is 200
     assert response.status_code == 200, response.data
+    return convert_settings_model_to_settings(settings_model)
 
 
 def get_filter_container_via_tasks_from_generate_filters_api(
@@ -262,6 +264,14 @@ async def assert_and_return_payload_async(response_future):
 def get_salesforce_compatible_datetime_now():
     now = datetime.now()
     return now.strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+
+def get_salesforce_compatible_datetime_days_from_now(days_in_future: int):
+    now = datetime.now()
+    return (now + timedelta(days=days_in_future)).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
+
+def get_salesforce_compatible_datetime_hours_from_now(hours_in_future: int):
+    now = datetime.now()
+    return (now + timedelta(hours=hours_in_future)).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
 
 def setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account(
     mock_user_id,
