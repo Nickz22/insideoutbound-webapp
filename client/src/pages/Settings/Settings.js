@@ -122,8 +122,7 @@ const Settings = () => {
   }
 
   return (
-
-    <Box sx={{ width: "100%", height: "100%", mt: 2, overflow: "scroll" }}>
+    <Box sx={{ width: "100%", height: "100%" }}>
       <AppBar position="sticky" color="default" elevation={0}>
         <Tabs value={currentTab} onChange={handleTabChange} variant="fullWidth">
           <Tab label="General Settings" />
@@ -132,10 +131,12 @@ const Settings = () => {
           <Tab label="User Role" />
         </Tabs>
       </AppBar>
-      <TabGeneral />
-      <TabProspecting />
-      <TabMeeting />
-      <TabUserRole />
+      <Box sx={{ overflow: "scroll", width: "100%", height: "100%", paddingBottom: "16px" }}>
+        <TabGeneral />
+        <TabProspecting />
+        <TabMeeting />
+        <TabUserRole />
+      </Box>
 
       <Snackbar
         anchorOrigin={{ vertical: "bottom", horizontal: "right" }}

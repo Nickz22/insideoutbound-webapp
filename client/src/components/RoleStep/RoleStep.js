@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Button, CircularProgress, FormControl, MenuItem, Select } from '@mui/material';
+import { Box, Button, CircularProgress, FormControl, MenuItem, Select, Typography } from '@mui/material';
 import CustomTable from 'src/components/CustomTable/CustomTable';
 import { fetchSalesforceUsers } from 'src/components/Api/Api';
 
@@ -118,70 +118,65 @@ const RoleStep = (props) => {
                 maxWidth: "100%",
                 position: "relative",
                 alignItems: "center",
-                justifyContent: "start",
+                justifyContent: "center",
                 paddingTop: "85px",
                 paddingBottom: "85px"
             }}
         >
-            <div
-                style={{
+            <Box
+                sx={{
                     width: "100%",
                     maxWidth: "720px",
-                    padding: "16px"
+                    padding: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    boxShadow: "none"
                 }}
             >
-                <p
+                <Typography
+                    variant='subtitle1'
                     style={{
-                        margin: 0,
                         color: "rgba(30, 36, 47, 1)",
-                        fontSize: "14px",
-                        fontWeight: "500",
                         letterSpacing: "4.76px",
                         textAlign: "center"
                     }}
                 >
                     YOUR DATA VISUALIZED
-                </p>
-                <h1
+                </Typography>
+                <Typography
+                    variant='display1'
                     style={{
-                        margin: 0,
                         color: "rgba(30, 36, 47, 1)",
-                        fontSize: "88px",
-                        fontWeight: "700",
                         letterSpacing: "-2.64px",
-                        lineHeight: "1.2",
+                        lineHeight: "0.98",
                         textAlign: "center"
                     }}
                 >
                     Welcome to your
-                </h1>
-                <h1
+                </Typography>
+                <Typography
+                    variant='display1'
                     style={{
-                        margin: 0,
                         color: "rgba(30, 36, 47, 1)",
-                        fontSize: "88px",
-                        fontWeight: "700",
                         letterSpacing: "-2.64px",
-                        lineHeight: "1.2",
+                        lineHeight: "0.98",
                         textAlign: "center"
                     }}
                 >
                     Onboarding
-                </h1>
-                <p
+                </Typography>
+                <Typography
+                    variant='body1'
                     style={{
                         margin: 0,
                         marginTop: "2rem",
                         color: "rgba(76, 76, 76, 1)",
-                        fontSize: "16px",
-                        fontWeight: "400",
-                        letterSpacing: "-0.48px",
-                        lineHeight: "1.5",
                         textAlign: "center"
                     }}
                 >
                     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Quis ipsum suspendisse ultrices gravida.
-                </p>
+                </Typography>
                 <Box
                     style={{
                         marginTop: "42px",
@@ -194,18 +189,16 @@ const RoleStep = (props) => {
                         borderRadius: "49px"
                     }}
                 >
-                    <h2
+                    <Typography
+                        variant='h3'
                         style={{
-                            fontWeight: "500",
-                            fontSize: "32px",
                             letterSpacing: "-0.96px",
                             textAlign: "center",
                             color: "rgba(30, 36, 47, 1)",
-                            lineHeight: "1",
                         }}
                     >
                         Tell Us About Yourself
-                    </h2>
+                    </Typography>
                     <FormControl fullWidth variant="outlined" margin="normal">
                         <Select
                             value={props.inputValues.userRole}
@@ -290,7 +283,10 @@ const RoleStep = (props) => {
                                 width: "271px",
                                 height: "52px",
                                 borderRadius: "40px",
-
+                                fontWeight: "700",
+                                fontSize: "32px",
+                                letterSpacing: "-0.96px",
+                                textTransform: "none"
                             }}
 
                         >
@@ -298,7 +294,7 @@ const RoleStep = (props) => {
                         </Button>
                     </Box>
                 </Box>
-            </div >
+            </Box >
 
         </Box >
     );

@@ -54,7 +54,7 @@ const TaskQueryCounter = () => {
   };
 
   return (
-    <Box>
+    <Box sx={{ overflow: "scroll", width: "100%", height: "100%", padding: "32px 32px 16px" }}>
       <Typography variant="h6" gutterBottom>
         Task Query Counter
       </Typography>
@@ -85,7 +85,7 @@ const TaskQueryCounter = () => {
           {error}
         </Typography>
       )}
-    </Box>
+    </Box >
   );
 };
 

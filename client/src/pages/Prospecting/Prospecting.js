@@ -11,14 +11,13 @@ import {
   Box,
   Alert,
   FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  LinearProgress,
   IconButton,
   Tooltip,
   Link,
   Typography,
+  Button,
+  Paper,
+  Grid
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "../../components/DataFilter/DataFilter";
@@ -35,15 +34,133 @@ import ProspectingMetadataOverview from "../../components/ProspectingMetadataOve
 import ProspectingEffortTimeline from "../../components/ProspectingEffortTimeline/ProspectingEffortTimeline";
 import ProspectingMetrics from "../../components/ProspectingMetrics/ProspectingMetrics";
 
+import Lottie from "lottie-react";
+import ProspectingLoadingAnimation from "../../assets/lottie/prospecting-loading-animation.json"
+import HintsShowOnLoading from "src/components/HintsShowOnLoading/HintsShowOnLoading";
+import CustomSelect from "src/components/CustomSelect/CustomSelect";
+import SummaryBarChartCard from "src/components/SummaryCard/SummaryBarChartCard";
+import SummaryLineChartCard from "src/components/SummaryCard/SummaryLineChartCard";
 /**
  * @typedef {import('types').Activation} Activation
  */
+
+const dataset = {
+  activeApproachedPerUser: {
+    title: "Active Approaches per User",
+    target: 5,
+    valueType: "number",
+    data: [
+      {
+        label: "User 1",
+        value: 3
+      },
+      {
+        label: "User 2",
+        value: 6
+      },
+      {
+        label: "User 3",
+        value: 7
+      },
+      {
+        label: "User 4",
+        value: 2
+      }
+    ]
+  },
+  closedRevenuePerUser: {
+    title: "Closed Revenue per User",
+    target: 75000,
+    valueType: "currency",
+    data: [
+      {
+        label: "User 1",
+        value: 100000
+      },
+      {
+        label: "User 2",
+        value: 43000
+      },
+      {
+        label: "User 3",
+        value: 23000
+      },
+      {
+        label: "User 4",
+        value: 123000
+      },
+    ]
+  },
+  totalPipelineValue: {
+    title: "Total Pipeline Value",
+    target: 200,
+    valueType: "currency",
+    data: [
+      {
+        label: "Mon",
+        value: 75
+      },
+      {
+        label: "Tue",
+        value: 112
+      },
+      {
+        label: "Wed",
+        value: 90
+      },
+      {
+        label: "Thu",
+        value: 400
+      },
+      {
+        label: "Fri",
+        value: 275
+      },
+      {
+        label: "Sat",
+        value: 275
+      },
+      {
+        label: "Sun",
+        value: 124
+      },
+    ]
+  },
+  activationsPerStatus: {
+    title: "Activations per Status",
+    target: 5,
+    valueType: "number",
+    data: [
+      {
+        label: "1. Activated",
+        value: 8
+      },
+      {
+        label: "2. Engaged",
+        value: 4
+      },
+      {
+        label: "3. Meeting Set",
+        value: 5
+      },
+      {
+        label: "4. Opportunity Created",
+        value: 6
+      },
+      {
+        label: "5. Unresponsive",
+        value: 4
+      },
+    ]
+  }
+}
 
 const Prospecting = () => {
   const [period, setPeriod] = useState("7d");
   const [view, setView] = useState("Summary");
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const [initialDataLoading, setInitialDataLoading] = useState(false);
   const [error, setError] = useState(null);
   const [summaryData, setSummaryData] = useState(null);
   const [rawData, setRawData] = useState([]);
@@ -65,7 +182,7 @@ const Prospecting = () => {
   });
 
   const freeTrialDaysLeft = useMemo(() => {
-    if (loggedInUser.created_at.length === 0) {
+    if (loggedInUser.created_at?.length === 0) {
       return 0; // No creation date, no trial left
     }
 
@@ -134,8 +251,10 @@ const Prospecting = () => {
 
   useEffect(() => {
     const fetchInitialData = async () => {
+
       await fetchData();
       try {
+        setInitialDataLoading(true)
         const [userResponse, instanceUrlResponse] = await Promise.all([
           getLoggedInUser(),
           getInstanceUrl(),
@@ -152,6 +271,8 @@ const Prospecting = () => {
         }
       } catch (error) {
         console.error("Error fetching instance URL:", error);
+      } finally {
+        setInitialDataLoading(false)
       }
     };
 
@@ -248,11 +369,19 @@ const Prospecting = () => {
           width: "100%",
         }}
       >
-        <Box sx={{ width: "100%", maxWidth: 400, textAlign: "center" }}>
-          <Typography variant="h6" gutterBottom>
+        <Box sx={{ position: "relative", width: "100%", maxWidth: 852, textAlign: "center", display: "flex", flexDirection: "column", alignItems: "center" }}>
+          <Typography variant="h6" gutterBottom sx={{ fontWeight: "700", fontSize: "54px", letterSpacing: "-1.62px", lineHeight: "1" }}>
             {message}
           </Typography>
-          <LinearProgress />
+          <Box sx={{ width: "271px", height: "271px", position: "relative", top: "-75px" }}>
+            <Lottie animationData={ProspectingLoadingAnimation} loop={true} />
+          </Box>
+
+          <Typography variant="caption" gutterBottom sx={{ marginTop: "-130px", marginBottom: "20px", width: "586px", fontSize: "18px", lineHeight: "1.78" }}>
+            While the magic runs behind the scenes, here are some helpful hints to get the best use case from the app:
+          </Typography>
+
+          <HintsShowOnLoading />
         </Box>
       </Box>
     );
@@ -297,12 +426,75 @@ const Prospecting = () => {
     }
   }, [filteredData]);
 
-  if (loading) {
-    return getLoadingComponent("Looking for prospecting activities...");
+  if (loading || initialDataLoading) {
+    return getLoadingComponent("We are fetching your activity...");
   }
 
   if (error) {
     return <Alert severity="error">{error}</Alert>;
+  }
+
+  if (loggedInUser.status === "not paid" && freeTrialDaysLeft === 0) {
+    return (
+      <Box
+        sx={{
+          position: "relative",
+          width: "100%",
+          height: "100dvh",
+          maxHeight: "100dvh",
+          overflow: "hidden",
+          backgroundColor: "#FFFFFF",
+          maxWidth: "100%",
+          boxSizing: "border-box",
+          padding: 0,
+          margin: 0,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center"
+        }}
+      >
+        <Paper
+          elevation={3}
+          sx={{
+            width: "852px",
+            borderRadius: "50px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: "34px 67px 47px",
+            boxShadow: "2px 13px 20.5px 1px #0000001A"
+          }}
+        >
+          <Typography sx={{ marginBottom: "14px", fontSize: "14px", lineHeight: "1", letterSpacing: "4.76px", fontWeight: "500", textAlign: "center" }}>HEADS UP!</Typography>
+          <Typography sx={{
+            marginBottom: "28px", fontSize: "54px", lineHeight: "1", letterSpacing: "-1.62px", fontWeight: "700", textAlign: "center"
+          }}>You’re free trial is over</Typography>
+          <Typography sx={{ marginBottom: "40px", fontSize: "18px", lineHeight: "1.78", fontWeight: "400", textAlign: "center" }}>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque aliquam sapien a lorem auctor, a varius lectus bibendum. Aenean non est at quam commodo.</Typography>
+
+          <Button
+            onClick={() => {
+              navigate("/app/account")
+            }}
+            sx={{
+              background: "linear-gradient(168deg, #FF7D2F 24.98%, #491EFF 97.93%)",
+              height: "57px",
+              width: "388px",
+              borderRadius: "40px",
+              color: "white",
+              fontSize: "32px",
+              letterSpacing: "-0.96px",
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              textTransform: "none"
+            }}
+          >
+            Upgrade to Paid
+          </Button>
+        </Paper>
+      </Box>
+    );
   }
 
   return (
@@ -340,58 +532,66 @@ const Prospecting = () => {
           }}
         >
           <DataFilter onFilter={handleDataFilter} rawData={rawData} />
-          <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-            <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="period-label">Period</InputLabel>
-              <Select
-                labelId="period-label"
-                id="period-select"
+          <Box sx={{ display: "flex", alignItems: "center", gap: "24px" }}>
+            <FormControl variant="outlined" size="small" sx={{ minWidth: "64px", marginTop: "-12px", }}>
+              <CustomSelect
                 value={period}
-                onChange={handlePeriodChange}
                 label="Period"
-              >
-                <MenuItem value="All">All</MenuItem>
-                <MenuItem value="24h">24h</MenuItem>
-                <MenuItem value="48h">48h</MenuItem>
-                <MenuItem value="7d">7d</MenuItem>
-                <MenuItem value="30d">30d</MenuItem>
-                <MenuItem value="90d">90d</MenuItem>
-              </Select>
+                onChange={handlePeriodChange}
+                placeholder="Select Field"
+                selectSx={{
+                  width: "100%",
+                  fontSize: "16px",
+                  lineHeight: "1.78",
+                  letterSpacing: "-0.48px",
+                  paddingBottom: "0px"
+                }}
+                labelSx={{
+                  fontSize: "12px",
+                  top: "13px",
+                  left: "-14px",
+                  "&.Mui-focused": {
+                    top: "0px"
+                  },
+                }}
+                options={[
+                  "All",
+                  "24h",
+                  "48h",
+                  "7d",
+                  "30d",
+                  "90d",
+                ]}
+              />
+
             </FormControl>
-            <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-              <InputLabel id="view-label">View</InputLabel>
-              <Select
-                labelId="view-label"
-                id="view-select"
+            <FormControl variant="outlined" size="small" sx={{ minWidth: "93px", marginTop: "-12px" }}>
+              <CustomSelect
                 value={view}
-                onChange={handleViewChange}
                 label="View"
-              >
-                <MenuItem value="Summary">Summary</MenuItem>
-                <MenuItem value="Detailed">Detailed</MenuItem>
-              </Select>
+                onChange={handleViewChange}
+                placeholder="Select View"
+                selectSx={{
+                  width: "100%",
+                  fontSize: "16px",
+                  lineHeight: "1.78",
+                  letterSpacing: "-0.48px",
+                  paddingBottom: "0px"
+                }}
+                labelSx={{
+                  fontSize: "12px",
+                  top: "13px",
+                  left: "-14px",
+                  "&.Mui-focused": {
+                    top: "0px"
+                  },
+                }}
+                options={[
+                  "Summary",
+                  "Detailed",
+                ]}
+              />
             </FormControl>
-            {activatedByUsers.length > 0 && (
-              <FormControl variant="outlined" size="small" sx={{ minWidth: 120 }}>
-                <InputLabel id="activated-by-label">Activated By</InputLabel>
-                <Select
-                  labelId="activated-by-label"
-                  id="activated-by-select"
-                  value={selectedActivatedBy}
-                  onChange={handleActivatedByChange}
-                  label="Activated By"
-                >
-                  <MenuItem value="">
-                    <em>All</em>
-                  </MenuItem>
-                  {activatedByUsers.map((user) => (
-                    <MenuItem key={user.id} value={user.id}>
-                      {`${user.firstName} ${user.lastName}`}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            )}
             <Tooltip
               title={loggedInUser.status === "not paid" && freeTrialDaysLeft === 0 ? "please upgrade to continue fetching your prospecting data" : "Refresh data from org"}>
               <IconButton
@@ -410,131 +610,83 @@ const Prospecting = () => {
           </Box>
         </Box>
 
-      {error ? (
-        <Alert severity="error">{error}</Alert>
-      ) : view === "Summary" ? (
-        <Grid container spacing={2}>
-          {summaryLoading ? (
-            getLoadingComponent("Generating summary...")
-          ) : (
-            <>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Activations"
-                  value={summaryData.total_activations.toString()}
-                  subText=""
-                  tooltipTitle="The number of approached accounts in the selected period"
+        {error ? (
+          <Alert severity="error">{error}</Alert>
+        ) : view === "Summary" ? (
+          <Grid container spacing={3}>
+            {summaryLoading ? (
+              getLoadingComponent("Generating summary...")
+            ) : (
+              <>
+                <ProspectingMetrics
+                  summaryData={summaryData}
+                  summaryLoading={summaryLoading}
+                  getLoadingComponent={getLoadingComponent}
                 />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Activations Today"
-                  value={summaryData.activations_today.toString()}
-                  subText=""
-                  tooltipTitle="The number of accounts which were approached today"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Tasks"
-                  value={summaryData.total_tasks.toString()}
-                  subText=""
-                  tooltipTitle="The total number of prospecting Tasks created in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Events"
-                  value={summaryData.total_events.toString()}
-                  subText=""
-                  tooltipTitle="The total number of meetings created in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Avg Tasks Per Contact"
-                  value={summaryData.avg_tasks_per_contact.toFixed(2)}
-                  subText=""
-                  tooltipTitle="The average number of tasks per contact under each activated account"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Avg Contacts Per Account"
-                  value={summaryData.avg_contacts_per_account.toFixed(2)}
-                  subText=""
-                  tooltipTitle="The average number of tasks per activated account"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Deals"
-                  value={summaryData.total_deals.toString()}
-                  subText=""
-                  tooltipTitle="The total number of open opportunities related to any activated account in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Total Pipeline Value"
-                  value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
-                  subText=""
-                  tooltipTitle="The total amount of open opportunities related to any activated account in the selected period"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6} md={4} lg={4}>
-                <MetricCard
-                  title="Engaged Activations"
-                  value={summaryData.engaged_activations.toString()}
-                  subText=""
-                  tooltipTitle="The number of activated Accounts which have had inbound engagement"
-                />
-              </Grid>
-            </>
-          )}
-        </Grid>
-      ) : (
-        <>
-          <CustomTable
-            tableData={{
-              columns: tableColumns,
-              data: filteredData.map((item) => ({
-                ...item,
-                "account.name": (
-                  <Link
-                    href={`${instanceUrl}/${item.account?.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {item.account?.name || "N/A"}
-                  </Link>
-                ),
-                "opportunity.name": item.opportunity ? (
-                  <Link
-                    href={`${instanceUrl}/${item.opportunity.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {item.opportunity.name || "N/A"}
-                  </Link>
-                ) : (
-                  "N/A"
-                ),
-              })),
-              selectedIds: new Set(),
-              availableColumns: tableColumns,
-            }}
-            paginate={true}
-            onRowClick={handleRowClick}
-          />
-
-          {selectedActivation && (
-            <Box
-              sx={{
-                marginTop: 4,
-                display: "flex",
-                height: "calc(100vh - 600px)",
-                minHeight: "400px",
+                <Grid item xs={12} sm={4.5} md={4.5} lg={4.5}>
+                  <SummaryBarChartCard
+                    data={dataset.activeApproachedPerUser.data}
+                    target={dataset.activeApproachedPerUser.target}
+                    title={dataset.activeApproachedPerUser.title}
+                    direction={"vertical"}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={7.5} md={7.5} lg={7.5}>
+                  <SummaryBarChartCard
+                    data={dataset.closedRevenuePerUser.data}
+                    target={dataset.closedRevenuePerUser.target}
+                    title={dataset.closedRevenuePerUser.title}
+                    direction={"vertical"}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4.5} md={4.5} lg={4.5}>
+                  <SummaryLineChartCard
+                    data={dataset.totalPipelineValue.data}
+                    target={dataset.totalPipelineValue.target}
+                    title={dataset.totalPipelineValue.title}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={7.5} md={7.5} lg={7.5}>
+                  <SummaryBarChartCard
+                    data={dataset.activationsPerStatus.data}
+                    target={dataset.activationsPerStatus.target}
+                    title={dataset.activationsPerStatus.title}
+                    direction={"horizontal"}
+                  />
+                </Grid>
+              </>
+            )}
+          </Grid>
+        ) : (
+          <>
+            <CustomTable
+              tableData={{
+                columns: tableColumns,
+                data: filteredData.map((item) => ({
+                  ...item,
+                  "account.name": (
+                    <Link
+                      href={`${instanceUrl}/${item.account?.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.account?.name || "N/A"}
+                    </Link>
+                  ),
+                  "opportunity.name": item.opportunity ? (
+                    <Link
+                      href={`${instanceUrl}/${item.opportunity.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.opportunity.name || "N/A"}
+                    </Link>
+                  ) : (
+                    "N/A"
+                  ),
+                })),
+                selectedIds: new Set(),
+                availableColumns: tableColumns,
               }}
               paginate={true}
               onRowClick={handleRowClick}
@@ -577,33 +729,35 @@ const Prospecting = () => {
 
       </Box>
 
-      {loggedInUser.status === "not paid" && freeTrialDaysLeft > 0 && (
-        <Box
-          onClick={() => {
-            navigate("/app/account")
-          }}
-          sx={{
-            position: "absolute",
-            bottom: "60px",
-            right: "-65px",
-            transform: "rotate(-45deg)",
-            backgroundColor: "#1E242F",
-            color: "white",
-            fontWeight: "bold",
-            height: "56px",
-            width: "320px",
-            boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
-            zIndex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            cursor: "pointer"
-          }}
-        >
-          {freeTrialDaysLeft} days left in trial
-        </Box>
-      )}
+      {
+        loggedInUser.status === "not paid" && freeTrialDaysLeft > 0 && (
+          <Box
+            onClick={() => {
+              navigate("/app/account")
+            }}
+            sx={{
+              position: "absolute",
+              bottom: "60px",
+              right: "-75px",
+              transform: "rotate(-45deg)",
+              backgroundColor: "#1E242F",
+              color: "white",
+              fontWeight: "bold",
+              height: "56px",
+              width: "320px",
+              boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
+              zIndex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              overflow: "hidden",
+              cursor: "pointer"
+            }}
+          >
+            {freeTrialDaysLeft} days left in trial
+          </Box>
+        )
+      }
     </Box>
   );
 };

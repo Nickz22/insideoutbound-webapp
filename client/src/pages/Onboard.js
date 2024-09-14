@@ -68,7 +68,7 @@ const Onboard = () => {
       taskSObjectFields.current =
         taskSObjectFields.current.length > 0
           ? taskSObjectFields.current
-          : (await fetchTaskFields()).data.map(
+          : (await fetchTaskFields()).data?.map(
             /** @param {SObjectField} field */
             (field) => ({
               id: field.name,
@@ -108,6 +108,7 @@ const Onboard = () => {
       });
     };
     setInitialCategoryFormTableData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
 
   useEffect(() => {
@@ -128,8 +129,12 @@ const Onboard = () => {
         const settings = getSettingsFromResponses();
         const salesforceUserIds = [
           ...(settings.teamMemberIds || []),
-          settings.salesforceUserId,
         ];
+
+        if (settings.salesforceUserId) {
+          salesforceUserIds.push(settings.salesforceUserId)
+        }
+
         if (salesforceUserIds.length === 0 || !salesforceUserIds[0]) return;
         const response = await fetchSalesforceTasksByUserIds(salesforceUserIds);
         if (!response.success) {
@@ -147,6 +152,7 @@ const Onboard = () => {
       }
     };
     setSalesforceTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gatheringResponses]);
 
   useEffect(() => {
@@ -175,6 +181,7 @@ const Onboard = () => {
     }
   }, [isTransitioning]);
 
+  /** @param {number} clickedStep */
   const handleStepClick = (clickedStep) => {
     if (clickedStep < step) {
       setStep(clickedStep);
@@ -330,7 +337,20 @@ const Onboard = () => {
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
       return (
         <>
-          <Typography variant="h6" gutterBottom>
+          <Typography
+            variant="h4"
+            component="h2"
+            gutterBottom
+            sx={{
+              fontWeight: "500",
+              fontSize: "40px",
+              lineHeight: "1.78",
+              letterSpacing: "-1.2px",
+            }}
+          >
+            Prospecting Categories
+          </Typography>
+          <Typography variant="body1" paragraph>
             Define criteria by which we will recognize an Inbound Call, Outbound
             Call, Inbound Email and Outbound Email.
           </Typography>

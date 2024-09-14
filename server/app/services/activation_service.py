@@ -31,7 +31,6 @@ from app.mapper.mapper import convert_dict_to_opportunity
 from app.helpers.activation_helper import (
     update_prospecting_metadata,
     get_new_status,
-    is_inbound_criteria,
     create_activation,
     get_task_ids_by_criteria_name,
     get_all_tasks_under_account,
