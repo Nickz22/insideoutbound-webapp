@@ -644,34 +644,22 @@ const Prospecting = () => {
             />
 
             {selectedActivation && (
-              <Box
-                sx={{
-                  marginTop: 4,
-                  display: "flex",
-                  height: "calc(100vh - 600px)",
-                  minHeight: "400px",
-                }}
-              >
-                <Box sx={{ width: "40%", overflowY: "auto", pr: 2 }}>
-                  <Typography variant="h6" gutterBottom>
-                    Prospecting Metadata for {selectedActivation.account.name}
-                  </Typography>
-                  <ProspectingMetadataOverview
-                    metadata={selectedActivation.prospecting_metadata}
-                  />
+              <Box sx={{ mt: 4 }}>
+                <Box sx={{ mb: 4, overflowX: "auto", width: "100%" }}>
+                  <Box sx={{ minWidth: "600px" }}>
+                    {" "}
+                    {/* Adjust this value as needed */}
+                    <ProspectingEffortTimeline
+                      efforts={selectedActivation.prospecting_effort}
+                    />
+                  </Box>
                 </Box>
-                <Box
-                  sx={{
-                    width: "60%",
-                    overflowY: "auto",
-                    pl: 2,
-                    borderLeft: "1px solid #e0e0e0",
-                  }}
-                >
-                  <ProspectingEffortTimeline
-                    efforts={selectedActivation.prospecting_effort}
-                  />
-                </Box>
+                <Typography variant="h6" gutterBottom>
+                  Prospecting Metadata
+                </Typography>
+                <ProspectingMetadataOverview
+                  metadata={selectedActivation.prospecting_metadata}
+                />
               </Box>
             )}
           </>

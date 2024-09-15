@@ -1,21 +1,13 @@
 import React, { useState, useMemo } from "react";
 import {
   Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Checkbox,
-  Divider,
   Paper,
   TableContainer,
-  Avatar,
+  TablePagination,
+  Box,
   TextField,
   InputAdornment,
   IconButton,
-  Box,
-  TablePagination,
-  TableSortLabel,
   Menu,
   MenuItem,
   Modal,
@@ -24,10 +16,15 @@ import {
   ListItem,
   ListItemIcon,
   ListItemText,
-  Tooltip,
+  Checkbox,
+  Avatar,
+  Divider,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
+import TableHeader from "./TableHeader";
+import TableBody from "./TableBody";
+import { sortData, filterData } from "../../utils/data";
 
 /**
  * @typedef {import('types').TableColumn} TableColumn
@@ -57,54 +54,14 @@ const CustomTable = ({
   const [order, setOrder] = useState("asc");
   const [contextMenu, setContextMenu] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [selectedRowId, setSelectedRowId] = useState(null);
 
   const filteredData = useMemo(() => {
-    return tableData.data.filter((item) => {
-      return Object.values(item).some((value) => {
-        if (Array.isArray(value)) {
-          // when value is array, iterate over each element and search within each element
-          return value.some((arrayItem) => {
-            if (typeof arrayItem === 'object' && arrayItem !== null) {
-              // If the array element is an object, iterate over its values
-              return Object.values(arrayItem).some((nestedValue) => {
-                return nestedValue?.toString().toLowerCase().includes(searchTerm.toLowerCase());
-              });
-            } else {
-              // assume the element is string if the element is not an object
-              return arrayItem?.toString().toLowerCase().includes(searchTerm.toLowerCase());
-            }
-          });
-        } else if (typeof value === 'object' && value !== null) {
-          // If value is an object, iterate over its values
-          return Object.values(value).some((nestedValue) => {
-            return nestedValue?.toString().toLowerCase().includes(searchTerm.toLowerCase());
-          });
-        } else {
-          // If value is not an object and not an array, assume value is primitive value
-          return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
-        }
-      });
-    });
-
+    return filterData(tableData.data, searchTerm);
   }, [tableData.data, searchTerm]);
 
   const sortedData = useMemo(() => {
-    if (!orderBy) return filteredData;
-
-    return [...filteredData].sort((a, b) => {
-      const aValue = a[orderBy];
-      const bValue = b[orderBy];
-
-      // Handle falsey values
-      if (!aValue && bValue) return order === "asc" ? 1 : -1;
-      if (aValue && !bValue) return order === "asc" ? -1 : 1;
-      if (!aValue && !bValue) return 0;
-
-      // Normal comparison for truthy values
-      if (aValue < bValue) return order === "asc" ? -1 : 1;
-      if (aValue > bValue) return order === "asc" ? 1 : -1;
-      return 0;
-    });
+    return sortData(filteredData, orderBy, order);
   }, [filteredData, orderBy, order]);
 
   const paginatedData = useMemo(() => {
@@ -167,6 +124,13 @@ const CustomTable = ({
     onSelectionChange(newSelectedIds);
   };
 
+  const handleRowClick = (item) => {
+    setSelectedRowId(item.id);
+    if (onRowClick) {
+      onRowClick(item);
+    }
+  };
+
   /**
    * @param {TableColumn} column
    * @param {Record<string, any>} item
@@ -223,55 +187,24 @@ const CustomTable = ({
         style={{ maxHeight: 400, overflow: "auto" }}
       >
         <Table stickyHeader>
-          <TableHead>
-            <TableRow onContextMenu={handleContextMenu}>
-              {tableData.columns.map((column) => (
-                <Tooltip
-                  key={column.id}
-                  title="Right-click for more columns"
-                  arrow
-                >
-                  <TableCell
-                    key={column.id}
-                    style={{ backgroundColor: "#f5f5f5" }}
-                    sortDirection={orderBy === column.id ? order : false}
-                  >
-                    <TableSortLabel
-                      active={orderBy === column.id}
-                      direction={orderBy === column.id ? order : "asc"}
-                      onClick={() => handleSort(column.id)}
-                    >
-                      {column.label}
-                    </TableSortLabel>
-                  </TableCell>
-                </Tooltip>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {paginatedData.map((item) => (
-              <TableRow
-                key={item.id}
-                onClick={() => (onRowClick ? onRowClick(item) : null)}
-                style={{ cursor: onRowClick ? "pointer" : "default" }}
-                sx={{
-                  '&:hover': {
-                    backgroundColor: onRowClick ? "Highlight" : "none",
-                  },
-                }}
-              >
-                {tableData.columns.map((column) => (
-                  <TableCell key={`${item.id}-${column.id}`}>
-                    {renderCell(column, item)}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
+          <TableHeader
+            columns={tableData.columns}
+            orderBy={orderBy}
+            order={order}
+            onSort={handleSort}
+            onContextMenu={handleContextMenu}
+          />
+          <TableBody
+            data={paginatedData}
+            columns={tableData.columns}
+            renderCell={renderCell}
+            onRowClick={handleRowClick}
+            selectedRowId={selectedRowId}
+          />
         </Table>
       </TableContainer>
     ),
-    [paginatedData, tableData.columns, tableData.selectedIds, orderBy, order]
+    [paginatedData, tableData.columns, tableData.selectedIds, orderBy, order, selectedRowId]
   );
 
   return (
