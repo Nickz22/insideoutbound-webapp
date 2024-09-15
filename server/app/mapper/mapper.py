@@ -1,5 +1,6 @@
 from app.data_models import (
     Account,
+    Contact,
     Settings,
     FilterContainer,
     Filter,
@@ -159,6 +160,11 @@ def supabase_dict_to_python_activation(row: Dict) -> Activation:
         row["prospecting_effort"] = [
             ProspectingEffort(**item) for item in json.loads(row["prospecting_effort"])
         ]
+    
+    if "active_contacts" in row and row["active_contacts"]:
+        row["active_contacts"] = [
+            Contact(**item) for item in json.loads(row["active_contacts"])
+        ]
 
     # Convert array fields to sets
     for field in ["active_contact_ids", "task_ids", "event_ids"]:
@@ -191,6 +197,9 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
         activation_dict["active_contact_ids"] = list(
             activation_dict["active_contact_ids"]
         )
+    
+    if "active_contacts" in activation_dict:
+        activation_dict["active_contacts"] = json.dumps(activation_dict["active_contacts"])
 
     if "task_ids" in activation_dict:
         activation_dict["task_ids"] = list(activation_dict["task_ids"])
@@ -230,6 +239,7 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
         "activated_by_id",
         "activated_by",
         "active_contact_ids",
+        "active_contacts",
         "task_ids",
         "activated_date",
         "first_prospecting_activity",

@@ -79,6 +79,7 @@ def update_prospecting_metadata(prospecting_effort, task, criteria_name):
     if metadata:
         metadata.last_occurrence = max(metadata.last_occurrence, task_date)
         metadata.total += 1
+        metadata.tasks.append(task)
     else:
         prospecting_effort.prospecting_metadata.append(
             ProspectingMetadata(
@@ -86,6 +87,7 @@ def update_prospecting_metadata(prospecting_effort, task, criteria_name):
                 first_occurrence=task_date,
                 last_occurrence=task_date,
                 total=1,
+                tasks=[task],
             )
         )
 
@@ -187,6 +189,7 @@ def create_activation(
         engaged_date=engaged_date.date() if engaged_date else None,
         days_engaged=(today - engaged_date.date()).days if engaged_date else None,
         active_contact_ids=active_contact_ids,
+        active_contacts=[contact_by_id[contact_id] for contact_id in active_contact_ids if contact_id in contact_by_id],
         activated_by=last_valid_task_creator,
         first_prospecting_activity=account_first_prospecting_activity,
         last_prospecting_activity=last_prospecting_activity,
@@ -199,10 +202,9 @@ def create_activation(
         task_ids=outbound_task_ids,
         status=activation_status,
         prospecting_metadata=create_prospecting_metadata(
-            outbound_task_ids,
-            task_ids_by_criteria_name,
-            all_tasks_under_account,
-            activation_status,
+            task_ids=outbound_task_ids,
+            task_ids_by_criteria_name=task_ids_by_criteria_name,
+            all_tasks_under_account=all_tasks_under_account
         ),
     )
 
@@ -241,6 +243,8 @@ def create_prospecting_efforts(
     current_status_date = activated_date
     current_tasks = []
 
+    meeting_time = None
+    opportunity_time = None
     for task in all_tasks_under_account:
         if task["Id"] not in outbound_task_ids:
             continue
@@ -261,9 +265,10 @@ def create_prospecting_efforts(
                     )
                 )
                 current_status = StatusEnum.opportunity_created
-                current_status_date = parse_datetime_string_with_timezone(
+                opportunity_time = parse_datetime_string_with_timezone(
                     qualifying_opportunity["CreatedDate"]
-                ).date()
+                )
+                current_status_date = opportunity_time.date()
                 current_tasks = []
 
         elif qualifying_event and task_date >= parse_datetime_string_with_timezone(
@@ -280,11 +285,11 @@ def create_prospecting_efforts(
                     )
                 )
                 current_status = StatusEnum.meeting_set
-                current_status_date = parse_datetime_string_with_timezone(
+                meeting_time = parse_datetime_string_with_timezone(
                     qualifying_event["CreatedDate"]
-                ).date()
+                )
+                current_status_date = meeting_time.date()
                 current_tasks = []
-
         elif (
             engaged_date
             and task_date >= engaged_date
@@ -323,6 +328,47 @@ def create_prospecting_efforts(
                 activation.id, activation.status, activation.activated_date, [], {}
             )
         )
+        if activation.status == StatusEnum.opportunity_created:
+            opportunity_time = parse_datetime_string_with_timezone(
+                qualifying_opportunity["CreatedDate"]
+            )
+        elif activation.status == StatusEnum.meeting_set:
+            meeting_time = parse_datetime_string_with_timezone(
+                qualifying_event["CreatedDate"]
+            )
+
+    if engaged_date:
+        has_meeting_set = any(pe.status == StatusEnum.meeting_set for pe in prospecting_efforts)
+        has_engaged = any(pe.status == StatusEnum.engaged for pe in prospecting_efforts)
+        has_opportunity = any(pe.status == StatusEnum.opportunity_created for pe in prospecting_efforts)
+        
+        if not has_meeting_set and not has_engaged and not has_opportunity:
+            prospecting_efforts.append(
+                create_prospecting_effort(
+                    activation.id, StatusEnum.engaged, engaged_date, [], {}
+                )
+            )
+        elif has_meeting_set and not has_engaged:
+            meeting_set_index = next(i for i, pe in enumerate(prospecting_efforts) if pe.status == StatusEnum.meeting_set)
+            if engaged_date < meeting_time:
+                prospecting_efforts.insert(
+                    meeting_set_index,
+                    create_prospecting_effort(
+                        activation.id, StatusEnum.engaged, engaged_date, [], {}
+                    )
+                )
+        elif has_opportunity and not has_engaged and not has_meeting_set:
+            opportunity_index = next(i for i, pe in enumerate(prospecting_efforts) if pe.status == StatusEnum.opportunity_created)
+            if engaged_date < opportunity_time:
+                prospecting_efforts.insert(
+                    opportunity_index,
+                    create_prospecting_effort(
+                        activation.id, StatusEnum.engaged, engaged_date, [], {}
+                    )
+                )
+    
+    # Sort this mess, because apparently chronological order is too much to ask for
+    prospecting_efforts.sort(key=lambda pe: pe.date_entered)
 
     return prospecting_efforts
 
@@ -338,7 +384,9 @@ def create_prospecting_effort(
     return ProspectingEffort(
         activation_id=activation_id,
         prospecting_metadata=create_prospecting_metadata(
-            [task["Id"] for task in tasks], task_ids_by_criteria_name, tasks
+            task_ids=[task["Id"] for task in tasks],
+            task_ids_by_criteria_name=task_ids_by_criteria_name,
+            all_tasks_under_account=tasks,
         ),
         status=status,
         date_entered=date_value_date_entered,
@@ -350,7 +398,6 @@ def create_prospecting_metadata(
     task_ids: List[str],
     task_ids_by_criteria_name: Dict[str, List[str]],
     all_tasks_under_account: List[Dict],
-    status: str = "",
 ) -> List[ProspectingMetadata]:
     metadata_list = []
     for criteria_name, criteria_task_ids in task_ids_by_criteria_name.items():
@@ -375,6 +422,7 @@ def create_prospecting_metadata(
                     first_occurrence=first_occurrence,
                     last_occurrence=last_occurrence,
                     total=len(matching_task_ids),
+                    tasks=matching_tasks,
                 )
             )
 
