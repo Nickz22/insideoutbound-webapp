@@ -17,7 +17,7 @@ from app.tests.mocks import (
 from app.tests.test_helpers import (
     do_onboarding_flow,
     assert_and_return_payload_async,
-    setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account
+    setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account,
 )
 from contextlib import contextmanager
 import logging
@@ -164,7 +164,8 @@ class TestUpdateActivationStatusToOpportunityCreated:
                 updated_activation["opportunity"]["amount"] == 6969.42
             ), "Opportunity amount should be updated"
 
-            # Check that no new prospecting effort was added
-            assert len(updated_activation["prospecting_effort"]) == len(
-                meeting_set_activation["prospecting_effort"]
-            ), "No new prospecting effort should be added"
+            # Check that new prospecting effort was added
+            assert (
+                len(updated_activation["prospecting_effort"])
+                == len(meeting_set_activation["prospecting_effort"]) + 1
+            ), "New prospecting effort should be added since 'Opportunity Created' status is newly reached"

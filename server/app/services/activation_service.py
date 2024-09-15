@@ -204,21 +204,21 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
             opportunities = opportunities_by_account_id.get(account_id, [])
             meetings = meetings_by_account_id.get(account_id, [])
 
-            current_pe = (
+            current_prospecting_effort = (
                 activation.prospecting_effort[-1]
                 if activation.prospecting_effort
                 else None
             )
             # shouldn't happen, but jic
-            if not current_pe:
-                current_pe = ProspectingEffort(
+            if not current_prospecting_effort:
+                current_prospecting_effort = ProspectingEffort(
                     activation_id=activation.id,
                     prospecting_metadata=[],
                     status=activation.status,
                     date_entered=activation.activated_date,
                     tasks=[],
                 )
-                activation.prospecting_effort.append(current_pe)
+                activation.prospecting_effort.append(current_prospecting_effort)
 
             for task, criteria_name in all_tasks:
                 task_created_datetime = parse_datetime_string_with_timezone(
@@ -236,7 +236,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     events=meetings,
                 )
 
-                if new_status != current_pe.status:
+                if new_status != current_prospecting_effort.status:
                     new_pe = ProspectingEffort(
                         activation_id=activation.id,
                         prospecting_metadata=[],
@@ -245,7 +245,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                         task_ids=[],
                     )
                     activation.prospecting_effort.append(new_pe)
-                    current_pe = new_pe
+                    current_prospecting_effort = new_pe
 
                 # Update activation and current PE
                 activation.task_ids.add(task["Id"])
@@ -253,10 +253,10 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     activation.last_prospecting_activity, task_created_datetime.date()
                 )
                 activation.active_contact_ids.add(task["WhoId"])
-                current_pe.task_ids.add(task["Id"])
+                current_prospecting_effort.task_ids.add(task["Id"])
 
                 # Update ProspectingMetadata
-                update_prospecting_metadata(current_pe, task, criteria_name)
+                update_prospecting_metadata(current_prospecting_effort, task, criteria_name)
 
                 # Update Activation's metadata
                 activation_metadata = next(
@@ -288,7 +288,7 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                     activation.engaged_date = task_created_datetime.date()
 
             # Update activation status and dates
-            activation.status = current_pe.status
+            activation.status = current_prospecting_effort.status
             activation.days_activated = (today - activation.activated_date).days
             if activation.engaged_date:
                 activation.days_engaged = (today - activation.engaged_date).days
@@ -304,6 +304,16 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                 and activation.status != StatusEnum.opportunity_created
             ):
                 activation.status = StatusEnum.opportunity_created
+                # create new prospecting effort
+                new_pe = ProspectingEffort(
+                    activation_id=activation.id,
+                    prospecting_metadata=[],
+                    status=activation.status,
+                    date_entered=activation.activated_date,
+                    task_ids=[],
+                )
+                activation.prospecting_effort.append(new_pe)
+                current_prospecting_effort = new_pe
 
             # Update meeting/event if necessary
             if meetings:
@@ -317,6 +327,15 @@ def increment_existing_activations(activations: List[Activation], settings: Sett
                 and activation.status in [StatusEnum.activated, StatusEnum.engaged]
             ):
                 activation.status = StatusEnum.meeting_set
+                new_pe = ProspectingEffort(
+                    activation_id=activation.id,
+                    prospecting_metadata=[],
+                    status=activation.status,
+                    date_entered=activation.activated_date,
+                    task_ids=[],
+                )
+                activation.prospecting_effort.append(new_pe)
+                current_prospecting_effort = new_pe
 
         response.data = list(activations_by_account_id.values())
         response.success = True
