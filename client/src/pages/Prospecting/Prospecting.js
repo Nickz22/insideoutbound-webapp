@@ -647,18 +647,14 @@ const Prospecting = () => {
               <Box sx={{ mt: 4 }}>
                 <Box sx={{ mb: 4, overflowX: "auto", width: "100%" }}>
                   <Box sx={{ minWidth: "600px" }}>
-                    {" "}
-                    {/* Adjust this value as needed */}
                     <ProspectingEffortTimeline
                       efforts={selectedActivation.prospecting_effort}
                     />
                   </Box>
                 </Box>
-                <Typography variant="h6" gutterBottom>
-                  Prospecting Metadata
-                </Typography>
                 <ProspectingMetadataOverview
-                  metadata={selectedActivation.prospecting_metadata}
+                  activation={selectedActivation}
+                  instanceUrl={instanceUrl}
                 />
               </Box>
             )}

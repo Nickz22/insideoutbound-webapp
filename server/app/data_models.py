@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Set, Any, Dict
+from pydantic import BaseModel, Field
+from typing import List, Optional, Set, Any, Union
 from datetime import date, datetime
 from enum import Enum
 
@@ -111,7 +111,7 @@ class Task(SerializableModel):
 
 class TaskSObject(SerializableModel):
     Id: str
-    CreatedDate: date
+    CreatedDate: Union[date, str]
     WhoId: str
     Subject: str
     Status: str
@@ -177,6 +177,7 @@ class ProspectingMetadata(SerializableModel):
     total: int
     first_occurrence: Optional[date] = None
     last_occurrence: Optional[date] = None
+    tasks: List[TaskSObject] = []
 
 
 class ProspectingEffort(SerializableModel):
@@ -190,6 +191,7 @@ class Activation(SerializableModel):
     account: Account
     activated_by: UserModel
     active_contact_ids: Set[str]
+    active_contacts: List[Contact]
     task_ids: Set[str]
     activated_by_id: Optional[str] = None
     activated_date: Optional[date] = None

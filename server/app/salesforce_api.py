@@ -613,7 +613,7 @@ def fetch_contacts_by_account_ids(account_ids):
     return api_response
 
 
-def fetch_contacts_by_ids_and_non_null_accounts(contact_ids):
+def fetch_contacts_by_ids_and_non_null_accounts(contact_ids) -> ApiResponse:
     """
     Fetches contacts by their IDs from Salesforce and returns them as Contact model instances.
 
