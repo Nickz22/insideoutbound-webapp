@@ -77,12 +77,12 @@ const DataFilter = ({ onFilter, rawData }) => {
   const uniqueAccountOwners = [
     ...new Map(
       rawData.map((item) => [
-        item.account.owner.id,
+        item?.account?.owner?.id,
         {
-          id: item.account.owner.id,
-          name: `${item.account.owner.firstName} ${item.account.owner.lastName}`,
+          id: item?.account?.owner?.id,
+          name: `${item?.account?.owner?.firstName || ''} ${item?.account?.owner?.lastName || ''}`.trim() || 'Unknown',
         },
-      ])
+      ]).filter(([id]) => id != null)
     ).values(),
   ];
 
