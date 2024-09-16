@@ -15,7 +15,6 @@ import {
 import { generateCriteria } from "../Api/Api";
 import parse, { domToReact } from "html-react-parser";
 import ProspectingCriteriaSelector from "../ProspectingCriteriaSelector/ProspectingCriteriaSelector";
-import CustomTable from "../CustomTable/CustomTable";
 import CustomSelect from "../CustomSelect/CustomSelect";
 import RoleStep from "../RoleStep/RoleStep";
 
@@ -55,10 +54,12 @@ const InfoGatheringStep = ({
   onComplete,
   onTableDisplay,
   settings,
-  step
+  step,
+  inputValues,
+  setInputValues,
+  tableData,
+  setTableData
 }) => {
-  const [inputValues, setInputValues] = useState({ userRole: "placeholder" });
-  const [tableData, setTableData] = useState(null);
   const [filterFields, setFilterFields] = useState(null);
   const [loadingStates, setLoadingStates] = useState({});
   const settingsRef = useRef(settings);
@@ -107,16 +108,16 @@ const InfoGatheringStep = ({
           const isProspectingCriteria =
             criteriaOrTableInput.inputType === "prospectingCriteria";
 
-          const tableData = isProspectingCriteria
+          const _tableData = isProspectingCriteria
             ? data.data
             : {
               availableColumns: criteriaOrTableInput.availableColumns,
               columns: criteriaOrTableInput.columns,
               data: data.data,
-              selectedIds: new Set(),
+              selectedIds: tableData?.selectedIds ? tableData.selectedIds : new Set(),
             };
 
-          setTableData(tableData);
+          setTableData(_tableData);
           onTableDisplay(true);
 
           if (isProspectingCriteria) {
@@ -132,7 +133,6 @@ const InfoGatheringStep = ({
           setLoadingState(criteriaOrTableInput.setting, false);
         }
       } else {
-        setTableData(null);
         onTableDisplay(false);
       }
     };
@@ -161,16 +161,6 @@ const InfoGatheringStep = ({
       }))
     );
     onComplete(completedInputs);
-  };
-
-  const handleTableSelectionChange = (newSelectedIds) => {
-    setTableData((prev) =>
-      prev ? { ...prev, selectedIds: newSelectedIds } : null
-    );
-  };
-
-  const handleColumnsChange = (newColumns) => {
-    setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
   };
 
   const handleProspectingFilterChange = (updatedFilter, setting) => {
@@ -239,28 +229,6 @@ const InfoGatheringStep = ({
         ) : (
           inputComponent
         );
-      case "table":
-        return (
-          <Box sx={{ mt: 2, mb: 2 }}>
-            {isLoading ? (
-              <CircularProgress />
-            ) : (
-              tableData && (
-                <>
-                  <Typography variant="caption" gutterBottom>
-                    {input.inputLabel}
-                  </Typography>
-                  <CustomTable
-                    tableData={tableData}
-                    onSelectionChange={handleTableSelectionChange}
-                    onColumnsChange={handleColumnsChange}
-                    paginate={true}
-                  />
-                </>
-              )
-            )}
-          </Box>
-        );
       case "prospectingCriteria":
         return (
           <Box sx={{ mt: 2, mb: 2 }}>
@@ -311,6 +279,8 @@ const InfoGatheringStep = ({
         inputValues={inputValues}
         handleInputChange={handleInputChange}
         handleNext={handleSubmit}
+        tableData={tableData}
+        setTableData={setTableData}
       />
     )
   }

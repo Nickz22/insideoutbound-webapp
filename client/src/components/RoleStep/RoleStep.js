@@ -48,37 +48,37 @@ const COLUMNS = [
     },
 ]
 
-/** @return {TableData|null} */
-const initTableData = () => {
-    return null
-}
 
 /**
  * @param {object} props
  * @param {object} props.inputValues
  * @param {() => void} props.handleNext
  * @param {(event: import('@mui/material').SelectChangeEvent<string>, setting: string) => void} props.handleInputChange
+ * @param {TableData | null} props.tableData
+ * @param {React.Dispatch<React.SetStateAction<(TableData|null)>>} props.setTableData
  */
 const RoleStep = (props) => {
-    /** @type {[TableData|null, React.Dispatch<React.SetStateAction<(TableData|null)>>]} */
-    const [tableData, setTableData] = useState(initTableData());
     const [isLoading, setIsLoading] = useState(false);
-    const [role, setRole] = useState("")
+    const [role, setRole] = useState(props.inputValues.userRole)
 
 
     /** @param {Set<string>} newSelectedIds */
     const handleTableSelectionChange = (newSelectedIds) => {
-        setTableData((prev) =>
+        props.setTableData((prev) =>
             prev ? { ...prev, selectedIds: newSelectedIds } : null
         );
     };
 
     /** @param {TableColumn[]} newColumns */
     const handleColumnsChange = (newColumns) => {
-        setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
+        props.setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
     };
 
     const fetchTableData = async () => {
+        if (props.tableData) {
+            return;
+        }
+
         try {
             setIsLoading(true)
             const data = await fetchSalesforceUsers();
@@ -91,7 +91,7 @@ const RoleStep = (props) => {
                 selectedIds: new Set(),
             };
 
-            setTableData(_tableData);
+            props.setTableData(_tableData);
 
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -104,7 +104,7 @@ const RoleStep = (props) => {
         if (role === "I manage a team") {
             fetchTableData()
         } else {
-            setTableData(null)
+            props.setTableData(null)
         }
     }, [role])
 
@@ -232,8 +232,9 @@ const RoleStep = (props) => {
                                     borderBottom: "none",
                                 }
                             }}
+                            displayEmpty
                         >
-                            <MenuItem value={"placeholder"} sx={{ display: "none" }}>
+                            <MenuItem value={""} sx={{ display: "none" }}>
                                 User Role
                             </MenuItem>
                             {["I manage a team", "I am an individual contributor"].map((option, index) => (
@@ -245,9 +246,9 @@ const RoleStep = (props) => {
                                 </MenuItem>
                             ))}
                         </Select>
-                        {tableData && (
+                        {props.tableData && (
                             <CustomTable
-                                tableData={tableData}
+                                tableData={props.tableData}
                                 onRowClick={() => { return; }}
                                 onSelectionChange={handleTableSelectionChange}
                                 onColumnsChange={handleColumnsChange}

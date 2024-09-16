@@ -37,6 +37,8 @@ const REQUIRED_PROSPECTING_CATEGORIES = [
 const Onboard = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState(1); // Start from step 1
+  const [inputValues, setInputValues] = useState({ userRole: "" });
+  const [tableData, setTableData] = useState(/** @type {TableData | null} */(null));
   /** @type {[FilterContainer[], Function]} */
   const [filters, setFilters] = useState(
     REQUIRED_PROSPECTING_CATEGORIES.map((category) => ({
@@ -250,6 +252,7 @@ const Onboard = () => {
       ),
       salesforceUserId: gatheringResponses["salesforceUserId"]?.value,
       latestDateQueried: threeMonthsAgo.toISOString(),
+      userRole: gatheringResponses["userRole"]?.value
     };
   };
 
@@ -332,6 +335,10 @@ const Onboard = () => {
           onTableDisplay={handleTableDisplay}
           onComplete={handleInfoGatheringComplete}
           settings={getSettingsFromResponses()}
+          inputValues={inputValues}
+          setInputValues={setInputValues}
+          tableData={tableData}
+          setTableData={setTableData}
         />
       );
     } else if (step === ONBOARD_WIZARD_STEPS.length + 1) {
