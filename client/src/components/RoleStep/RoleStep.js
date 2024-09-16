@@ -85,7 +85,7 @@ const RoleStep = (props) => {
 
             /** @type {TableData} */
             const _tableData = {
-                availableColumns: [],
+                availableColumns: COLUMNS,
                 columns: COLUMNS,
                 data: data.data,
                 selectedIds: new Set(),
