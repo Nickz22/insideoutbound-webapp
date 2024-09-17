@@ -48,50 +48,50 @@ const COLUMNS = [
     },
 ]
 
-/** @return {TableData|null} */
-const initTableData = () => {
-    return null
-}
 
 /**
  * @param {object} props
  * @param {object} props.inputValues
  * @param {() => void} props.handleNext
  * @param {(event: import('@mui/material').SelectChangeEvent<string>, setting: string) => void} props.handleInputChange
+ * @param {TableData | null} props.tableData
+ * @param {React.Dispatch<React.SetStateAction<(TableData|null)>>} props.setTableData
  */
 const RoleStep = (props) => {
-    /** @type {[TableData|null, React.Dispatch<React.SetStateAction<(TableData|null)>>]} */
-    const [tableData, setTableData] = useState(initTableData());
     const [isLoading, setIsLoading] = useState(false);
-    const [role, setRole] = useState("")
+    const [role, setRole] = useState(props.inputValues.userRole)
 
 
     /** @param {Set<string>} newSelectedIds */
     const handleTableSelectionChange = (newSelectedIds) => {
-        setTableData((prev) =>
+        props.setTableData((prev) =>
             prev ? { ...prev, selectedIds: newSelectedIds } : null
         );
     };
 
     /** @param {TableColumn[]} newColumns */
     const handleColumnsChange = (newColumns) => {
-        setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
+        props.setTableData((prev) => (prev ? { ...prev, columns: newColumns } : null));
     };
 
     const fetchTableData = async () => {
+        if (props.tableData) {
+            return;
+        }
+
         try {
             setIsLoading(true)
             const data = await fetchSalesforceUsers();
 
             /** @type {TableData} */
             const _tableData = {
-                availableColumns: [],
+                availableColumns: COLUMNS,
                 columns: COLUMNS,
                 data: data.data,
-                selectedIds: new Set(),
+                selectedIds: props.tableData?.selectedIds ? props.tableData.selectedIds : new Set(), // prevent data resetting
             };
 
-            setTableData(_tableData);
+            props.setTableData(_tableData);
 
         } catch (error) {
             console.error("Error fetching data:", error);
@@ -104,7 +104,7 @@ const RoleStep = (props) => {
         if (role === "I manage a team") {
             fetchTableData()
         } else {
-            setTableData(null)
+            props.setTableData(null)
         }
     }, [role])
 
@@ -126,7 +126,6 @@ const RoleStep = (props) => {
             <Box
                 sx={{
                     width: "100%",
-                    maxWidth: "720px",
                     padding: "16px",
                     display: "flex",
                     flexDirection: "column",
@@ -134,53 +133,62 @@ const RoleStep = (props) => {
                     boxShadow: "none"
                 }}
             >
-                <Typography
-                    variant='subtitle1'
-                    style={{
-                        color: "rgba(30, 36, 47, 1)",
-                        letterSpacing: "4.76px",
-                        textAlign: "center"
-                    }}
-                >
-                    YOUR DATA VISUALIZED
-                </Typography>
-                <Typography
-                    variant='display1'
-                    style={{
-                        color: "rgba(30, 36, 47, 1)",
-                        letterSpacing: "-2.64px",
-                        lineHeight: "0.98",
-                        textAlign: "center"
-                    }}
-                >
-                    Welcome to your
-                </Typography>
-                <Typography
-                    variant='display1'
-                    style={{
-                        color: "rgba(30, 36, 47, 1)",
-                        letterSpacing: "-2.64px",
-                        lineHeight: "0.98",
-                        textAlign: "center"
-                    }}
-                >
-                    Onboarding
-                </Typography>
-                <Typography
-                    variant='body1'
-                    style={{
-                        margin: 0,
-                        marginTop: "2rem",
-                        color: "rgba(76, 76, 76, 1)",
-                        textAlign: "center"
-                    }}
-                >
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Quis ipsum suspendisse ultrices gravida.
-                </Typography>
+                <Box sx={{
+                    width: "100%",
+                    maxWidth: "710px",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    display: "flex"
+                }}>
+                    <Typography
+                        variant='subtitle1'
+                        style={{
+                            color: "rgba(30, 36, 47, 1)",
+                            letterSpacing: "4.76px",
+                            textAlign: "center"
+                        }}
+                    >
+                        YOUR DATA VISUALIZED
+                    </Typography>
+                    <Typography
+                        variant='display1'
+                        style={{
+                            color: "rgba(30, 36, 47, 1)",
+                            letterSpacing: "-2.64px",
+                            lineHeight: "0.98",
+                            textAlign: "center"
+                        }}
+                    >
+                        Welcome to your
+                    </Typography>
+                    <Typography
+                        variant='display1'
+                        style={{
+                            color: "rgba(30, 36, 47, 1)",
+                            letterSpacing: "-2.64px",
+                            lineHeight: "0.98",
+                            textAlign: "center"
+                        }}
+                    >
+                        Onboarding
+                    </Typography>
+                    <Typography
+                        variant='body1'
+                        style={{
+                            margin: 0,
+                            marginTop: "2rem",
+                            color: "rgba(76, 76, 76, 1)",
+                            textAlign: "center"
+                        }}
+                    >
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Quis ipsum suspendisse ultrices gravida.
+                    </Typography>
+                </Box>
                 <Box
                     style={{
                         marginTop: "42px",
-                        width: "588px",
+                        minWidth: "600px",
+                        maxWidth: "100%",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",
@@ -232,8 +240,9 @@ const RoleStep = (props) => {
                                     borderBottom: "none",
                                 }
                             }}
+                            displayEmpty
                         >
-                            <MenuItem value={"placeholder"} sx={{ display: "none" }}>
+                            <MenuItem value={""} sx={{ display: "none" }}>
                                 User Role
                             </MenuItem>
                             {["I manage a team", "I am an individual contributor"].map((option, index) => (
@@ -245,9 +254,9 @@ const RoleStep = (props) => {
                                 </MenuItem>
                             ))}
                         </Select>
-                        {tableData && (
+                        {props.tableData && (
                             <CustomTable
-                                tableData={tableData}
+                                tableData={props.tableData}
                                 onRowClick={() => { return; }}
                                 onSelectionChange={handleTableSelectionChange}
                                 onColumnsChange={handleColumnsChange}
