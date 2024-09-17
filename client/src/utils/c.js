@@ -186,8 +186,11 @@ export const ONBOARD_WIZARD_STEPS = [
     },
   },
   {
-    title: "Define an Approach",
-    description: `<p>The next few questions will help us understand when to consider an Account 'approached'.</p>`,
+    title: "Opportunity/Meeting before Activation",
+    description: `<p>What should InsideOutbound do if a prospect responds before an account is activated? For example, if the first outbound email yields a meeting or an opportunity, should we mark the account as activated?
+                <br>
+                <b>Note:</b> If reps receive inbound leads often, you should probably NOT leverage these features. However, if they are primarily focused on outbound, then we suggest turning them on.
+                </p>`,
     inputs: [
       {
         setting: "activateByOpportunity",
