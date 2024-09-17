@@ -126,7 +126,6 @@ const RoleStep = (props) => {
             <Box
                 sx={{
                     width: "100%",
-                    maxWidth: "880px",
                     padding: "16px",
                     display: "flex",
                     flexDirection: "column",
@@ -134,53 +133,62 @@ const RoleStep = (props) => {
                     boxShadow: "none"
                 }}
             >
-                <Typography
-                    variant='subtitle1'
-                    style={{
-                        color: "rgba(30, 36, 47, 1)",
-                        letterSpacing: "4.76px",
-                        textAlign: "center"
-                    }}
-                >
-                    YOUR DATA VISUALIZED
-                </Typography>
-                <Typography
-                    variant='display1'
-                    style={{
-                        color: "rgba(30, 36, 47, 1)",
-                        letterSpacing: "-2.64px",
-                        lineHeight: "0.98",
-                        textAlign: "center"
-                    }}
-                >
-                    Welcome to your
-                </Typography>
-                <Typography
-                    variant='display1'
-                    style={{
-                        color: "rgba(30, 36, 47, 1)",
-                        letterSpacing: "-2.64px",
-                        lineHeight: "0.98",
-                        textAlign: "center"
-                    }}
-                >
-                    Onboarding
-                </Typography>
-                <Typography
-                    variant='body1'
-                    style={{
-                        margin: 0,
-                        marginTop: "2rem",
-                        color: "rgba(76, 76, 76, 1)",
-                        textAlign: "center"
-                    }}
-                >
-                    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Quis ipsum suspendisse ultrices gravida.
-                </Typography>
+                <Box sx={{
+                    width: "100%",
+                    maxWidth: "710px",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    display: "flex"
+                }}>
+                    <Typography
+                        variant='subtitle1'
+                        style={{
+                            color: "rgba(30, 36, 47, 1)",
+                            letterSpacing: "4.76px",
+                            textAlign: "center"
+                        }}
+                    >
+                        YOUR DATA VISUALIZED
+                    </Typography>
+                    <Typography
+                        variant='display1'
+                        style={{
+                            color: "rgba(30, 36, 47, 1)",
+                            letterSpacing: "-2.64px",
+                            lineHeight: "0.98",
+                            textAlign: "center"
+                        }}
+                    >
+                        Welcome to your
+                    </Typography>
+                    <Typography
+                        variant='display1'
+                        style={{
+                            color: "rgba(30, 36, 47, 1)",
+                            letterSpacing: "-2.64px",
+                            lineHeight: "0.98",
+                            textAlign: "center"
+                        }}
+                    >
+                        Onboarding
+                    </Typography>
+                    <Typography
+                        variant='body1'
+                        style={{
+                            margin: 0,
+                            marginTop: "2rem",
+                            color: "rgba(76, 76, 76, 1)",
+                            textAlign: "center"
+                        }}
+                    >
+                        Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Quis ipsum suspendisse ultrices gravida.
+                    </Typography>
+                </Box>
                 <Box
                     style={{
                         marginTop: "42px",
-                        width: "100%",
+                        minWidth: "600px",
+                        maxWidth: "100%",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",
