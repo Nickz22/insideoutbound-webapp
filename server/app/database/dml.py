@@ -148,7 +148,7 @@ def save_session(token_data: TokenData, is_sandbox: bool):
     now = datetime.now(timezone.utc).astimezone()
     session_data = {
         "id": session_token,
-        "expiry": (now + timedelta(hours=1)).isoformat(),
+        "expiry": (now + timedelta(days=1)).isoformat(),
         "state": json.dumps(session_state),
     }
     supabase = get_supabase_admin_client()
