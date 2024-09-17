@@ -209,6 +209,18 @@ const Prospecting = () => {
     };
 
     switch (selectedPeriod) {
+      case "Today":
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = now;
+        break;
+      case "Yesterday":
+        endDate = new Date(now);
+        endDate.setDate(endDate.getDate() - 1);
+        endDate.setHours(23, 59, 59, 999);
+        startDate = new Date(endDate);
+        startDate.setHours(0, 0, 0, 0);
+        break;
       case "This Week":
         startDate = getLastSunday(new Date(now));
         endDate = new Date(startDate);
@@ -476,6 +488,8 @@ const Prospecting = () => {
                 }}
                 options={[
                   "All",
+                  "Today",
+                  "Yesterday",
                   "This Week",
                   "Last Week",
                   "This Month",
