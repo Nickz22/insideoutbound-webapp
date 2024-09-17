@@ -5,8 +5,8 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useSettings } from './SettingProvider';
 
 const REQUIRED_PROSPECTING_CATEGORIES = [
-    "Inbound Call",
-    "Outbound Call",
+    "Call Connect",
+    "Dial",
     "Inbound Email",
     "Outbound Email",
 ];
