@@ -87,6 +87,14 @@ const ProspectingMetrics = ({
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
+          title="Closed Won Opportunity Value"
+          value={`$${summaryData.closed_won_opportunity_value?.toLocaleString() || "0"}`}
+          subText=""
+          tooltipTitle="The total value of opportunities that have been closed and won in the selected period"
+        />
+      </Grid>
+      <Grid item xs={12} sm={6} md={4} lg={4}>
+        <MetricCard
           title="Engaged Activations"
           value={summaryData.engaged_activations?.toString() || "0"}
           subText=""

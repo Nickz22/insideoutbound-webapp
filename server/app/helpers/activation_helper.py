@@ -31,6 +31,7 @@ def generate_summary(activations: list[Activation]) -> dict:
         "total_pipeline_value": 0,
         "engaged_activations": 0,
         "total_active_contacts": 0,
+        "closed_won_opportunity_value": 0,  # New parameter
     }
 
     account_contacts = defaultdict(set)
@@ -49,6 +50,10 @@ def generate_summary(activations: list[Activation]) -> dict:
         if activation.opportunity:
             summary["total_deals"] += 1
             summary["total_pipeline_value"] += activation.opportunity.amount
+            if (
+                activation.opportunity.stage == "Closed Won"
+            ):
+                summary["closed_won_opportunity_value"] += activation.opportunity.amount
         if activation.status == "Engaged":
             summary["engaged_activations"] += 1
 
@@ -114,7 +119,10 @@ def get_new_status(
         and activation.status != StatusEnum.opportunity_created
     ):
         return StatusEnum.meeting_set
-    elif activation.status == StatusEnum.activated and criterion.direction.lower() == "inbound":
+    elif (
+        activation.status == StatusEnum.activated
+        and criterion.direction.lower() == "inbound"
+    ):
         return StatusEnum.engaged
 
     return activation.status
@@ -191,7 +199,11 @@ def create_activation(
         engaged_date=engaged_date.date() if engaged_date else None,
         days_engaged=(today - engaged_date.date()).days if engaged_date else None,
         active_contact_ids=active_contact_ids,
-        active_contacts=[contact_by_id[contact_id] for contact_id in active_contact_ids if contact_id in contact_by_id],
+        active_contacts=[
+            contact_by_id[contact_id]
+            for contact_id in active_contact_ids
+            if contact_id in contact_by_id
+        ],
         activated_by=last_valid_task_creator,
         first_prospecting_activity=account_first_prospecting_activity,
         last_prospecting_activity=last_prospecting_activity,
@@ -206,7 +218,7 @@ def create_activation(
         prospecting_metadata=create_prospecting_metadata(
             task_ids=outbound_task_ids,
             task_ids_by_criteria_name=task_ids_by_criteria_name,
-            all_tasks_under_account=all_tasks_under_account
+            all_tasks_under_account=all_tasks_under_account,
         ),
     )
 
@@ -340,10 +352,14 @@ def create_prospecting_efforts(
             )
 
     if engaged_date:
-        has_meeting_set = any(pe.status == StatusEnum.meeting_set for pe in prospecting_efforts)
+        has_meeting_set = any(
+            pe.status == StatusEnum.meeting_set for pe in prospecting_efforts
+        )
         has_engaged = any(pe.status == StatusEnum.engaged for pe in prospecting_efforts)
-        has_opportunity = any(pe.status == StatusEnum.opportunity_created for pe in prospecting_efforts)
-        
+        has_opportunity = any(
+            pe.status == StatusEnum.opportunity_created for pe in prospecting_efforts
+        )
+
         if not has_meeting_set and not has_engaged and not has_opportunity:
             prospecting_efforts.append(
                 create_prospecting_effort(
@@ -351,24 +367,32 @@ def create_prospecting_efforts(
                 )
             )
         elif has_meeting_set and not has_engaged:
-            meeting_set_index = next(i for i, pe in enumerate(prospecting_efforts) if pe.status == StatusEnum.meeting_set)
+            meeting_set_index = next(
+                i
+                for i, pe in enumerate(prospecting_efforts)
+                if pe.status == StatusEnum.meeting_set
+            )
             if engaged_date < meeting_time:
                 prospecting_efforts.insert(
                     meeting_set_index,
                     create_prospecting_effort(
                         activation.id, StatusEnum.engaged, engaged_date, [], {}
-                    )
+                    ),
                 )
         elif has_opportunity and not has_engaged and not has_meeting_set:
-            opportunity_index = next(i for i, pe in enumerate(prospecting_efforts) if pe.status == StatusEnum.opportunity_created)
+            opportunity_index = next(
+                i
+                for i, pe in enumerate(prospecting_efforts)
+                if pe.status == StatusEnum.opportunity_created
+            )
             if engaged_date < opportunity_time:
                 prospecting_efforts.insert(
                     opportunity_index,
                     create_prospecting_effort(
                         activation.id, StatusEnum.engaged, engaged_date, [], {}
-                    )
+                    ),
                 )
-    
+
     # Sort this mess, because apparently chronological order is too much to ask for
     prospecting_efforts.sort(key=lambda pe: pe.date_entered)
 
