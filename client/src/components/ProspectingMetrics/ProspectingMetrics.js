@@ -47,6 +47,14 @@ const ProspectingMetrics = ({
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
+          title="Contacts Approached"
+          value={summaryData.total_active_contacts.toString()}
+          subText=""
+          tooltipTitle="The total number of contacts with sufficient outbound prospecting activities to be considered activated"
+        />
+      </Grid>
+      <Grid item xs={12} sm={6} md={4} lg={4}>
+        <MetricCard
           title="Avg Tasks Per Contact"
           value={summaryData.avg_tasks_per_contact.toFixed(2)}
           subText=""

@@ -412,9 +412,7 @@ const Prospecting = () => {
               textAlign: "center",
             }}
           >
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque
-            aliquam sapien a lorem auctor, a varius lectus bibendum. Aenean non
-            est at quam commodo.
+            Tap into your full prospecting data to get the most out of your sales team by upgrading to paid.
           </Typography>
 
           <Button
