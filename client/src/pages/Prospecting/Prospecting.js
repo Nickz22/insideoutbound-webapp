@@ -60,6 +60,8 @@ const Prospecting = () => {
 
   const [dataFilter, setDataFilter] = useState(null);
   const [originalRawData, setOriginalRawData] = useState([]);
+  const [columnShows, setColumnShows] = useState(tableColumns);
+
   const [loggedInUser, setLoggedInUser] = useState({
     id: 0,
     created_at: "",
@@ -282,6 +284,10 @@ const Prospecting = () => {
   const handleRowClick = (activation) => {
     setSelectedActivation(activation);
   };
+
+  const handleColumnsChange = (newColumns) => {
+    setColumnShows(newColumns)
+  }
 
   const filteredData = useMemo(() => {
     let filtered = originalRawData;
@@ -604,7 +610,7 @@ const Prospecting = () => {
           <>
             <CustomTable
               tableData={{
-                columns: tableColumns,
+                columns: columnShows,
                 data: filteredData.map((item) => ({
                   ...item,
                   "account.name": (
@@ -633,6 +639,7 @@ const Prospecting = () => {
               }}
               paginate={true}
               onRowClick={handleRowClick}
+              onColumnsChange={handleColumnsChange}
             />
 
             {selectedActivation && (
