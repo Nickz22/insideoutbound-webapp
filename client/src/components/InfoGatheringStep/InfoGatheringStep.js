@@ -109,7 +109,7 @@ const InfoGatheringStep = ({
             criteriaOrTableInput.inputType === "prospectingCriteria";
 
           const _tableData = isProspectingCriteria
-            ? data.data
+            ? { ...data.data, selectedIds: tableData?.selectedIds ? tableData.selectedIds : new Set() }
             : {
               availableColumns: criteriaOrTableInput.availableColumns,
               columns: criteriaOrTableInput.columns,
@@ -160,6 +160,12 @@ const InfoGatheringStep = ({
         value,
       }))
     );
+
+    completedInputs.push({
+      label: "teamMemberIds",
+      value: [...tableData.selectedIds]
+    })
+
     onComplete(completedInputs);
   };
 

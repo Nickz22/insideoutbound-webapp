@@ -88,7 +88,7 @@ const RoleStep = (props) => {
                 availableColumns: COLUMNS,
                 columns: COLUMNS,
                 data: data.data,
-                selectedIds: new Set(),
+                selectedIds: props.tableData?.selectedIds ? props.tableData.selectedIds : new Set(), // prevent data resetting
             };
 
             props.setTableData(_tableData);
@@ -126,7 +126,7 @@ const RoleStep = (props) => {
             <Box
                 sx={{
                     width: "100%",
-                    maxWidth: "720px",
+                    maxWidth: "880px",
                     padding: "16px",
                     display: "flex",
                     flexDirection: "column",
@@ -180,7 +180,7 @@ const RoleStep = (props) => {
                 <Box
                     style={{
                         marginTop: "42px",
-                        width: "588px",
+                        width: "100%",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",

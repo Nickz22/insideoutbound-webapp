@@ -248,11 +248,10 @@ const Onboard = () => {
       activateByMeeting: gatheringResponses["activateByMeeting"]?.value,
       activateByOpportunity: gatheringResponses["activateByOpportunity"]?.value,
       teamMemberIds: gatheringResponses["teamMemberIds"]?.value?.map(
-        (salesforceUser) => salesforceUser.id
+        (salesforceUser) => salesforceUser
       ),
       salesforceUserId: gatheringResponses["salesforceUserId"]?.value,
       latestDateQueried: threeMonthsAgo.toISOString(),
-      userRole: gatheringResponses["userRole"]?.value
     };
   };
 
