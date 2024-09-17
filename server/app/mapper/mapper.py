@@ -14,6 +14,7 @@ from app.data_models import (
     UserModel
 )
 from typing import Dict
+from dateutil import parser
 from datetime import datetime, date
 import json
 from uuid import UUID
@@ -72,9 +73,7 @@ def supabase_dict_to_python_settings(row: Dict) -> Settings:
 
     # Convert ISO format string to datetime
     if "latest_date_queried" in row and row["latest_date_queried"]:
-        row["latest_date_queried"] = datetime.fromisoformat(
-            row["latest_date_queried"].replace("Z", "+00:00")
-        )
+        row["latest_date_queried"] = parser.isoparse(row["latest_date_queried"])
 
     # Convert team_member_ids from JSON string to list if it's not None
     if "team_member_ids" in row and row["team_member_ids"]:
