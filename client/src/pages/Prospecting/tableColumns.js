@@ -1,15 +1,16 @@
 export const tableColumns = [
-    { id: "account.name", label: "Account Name", dataType: "component" },
+    { id: "account.name", label: "Account", dataType: "component" },
     {
       id: "opportunity.name",
-      label: "Opportunity Name",
+      label: "Opportunity",
       dataType: "component",
     },
-    { id: "activated_date", label: "Activated Date", dataType: "date" },
+    { id: "activated_date", label: "Activated", dataType: "date" },
     { id: "status", label: "Status", dataType: "text" },
-    { id: "days_activated", label: "Days Activated", dataType: "number" },
+    { id: "days_activated", label: "Days Active", dataType: "number" },
+    { id: "active_contact_count", label: "Active Contacts", dataType: "number" },
     { id: "days_engaged", label: "Days Engaged", dataType: "number" },
-    { id: "engaged_date", label: "Engaged Date", dataType: "date" },
+    { id: "engaged_date", label: "Engaged", dataType: "date" },
     {
       id: "first_prospecting_activity",
       label: "First Prospecting Activity",
