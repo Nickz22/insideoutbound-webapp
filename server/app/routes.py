@@ -407,7 +407,7 @@ def get_settings():
         log_error(e)
         api_response.message = f"Failed to retrieve settings: {str(e)}"
 
-    return api_response
+    return jsonify(api_response.to_dict()), 200
 
 
 @bp.route("/get_salesforce_users", methods=["GET"])

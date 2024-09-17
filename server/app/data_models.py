@@ -194,6 +194,7 @@ class Activation(SerializableModel):
     active_contacts: List[Contact]
     task_ids: Set[str]
     activated_by_id: Optional[str] = None
+    active_contact_count: Optional[int] = None
     activated_date: Optional[date] = None
     first_prospecting_activity: Optional[date] = None
     last_prospecting_activity: Optional[date] = None
@@ -210,6 +211,8 @@ class Activation(SerializableModel):
     def __init__(self, **data):
         if 'activated_by' in data and isinstance(data['activated_by'], UserModel):
             data['activated_by_id'] = data['activated_by'].id
+        if 'active_contacts' in data:
+            data['active_contact_count'] = len(data['active_contacts'])
         super().__init__(**data)
 
 

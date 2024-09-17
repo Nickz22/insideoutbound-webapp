@@ -8,6 +8,8 @@ import MemberIcon from "../icons/MemberIcon";
 import DocumentIcon from "../icons/DocumentIcon";
 import PaidIcon from "../icons/PaidIcon";
 
+const hintInterval = 3000;
+
 const HintsShowOnLoading = () => {
   const hints = [
     {
@@ -65,7 +67,7 @@ const HintsShowOnLoading = () => {
         });
         setFade(true);
       }, 1000);
-    }, 5000);
+    }, hintInterval);
 
     return () => clearInterval(interval);
   }, [hints.length, isLastHint]);

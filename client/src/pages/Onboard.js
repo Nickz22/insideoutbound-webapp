@@ -28,8 +28,8 @@ import { ONBOARD_WIZARD_STEPS } from "../utils/c";
 import Logo from "src/components/Logo/Logo";
 
 const REQUIRED_PROSPECTING_CATEGORIES = [
-  "Inbound Call",
-  "Outbound Call",
+  "Call Connect",
+  "Dial",
   "Inbound Email",
   "Outbound Email",
 ];
@@ -358,8 +358,7 @@ const Onboard = () => {
             Prospecting Categories
           </Typography>
           <Typography variant="body1" paragraph>
-            Define criteria by which we will recognize an Inbound Call, Outbound
-            Call, Inbound Email and Outbound Email.
+            Define criteria by which we will recognize a connected call, outbound dial, inbound email and outbound email.
           </Typography>
           <ProspectingCriteriaSelector
             title="Prospecting Activity Criteria"
@@ -421,30 +420,6 @@ const Onboard = () => {
           orientation="vertical"
         />
       </Paper>
-      {/* <Box sx={{ flexGrow: 1, marginLeft: "250px" }}>
-        <Dialog
-          open
-          onClose={() => {
-            console.log("closing");
-          }}
-          PaperProps={{
-            style: dialogStyle,
-          }}
-          fullWidth
-          maxWidth={false}
-        >
-          <DialogContent
-            style={{
-              padding: isLargeDialogStep() ? "24px" : "16px",
-              transition: "padding 0.3s ease-in-out",
-              height: "100%",
-              overflow: "auto",
-            }}
-          >
-            {renderStep()}
-          </DialogContent>
-        </Dialog>
-      </Box> */}
       <Box
         sx={{
           display: "flex",

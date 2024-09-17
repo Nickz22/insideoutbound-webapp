@@ -15,8 +15,6 @@ import {
   Tooltip,
   Link,
   Typography,
-  Button,
-  Paper,
   Grid,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -45,9 +43,10 @@ import SummaryLineChartCard from "src/components/SummaryCard/SummaryLineChartCar
  */
 
 import { dataset } from "./mockDataset";
+import FreeTrialExpired from "../../components/FreeTrialExpired/FreeTrialExpired";
 
 const Prospecting = () => {
-  const [period, setPeriod] = useState("7d");
+  const [period, setPeriod] = useState("All");
   const [view, setView] = useState("Summary");
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -187,19 +186,94 @@ const Prospecting = () => {
     if (selectedPeriod === "All") return data;
 
     const now = new Date();
-    const periodInHours = {
-      "24h": 24,
-      "48h": 48,
-      "7d": 24 * 7,
-      "30d": 24 * 30,
-      "90d": 24 * 90,
-    }[selectedPeriod];
+    now.setHours(23, 59, 59, 999); // Set to end of day for inclusive comparison
+    let startDate, endDate;
+
+    const getLastSunday = (d) => {
+      const day = d.getDay();
+      return new Date(d.setDate(d.getDate() - day));
+    };
+
+    const getFirstDayOfMonth = (d) =>
+      new Date(d.getFullYear(), d.getMonth(), 1);
+    const getLastDayOfMonth = (d) =>
+      new Date(d.getFullYear(), d.getMonth() + 1, 0);
+
+    const getQuarterDates = (date) => {
+      const quarter = Math.floor(date.getMonth() / 3);
+      const startMonth = quarter * 3;
+      return {
+        start: new Date(date.getFullYear(), startMonth, 1),
+        end: new Date(date.getFullYear(), startMonth + 3, 0),
+      };
+    };
+
+    switch (selectedPeriod) {
+      case "Today":
+        startDate = new Date(now);
+        startDate.setHours(0, 0, 0, 0);
+        endDate = now;
+        break;
+      case "Yesterday":
+        endDate = new Date(now);
+        endDate.setDate(endDate.getDate() - 1);
+        endDate.setHours(23, 59, 59, 999);
+        startDate = new Date(endDate);
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case "This Week":
+        startDate = getLastSunday(new Date(now));
+        endDate = new Date(startDate);
+        endDate.setDate(endDate.getDate() + 6);
+        break;
+      case "Last Week":
+        endDate = getLastSunday(new Date(now));
+        endDate.setDate(endDate.getDate() - 1);
+        startDate = new Date(endDate);
+        startDate.setDate(startDate.getDate() - 6);
+        break;
+      case "This Month":
+        startDate = getFirstDayOfMonth(now);
+        endDate = getLastDayOfMonth(now);
+        break;
+      case "Last Month":
+        endDate = getFirstDayOfMonth(now);
+        endDate.setDate(endDate.getDate() - 1);
+        startDate = getFirstDayOfMonth(endDate);
+        break;
+      case "This Quarter":
+        const thisQuarter = getQuarterDates(now);
+        startDate = thisQuarter.start;
+        endDate = thisQuarter.end;
+        break;
+      case "Last Quarter":
+        const lastQuarterEnd = new Date(
+          now.getFullYear(),
+          Math.floor(now.getMonth() / 3) * 3,
+          0
+        );
+        const lastQuarter = getQuarterDates(lastQuarterEnd);
+        startDate = lastQuarter.start;
+        endDate = lastQuarter.end;
+        break;
+      default:
+        return data;
+    }
+
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
 
     return data.filter((item) => {
-      const lastProspectingActivity = new Date(item.last_prospecting_activity);
-      const hoursDifference =
-        (now - lastProspectingActivity) / (1000 * 60 * 60);
-      return hoursDifference < periodInHours; // Changed <= to
+      const [year, month, day] = item.last_prospecting_activity
+        .split("-")
+        .map(Number);
+      const lastProspectingActivity = new Date(year, month - 1, day);
+      lastProspectingActivity.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
+
+      return (
+        lastProspectingActivity >= startDate &&
+        lastProspectingActivity <= endDate
+      );
     });
   }, []);
 
@@ -347,100 +421,8 @@ const Prospecting = () => {
     return <Alert severity="error">{error}</Alert>;
   }
 
-  if (loggedInUser.status === "not paid" && freeTrialDaysLeft === 0) {
-    return (
-      <Box
-        sx={{
-          position: "relative",
-          width: "100%",
-          height: "100dvh",
-          maxHeight: "100dvh",
-          overflow: "hidden",
-          backgroundColor: "#FFFFFF",
-          maxWidth: "100%",
-          boxSizing: "border-box",
-          padding: 0,
-          margin: 0,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            width: "852px",
-            borderRadius: "50px",
-            display: "flex",
-            flexDirection: "column",
-            justifyContent: "center",
-            alignItems: "center",
-            padding: "34px 67px 47px",
-            boxShadow: "2px 13px 20.5px 1px #0000001A",
-          }}
-        >
-          <Typography
-            sx={{
-              marginBottom: "14px",
-              fontSize: "14px",
-              lineHeight: "1",
-              letterSpacing: "4.76px",
-              fontWeight: "500",
-              textAlign: "center",
-            }}
-          >
-            HEADS UP!
-          </Typography>
-          <Typography
-            sx={{
-              marginBottom: "28px",
-              fontSize: "54px",
-              lineHeight: "1",
-              letterSpacing: "-1.62px",
-              fontWeight: "700",
-              textAlign: "center",
-            }}
-          >
-            Your free trial is over
-          </Typography>
-          <Typography
-            sx={{
-              marginBottom: "40px",
-              fontSize: "18px",
-              lineHeight: "1.78",
-              fontWeight: "400",
-              textAlign: "center",
-            }}
-          >
-            Lorem ipsum dolor sit amet, consectetur adipiscing elit. Quisque
-            aliquam sapien a lorem auctor, a varius lectus bibendum. Aenean non
-            est at quam commodo.
-          </Typography>
-
-          <Button
-            onClick={() => {
-              navigate("/app/account");
-            }}
-            sx={{
-              background:
-                "linear-gradient(168deg, #FF7D2F 24.98%, #491EFF 97.93%)",
-              height: "57px",
-              width: "388px",
-              borderRadius: "40px",
-              color: "white",
-              fontSize: "32px",
-              letterSpacing: "-0.96px",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              textTransform: "none",
-            }}
-          >
-            Upgrade to Paid
-          </Button>
-        </Paper>
-      </Box>
-    );
+  if (loggedInUser.status !== "paid" && freeTrialDaysLeft === 0) {
+    return <FreeTrialExpired />;
   }
 
   return (
@@ -504,7 +486,17 @@ const Prospecting = () => {
                     top: "0px",
                   },
                 }}
-                options={["All", "24h", "48h", "7d", "30d", "90d"]}
+                options={[
+                  "All",
+                  "Today",
+                  "Yesterday",
+                  "This Week",
+                  "Last Week",
+                  "This Month",
+                  "Last Month",
+                  "This Quarter",
+                  "Last Quarter",
+                ]}
               />
             </FormControl>
             <FormControl

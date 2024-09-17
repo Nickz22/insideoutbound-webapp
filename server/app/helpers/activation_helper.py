@@ -30,6 +30,7 @@ def generate_summary(activations: list[Activation]) -> dict:
         "total_deals": 0,
         "total_pipeline_value": 0,
         "engaged_activations": 0,
+        "total_active_contacts": 0,
     }
 
     account_contacts = defaultdict(set)
@@ -54,6 +55,7 @@ def generate_summary(activations: list[Activation]) -> dict:
     summary["total_contacts"] = sum(
         len(contacts) for contacts in account_contacts.values()
     )
+    summary["total_active_contacts"] = len(account_contacts)
     summary["total_accounts"] = len(account_contacts)
     summary["avg_tasks_per_contact"] = (
         summary["total_tasks"] / summary["total_contacts"]
