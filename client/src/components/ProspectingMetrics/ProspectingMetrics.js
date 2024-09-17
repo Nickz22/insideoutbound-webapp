@@ -16,7 +16,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Activations"
-          value={summaryData.total_activations.toString()}
+          value={summaryData.total_activations?.toString() ||  "0"}
           subText=""
           tooltipTitle="The number of approached accounts in the selected period"
         />
@@ -24,7 +24,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Activations Today"
-          value={summaryData.activations_today.toString()}
+          value={summaryData.activations_today?.toString() || "0"}
           subText=""
           tooltipTitle="The number of accounts which were approached today"
         />
@@ -32,7 +32,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Tasks"
-          value={summaryData.total_tasks.toString()}
+          value={summaryData.total_tasks?.toString() || "0"}
           subText=""
           tooltipTitle="The total number of prospecting Tasks created in the selected period"
         />
@@ -40,7 +40,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Events"
-          value={summaryData.total_events.toString()}
+          value={summaryData.total_events?.toString() || "0"}
           subText=""
           tooltipTitle="The total number of meetings created in the selected period"
         />
@@ -48,7 +48,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Contacts Approached"
-          value={summaryData.total_active_contacts.toString()}
+          value={summaryData.total_active_contacts?.toString() || "0"}
           subText=""
           tooltipTitle="The total number of contacts with sufficient outbound prospecting activities to be considered activated"
         />
@@ -56,7 +56,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Avg Tasks Per Contact"
-          value={summaryData.avg_tasks_per_contact.toFixed(2)}
+          value={summaryData.avg_tasks_per_contact?.toFixed(2) || "0"}
           subText=""
           tooltipTitle="The average number of tasks per contact under each activated account"
         />
@@ -64,7 +64,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Avg Contacts Per Account"
-          value={summaryData.avg_contacts_per_account.toFixed(2)}
+          value={summaryData.avg_contacts_per_account?.toFixed(2) || "0"}
           subText=""
           tooltipTitle="The average number of tasks per activated account"
         />
@@ -72,7 +72,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Deals"
-          value={summaryData.total_deals.toString()}
+          value={summaryData.total_deals?.toString() || "0"}
           subText=""
           tooltipTitle="The total number of open opportunities related to any activated account in the selected period"
         />
@@ -80,7 +80,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Total Pipeline Value"
-          value={`$${summaryData.total_pipeline_value.toLocaleString()}`}
+          value={`$${summaryData.total_pipeline_value?.toLocaleString() || "0"}`}
           subText=""
           tooltipTitle="The total amount of open opportunities related to any activated account in the selected period"
         />
@@ -88,7 +88,7 @@ const ProspectingMetrics = ({
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
           title="Engaged Activations"
-          value={summaryData.engaged_activations.toString()}
+          value={summaryData.engaged_activations?.toString() || "0"}
           subText=""
           tooltipTitle="The number of activated Accounts which have had inbound engagement"
         />

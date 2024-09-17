@@ -394,7 +394,7 @@ const Account = () => {
 
       {userStatus === "paused" && (
         <SubscriptionAlertCard
-          title="Your Membership on Paused!"
+          title="Your Membership is paused!"
           subtitle="Don't Miss Out!"
           description="Your membership is on hold, but don't worry — you can resume anytime to unlock all the perks again. We're here when you're ready!"
           buttonText="Resume Membership"
