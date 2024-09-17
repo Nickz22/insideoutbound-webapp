@@ -39,7 +39,7 @@ const ProspectingMetrics = ({
       </Grid>
       <Grid item xs={12} sm={6} md={4} lg={4}>
         <MetricCard
-          title="Total Events"
+          title="Total Meetings"
           value={summaryData.total_events?.toString() || "0"}
           subText=""
           tooltipTitle="The total number of meetings created in the selected period"
