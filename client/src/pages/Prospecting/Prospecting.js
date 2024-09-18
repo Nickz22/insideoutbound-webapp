@@ -30,20 +30,17 @@ import {
 import CustomTable from "../../components/CustomTable/CustomTable";
 import ProspectingMetadataOverview from "../../components/ProspectingMetadataOverview/ProspectingMetadataOverview";
 import ProspectingEffortTimeline from "../../components/ProspectingEffortTimeline/ProspectingEffortTimeline";
-import ProspectingMetrics from "../../components/ProspectingMetrics/ProspectingMetrics";
 
 import Lottie from "lottie-react";
 import ProspectingLoadingAnimation from "../../assets/lottie/prospecting-loading-animation.json";
 import HintsShowOnLoading from "src/components/HintsShowOnLoading/HintsShowOnLoading";
 import CustomSelect from "src/components/CustomSelect/CustomSelect";
-import SummaryBarChartCard from "src/components/SummaryCard/SummaryBarChartCard";
-import SummaryLineChartCard from "src/components/SummaryCard/SummaryLineChartCard";
 /**
  * @typedef {import('types').Activation} Activation
  */
 
-import { dataset } from "./mockDataset";
 import FreeTrialExpired from "../../components/FreeTrialExpired/FreeTrialExpired";
+import ProspectingSummary from "./ProspectingSummary";
 
 const Prospecting = () => {
   const [period, setPeriod] = useState("All");
@@ -562,50 +559,7 @@ const Prospecting = () => {
         {error ? (
           <Alert severity="error">{error}</Alert>
         ) : view === "Summary" ? (
-          <Grid container spacing={3}>
-            {summaryLoading ? (
-              getLoadingComponent("Generating summary...")
-            ) : (
-              <>
-                <ProspectingMetrics
-                  summaryData={summaryData}
-                  summaryLoading={summaryLoading}
-                  getLoadingComponent={getLoadingComponent}
-                />
-                <Grid item xs={12} sm={4.5} md={4.5} lg={4.5}>
-                  <SummaryBarChartCard
-                    data={dataset.activeApproachedPerUser.data}
-                    target={dataset.activeApproachedPerUser.target}
-                    title={dataset.activeApproachedPerUser.title}
-                    direction={"vertical"}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={7.5} md={7.5} lg={7.5}>
-                  <SummaryBarChartCard
-                    data={dataset.closedRevenuePerUser.data}
-                    target={dataset.closedRevenuePerUser.target}
-                    title={dataset.closedRevenuePerUser.title}
-                    direction={"vertical"}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={4.5} md={4.5} lg={4.5}>
-                  <SummaryLineChartCard
-                    data={dataset.totalPipelineValue.data}
-                    target={dataset.totalPipelineValue.target}
-                    title={dataset.totalPipelineValue.title}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={7.5} md={7.5} lg={7.5}>
-                  <SummaryBarChartCard
-                    data={dataset.activationsPerStatus.data}
-                    target={dataset.activationsPerStatus.target}
-                    title={dataset.activationsPerStatus.title}
-                    direction={"horizontal"}
-                  />
-                </Grid>
-              </>
-            )}
-          </Grid>
+          <ProspectingSummary />
         ) : (
           <>
             <CustomTable
