@@ -161,10 +161,12 @@ const InfoGatheringStep = ({
       }))
     );
 
-    completedInputs.push({
-      label: "teamMemberIds",
-      value: [...tableData.selectedIds]
-    })
+    if (tableData) {
+      completedInputs.push({
+        label: "teamMemberIds",
+        value: [...tableData.selectedIds]
+      });
+    }
 
     onComplete(completedInputs);
   };
