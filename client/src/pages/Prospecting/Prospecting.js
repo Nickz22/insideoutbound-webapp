@@ -15,7 +15,9 @@ import {
   Tooltip,
   Link,
   Typography,
-  Grid,
+  Switch,
+  styled,
+  Stack,
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "../../components/DataFilter/DataFilter";
@@ -42,9 +44,57 @@ import CustomSelect from "src/components/CustomSelect/CustomSelect";
 import FreeTrialExpired from "../../components/FreeTrialExpired/FreeTrialExpired";
 import ProspectingSummary from "./ProspectingSummary";
 
+const AntSwitch = styled(Switch)(({ theme }) => ({
+  width: 28,
+  height: 16,
+  padding: 0,
+  display: 'flex',
+  '&:active': {
+    '& .MuiSwitch-thumb': {
+      width: 15,
+    },
+    '& .MuiSwitch-switchBase.Mui-checked': {
+      transform: 'translateX(9px)',
+    },
+  },
+  '& .MuiSwitch-switchBase': {
+    padding: 2,
+    '&.Mui-checked': {
+      transform: 'translateX(12px)',
+      color: '#fff',
+      '& + .MuiSwitch-track': {
+        opacity: 1,
+        backgroundColor: '#1890ff',
+        ...theme.applyStyles('dark', {
+          backgroundColor: '#177ddc',
+        }),
+      },
+    },
+  },
+  '& .MuiSwitch-thumb': {
+    boxShadow: '0 2px 4px 0 rgb(0 35 11 / 20%)',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    transition: theme.transitions.create(['width'], {
+      duration: 200,
+    }),
+  },
+  '& .MuiSwitch-track': {
+    borderRadius: 16 / 2,
+    opacity: 1,
+    backgroundColor: 'rgba(0,0,0,.25)',
+    boxSizing: 'border-box',
+    ...theme.applyStyles('dark', {
+      backgroundColor: 'rgba(255,255,255,.35)',
+    }),
+  },
+}));
+
+
 const Prospecting = () => {
   const [period, setPeriod] = useState("All");
-  const [view, setView] = useState("Summary");
+  const [isSummary, setIsSummary] = useState(true);
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [initialDataLoading, setInitialDataLoading] = useState(false);
@@ -175,10 +225,6 @@ const Prospecting = () => {
 
   const handlePeriodChange = (event) => {
     setPeriod(event.target.value);
-  };
-
-  const handleViewChange = (event) => {
-    setView(event.target.value);
   };
 
   const filterDataByPeriod = useCallback((data, selectedPeriod) => {
@@ -416,7 +462,7 @@ const Prospecting = () => {
     }
   }, [filteredData]);
 
-  if (loading || initialDataLoading) {
+  if (loading || initialDataLoading || summaryLoading) {
     return getLoadingComponent("We are fetching your activity...");
   }
 
@@ -507,28 +553,11 @@ const Prospecting = () => {
               size="small"
               sx={{ minWidth: "93px", marginTop: "-12px" }}
             >
-              <CustomSelect
-                value={view}
-                label="View"
-                onChange={handleViewChange}
-                placeholder="Select View"
-                selectSx={{
-                  width: "100%",
-                  fontSize: "16px",
-                  lineHeight: "1.78",
-                  letterSpacing: "-0.48px",
-                  paddingBottom: "0px",
-                }}
-                labelSx={{
-                  fontSize: "12px",
-                  top: "13px",
-                  left: "-14px",
-                  "&.Mui-focused": {
-                    top: "0px",
-                  },
-                }}
-                options={["Summary", "Detailed"]}
-              />
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                <Typography>Detailed</Typography>
+                <AntSwitch checked={isSummary} onChange={() => { setIsSummary(prev => !prev) }} inputProps={{ 'aria-label': 'ant design' }} />
+                <Typography>Summary</Typography>
+              </Stack>
             </FormControl>
             <Tooltip
               title={
@@ -558,8 +587,8 @@ const Prospecting = () => {
 
         {error ? (
           <Alert severity="error">{error}</Alert>
-        ) : view === "Summary" ? (
-          <ProspectingSummary />
+        ) : isSummary && !summaryLoading ? (
+          <ProspectingSummary period={period} summaryData={summaryData} />
         ) : (
           <>
             <CustomTable
