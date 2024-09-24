@@ -7,7 +7,8 @@ from app.data_models import TokenData
 from app.database.dml import save_session, delete_session
 from app.database.supabase_connection import get_supabase_admin_client
 from app.tests.mocks import (
-    mock_fetch_sobjects_async,
+    mock_fetch_contact_by_id_map,
+    mock_fetch_contacts_by_account_ids,
     response_based_on_query,
     get_mock_opportunity_for_account,
     get_n_mock_contacts_for_account,
@@ -87,13 +88,17 @@ class TestUpdateActivationStatusToOpportunityCreated:
         add_mock_response("fetch_logged_in_salesforce_user", {"Id": mock_user_id})
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
+    @patch(
+        "app.services.activation_service.fetch_contacts_by_account_ids",
+        side_effect=mock_fetch_contacts_by_account_ids,
+    )
     async def test_should_update_activation_status_to_opportunity_created_without_additional_task(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self, mock_sobject_fetch, mock_fetch_contact_composite, mock_fetch_contacts_by_account_ids
     ):
         with self.app.app_context():
             # Set up the initial activation
@@ -119,22 +124,26 @@ class TestUpdateActivationStatusToOpportunityCreated:
             )
             mock_opportunity["Amount"] = 6969.42
 
+            # unresponsive flow
+            add_mock_response("fetch_all_matching_tasks", [])
+            # increment activations flow
+            add_mock_response("fetch_all_matching_tasks", [])
+            # compute activations flow
+            add_mock_response("fetch_all_matching_tasks", [])
+            # unresponsive flow
             add_mock_response(
                 "fetch_opportunities_by_account_ids_from_date",
                 [mock_opportunity],
             )
-
-            # No new tasks
-            mock_contacts = get_n_mock_contacts_for_account(
-                1, meeting_set_activation["account"]["id"]
+            # compute activations flow
+            add_mock_response(
+                "fetch_opportunities_by_account_ids_from_date",
+                [mock_opportunity],
             )
-            # mock twice since two different queries are being made against same endpoint
-            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-            add_mock_response("contains_content_criteria_query", [])
-            add_mock_response("unique_values_content_criteria_query", [])
-            add_mock_response("fetch_events_by_account_ids_from_date", [])
-            add_mock_response("fetch_accounts_not_in_ids", [])
+            # unresponsive flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", [])
+            # compute activations flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", [])
 
             # Fetch updated activations
             updated_activations = await assert_and_return_payload_async(

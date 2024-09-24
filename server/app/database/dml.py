@@ -77,15 +77,24 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool) -> str:
 def upsert_activations(new_activations: list[Activation]):
     api_response = ApiResponse(data=[], message="", success=False)
     supabase = get_supabase_admin_client()
-    supabase_activations = [
-        {
-            **python_activation_to_supabase_dict(activation),
-        }
-        for activation in new_activations
-    ]
+    
+    CHUNK_SIZE = 100
+    
+    for i in range(0, len(new_activations), CHUNK_SIZE):
+        chunk = new_activations[i:i + CHUNK_SIZE]
+        supabase_activations = [
+            python_activation_to_supabase_dict(activation)
+            for activation in chunk
+        ]
 
-    supabase.table("Activations").upsert(supabase_activations).execute()
+        try:
+            supabase.table("Activations").upsert(supabase_activations).execute()
+        except Exception as e:
+            api_response.message = f"Error upserting chunk {i//CHUNK_SIZE}: {str(e)}"
+            return api_response
+
     api_response.success = True
+    api_response.message = f"Successfully upserted {len(new_activations)} activations"
     return api_response
 
 

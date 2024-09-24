@@ -6,28 +6,41 @@ from app.mapper.mapper import supabase_dict_to_python_activation
 from app.database.settings_selector import load_settings
 from app.utils import get_salesforce_team_ids, format_error_message
 
+from app.database.supabase_retry import retry_on_temporary_unavailable
 
+@retry_on_temporary_unavailable()
 def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResponse:
     supabase_client = get_supabase_admin_client()
     team_member_ids = get_salesforce_team_ids(load_settings())
 
-    response = (
-        supabase_client.table("Activations")
-        .select("*")
-        .neq("status", "Unresponsive")
-        .in_("activated_by_id", team_member_ids)
-        .order("first_prospecting_activity", desc=False)
-        .execute()
-    )
+    page_size = 1000
+    current_page = 0
+    all_activations = []
 
-    activations: List[Activation] = []
-    for row in response.data:
-        activation = supabase_dict_to_python_activation(row)
-        activations.append(activation)
+    while True:
+        response = (
+            supabase_client.table("Activations")
+            .select("*")
+            .neq("status", "Unresponsive")
+            .in_("activated_by_id", team_member_ids)
+            .order("first_prospecting_activity", desc=False)
+            .range(current_page * page_size, (current_page + 1) * page_size - 1)
+            .execute()
+        )
 
-    return ApiResponse(data=activations if activations else [], success=True)
+        if not response.data:
+            break
+
+        all_activations.extend(supabase_dict_to_python_activation(row) for row in response.data)
+        current_page += 1
+
+        if len(response.data) < page_size:
+            break
+
+    return ApiResponse(data=all_activations, success=True)
 
 
+@retry_on_temporary_unavailable()
 def load_inactive_activations() -> ApiResponse:
     try:
         supabase_client = get_supabase_admin_client()

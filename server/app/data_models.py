@@ -1,7 +1,8 @@
 from pydantic import BaseModel, Field
-from typing import List, Optional, Set, Any, Union
+from typing import List, Optional, Set, Any, Union, Dict
 from datetime import date, datetime
 from enum import Enum
+import re
 
 
 def serialize_complex_types(obj: Any) -> Any:
@@ -25,7 +26,8 @@ class SerializableModel(BaseModel):
             key: serialize_complex_types(value)
             for key, value in self.model_dump().items()
         }
-        
+
+
 class UserSObject(SerializableModel):
     Id: str
     Email: Optional[str] = None
@@ -34,6 +36,7 @@ class UserSObject(SerializableModel):
     FullPhotoUrl: Optional[str] = None
     FirstName: Optional[str] = None
     Role: Optional[str] = None
+
 
 class UserModel(SerializableModel):
     id: str
@@ -58,6 +61,8 @@ class UserModel(SerializableModel):
             photoUrl=sobject.FullPhotoUrl,
             role=sobject.Role,
         )
+
+
 class ApiResponse:
     def __init__(self, data=None, message="", success=False, status_code=None):
         self.data = data
@@ -98,7 +103,13 @@ class Account(SerializableModel):
     created_date: Optional[datetime] = None
     owner: Optional[UserModel] = None
 
-
+class Contact(SerializableModel):
+    id: str
+    first_name: str
+    last_name: str
+    account_id: str
+    account: Account
+    owner_id: Optional[str] = None
 class Task(SerializableModel):
     id: str
     created_date: datetime
@@ -106,6 +117,8 @@ class Task(SerializableModel):
     who_id: str
     subject: str
     status: str
+    contact: Optional[Contact] = None
+    account: Optional[Account] = None
     task_subtype: Optional[str] = None
 
 
@@ -147,14 +160,6 @@ class Event(SerializableModel):
     end_datetime: datetime
 
 
-class Contact(SerializableModel):
-    id: str
-    first_name: str
-    last_name: str
-    account_id: str
-    account: Account
-
-
 class StatusEnum(str, Enum):
     activated = "Activated"
     unresponsive = "Unresponsive"
@@ -186,6 +191,8 @@ class ProspectingEffort(SerializableModel):
     status: str
     date_entered: date
     task_ids: Set[str]
+
+
 class Activation(SerializableModel):
     id: str
     account: Account
@@ -209,10 +216,10 @@ class Activation(SerializableModel):
     status: StatusEnum = Field(default=StatusEnum.activated)
 
     def __init__(self, **data):
-        if 'activated_by' in data and isinstance(data['activated_by'], UserModel):
-            data['activated_by_id'] = data['activated_by'].id
-        if 'active_contacts' in data:
-            data['active_contact_count'] = len(data['active_contacts'])
+        if "activated_by" in data and isinstance(data["activated_by"], UserModel):
+            data["activated_by_id"] = data["activated_by"].id
+        if "active_contacts" in data:
+            data["active_contact_count"] = len(data["active_contacts"])
         super().__init__(**data)
 
 
@@ -223,12 +230,85 @@ class Filter(SerializableModel):
     data_type: str
     options: Optional[str] = None
 
+    def matches(self, task: Dict) -> bool:
+        task_value = task.get(self.field)
+        if task_value is None:
+            return False
+        if self.data_type == "string":
+            return self._match_string(str(task_value))
+        elif self.data_type == "number":
+            return self._match_number(float(task_value))
+        elif self.data_type == "date":
+            return self._match_date(task_value)
+        return False
+
+    def _match_string(self, task_value: str) -> bool:
+        task_value = task_value.lower()
+        value = self.value.lower()
+        if self.operator == "equals":
+            return task_value == value
+        elif self.operator == "not_equal":
+            return task_value != value
+        elif self.operator == "contains":
+            return value in task_value
+        elif self.operator == "does_not_contain":
+            return value not in task_value
+        return False
+
+    def _match_number(self, task_value: float) -> bool:
+        value = float(self.value)
+        if self.operator == "equals":
+            return task_value == value
+        elif self.operator == "not_equal":
+            return task_value != value
+        elif self.operator == "greater_than":
+            return task_value > value
+        elif self.operator == "less_than":
+            return task_value < value
+        elif self.operator == "greater_or_equal":
+            return task_value >= value
+        elif self.operator == "less_or_equal":
+            return task_value <= value
+        return False
+
+    def _match_date(self, task_value: str) -> bool:
+        # Parse the task_value, which is in the format 'YYYY-MM-DD'
+        task_date = datetime.strptime(task_value, "%Y-%m-%d").date()
+
+        if self.operator == "equals":
+            return task_date == datetime.strptime(self.value, "%Y-%m-%d").date()
+        elif self.operator == "not_equal":
+            return task_date != datetime.strptime(self.value, "%Y-%m-%d").date()
+        elif self.operator == "greater_than":
+            return task_date > datetime.strptime(self.value, "%Y-%m-%d").date()
+        elif self.operator == "less_than":
+            return task_date < datetime.strptime(self.value, "%Y-%m-%d").date()
+        return False
+
 
 class FilterContainer(SerializableModel):
     name: str
     filters: List[Filter]
     filter_logic: str
     direction: Optional[str] = None
+
+    def matches(self, task: Dict) -> bool:
+        conditions = [f.matches(task) for f in self.filters]
+        condition_map = {str(i + 1): c for i, c in enumerate(conditions)}
+
+        # Replace logical operators
+        logic = self.filter_logic.replace(" AND ", " and ").replace(" OR ", " or ")
+
+        # Evaluate the logical expression
+        try:
+            # Replace condition numbers with their boolean values
+            for i, condition in condition_map.items():
+                replace_condition_number = f"_{i}_"
+                logic = re.sub(r"\b" + replace_condition_number + r"\b", str(condition), logic)
+            return eval(logic, {"__builtins__": {}}, condition_map)
+        except Exception as e:
+            print(f"Error evaluating logic: {e}")
+            return False
 
 
 class Settings(SerializableModel):
@@ -299,6 +379,7 @@ class TableColumn(SerializableModel):
     id: str
     dataType: DataType
     label: str
+
 
 class TokenData(SerializableModel):
     access_token: str

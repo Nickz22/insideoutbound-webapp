@@ -12,14 +12,15 @@ from app.database.activation_selector import (
 )
 from app.database.supabase_connection import get_supabase_admin_client
 from app.tests.mocks import (
-    mock_fetch_sobjects_async,
+    mock_fetch_contact_by_id_map,
+    mock_fetch_contacts_by_account_ids,
     response_based_on_query,
     add_mock_response,
     clear_mocks,
 )
 from app.tests.test_helpers import (
     do_onboarding_flow,
-    setup_thirty_tasks_across_ten_contacts_and_five_accounts,
+    setup_thirty_tasks_across_ten_contacts_and_five_accounts_for_start_of_test,
     setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events,
     assert_and_return_payload,
     setup_six_tasks_across_two_contacts_and_one_account,
@@ -92,17 +93,23 @@ class TestCreateNewActivationsForPreviouslyActivatedAccounts:
         add_mock_response("fetch_logged_in_salesforce_user", {"Id": mock_user_id})
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
+    @patch(
+        "app.services.activation_service.fetch_contacts_by_account_ids",
+        side_effect=mock_fetch_contacts_by_account_ids,
+    )
     async def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self, mock_sobject_fetch, mock_fetch_contact_by_id_map, mock_fetch_contacts_by_account_ids
     ):
         with self.app.app_context():
             # setup mock api responses
-            setup_thirty_tasks_across_ten_contacts_and_five_accounts(mock_user_id)
+            setup_thirty_tasks_across_ten_contacts_and_five_accounts_for_start_of_test(
+                mock_user_id
+            )
 
             # initial account activation
             response = await asyncio.to_thread(
@@ -110,7 +117,9 @@ class TestCreateNewActivationsForPreviouslyActivatedAccounts:
             )
             initial_activations = assert_and_return_payload(response)
 
-            assert len(initial_activations) == 5
+            assert (
+                len(initial_activations) == 5
+            ), "Expected 5 initial activations since there are 10 Contacts with 3 Tasks each across 5 Accounts, and settings are configured to activate at that rate"
 
             # set last_prospecting_activity of first activation to 1 day over threshold
             activation_to_inactivate = (

@@ -8,18 +8,20 @@ from app.data_models import TokenData
 from app.database.dml import save_session, delete_session
 from app.database.supabase_connection import get_supabase_admin_client
 from app.tests.mocks import (
-    mock_fetch_sobjects_async,
+    mock_fetch_contact_by_id_map,
+    mock_fetch_contacts_by_account_ids,
     response_based_on_query,
     get_five_mock_accounts,
     get_two_mock_contacts_per_account,
     get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query,
     add_mock_response,
     clear_mocks,
+    set_mock_contacts_for_map,
 )
 from app.tests.test_helpers import (
     do_onboarding_flow,
     assert_and_return_payload_async,
-    get_salesforce_compatible_datetime_now
+    get_salesforce_compatible_datetime_now,
 )
 from contextlib import contextmanager
 import logging
@@ -89,13 +91,14 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
         add_mock_response("fetch_logged_in_salesforce_user", {"Id": mock_user_id})
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch("app.salesforce_api.fetch_contact_by_id_map", side_effect=mock_fetch_contact_by_id_map)
+    @patch(
+        "app.services.activation_service.fetch_contacts_by_account_ids",
+        side_effect=mock_fetch_contacts_by_account_ids,
+    )
     async def test_should_increment_existing_activation_given_new_outbound_activities(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self, mock_sobject_fetch, mock_fetch_contact_composite, mock_fetch_contacts_by_account_ids
     ):
         with self.app.app_context():
             # Set up initial activation
@@ -106,22 +109,18 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
                     3, mock_contacts, mock_user_id
                 )
             )
-            
+
             # set created_date to iso now
             for task in initial_tasks:
                 task["CreatedDate"] = get_salesforce_compatible_datetime_now()
+                task["Id"] = str(uuid.uuid4())
 
             # Setup mock responses for initial fetch
-            add_mock_response("fetch_accounts_not_in_ids", [mock_account])
-            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-            add_mock_response("unique_values_content_criteria_query", initial_tasks)
-            add_mock_response("contains_content_criteria_query", [])
+            set_mock_contacts_for_map(mock_contacts)
+            add_mock_response("fetch_all_matching_tasks", initial_tasks)
             add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
-            add_mock_response("fetch_events_by_account_ids_from_date", [])
-            add_mock_response(
-                "fetch_contacts_by_ids_and_non_null_accounts", mock_contacts
-            )
+            add_mock_response("fetch_events_by_contact_ids_from_date", [])
+
             add_mock_response(
                 "fetch_salesforce_users",
                 [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
@@ -146,20 +145,20 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
                     2, mock_contacts, mock_user_id
                 )
             )
-            
+
             # set created_date to iso now
             for task in new_tasks:
                 task["CreatedDate"] = get_salesforce_compatible_datetime_now()
                 task["Id"] = str(uuid.uuid4())
 
             # Setup mock responses for the second fetch
-            add_mock_response("fetch_accounts_not_in_ids", [])
-            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-            add_mock_response("unique_values_content_criteria_query", new_tasks)
-            add_mock_response("contains_content_criteria_query", [])
-            add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
-            add_mock_response("fetch_events_by_account_ids_from_date", [])
+            add_mock_response("fetch_all_matching_tasks", new_tasks) # increment existing activations flow
+            add_mock_response("fetch_all_matching_tasks", new_tasks) # unresponsive flow
+            add_mock_response("fetch_all_matching_tasks", new_tasks) # compute new activations flowå
+            add_mock_response("fetch_opportunities_by_account_ids_from_date", []) # increment existing activations flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", []) # increment existing activations flow
+            add_mock_response("fetch_opportunities_by_account_ids_from_date", []) # compute new activations flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", []) # compute new activations flow
             add_mock_response(
                 "fetch_salesforce_users",
                 [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],

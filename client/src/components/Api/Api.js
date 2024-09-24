@@ -63,10 +63,20 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
-    // For actual errors (network issues, etc.), just log them
-    console.error("Axios error:", error);
-    return Promise.reject(error);
+  async (error) => {
+    if (error.response) {
+      // The server responded with a status code outside the 2xx range
+      console.error("Server error:", error.response.status, error.response.data);
+      return Promise.reject(error.response.data);
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error("No response received:", error.request);
+      return Promise.reject(new Error("No response from server"));
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error("Request setup error:", error.message);
+      return Promise.reject(error);
+    }
   }
 );
 

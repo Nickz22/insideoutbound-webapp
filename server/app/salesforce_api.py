@@ -1,9 +1,10 @@
 import requests
 import asyncio
 import aiohttp
+from datetime import datetime, timezone
 from flask import current_app as app
 from typing import List, Dict
-from app.utils import pluck, format_error_message
+from app.utils import pluck, format_error_message, group_by, get_utc_now_for_supabase
 from app.data_models import (
     ApiResponse,
     Contact,
@@ -16,6 +17,7 @@ from app.data_models import (
 )
 from app.database.supabase_connection import get_session_state
 from app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
+import concurrent.futures
 
 
 def get_credentials():
@@ -65,88 +67,6 @@ def fetch_criteria_fields(sobject_type: str) -> List[CriteriaField]:
     return api_response
 
 
-def fetch_accounts_not_in_ids(account_ids):
-    """
-    Fetches all Accounts from Salesforce and loops through them to find those which are not in `account_ids`
-
-    Parameters:
-    - account_ids (list[str]): A list of account IDs to exclude from the fetched accounts.
-
-    Returns:
-    - ApiResponse: An ApiResponse object containing the fetched accounts as a list of Account objects.
-
-    Throws:
-    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
-    """
-    api_response = ApiResponse(data=[], message="", success=False)
-
-    try:
-        soql_query = "SELECT Id,Name,Industry,AnnualRevenue,NumberOfEmployees,CreatedDate FROM Account"
-
-        response = _fetch_sobjects(soql_query, get_credentials())
-        accounts = [
-            Account(
-                id=account.get("Id"),
-                name=account.get("Name"),
-                owner_id=account.get("OwnerId"),
-                industry=account.get("Industry"),
-                annual_revenue=account.get("AnnualRevenue"),
-            )
-            for account in response.data
-            if account.get("Id") not in account_ids
-        ]
-
-        api_response.data = accounts
-        api_response.success = True
-        api_response.message = "Accounts fetched successfully."
-    except Exception as e:
-        raise Exception(format_error_message(e))
-
-    return api_response
-
-
-def fetch_criteria_tasks_by_account_ids_from_date(
-    account_ids: list[str],
-    start: str,
-    criteria: list[FilterContainer],
-    salesforce_user_ids: list[str],
-):
-    """
-    Takes response from fetch_tasks_by_account_ids_from_date_not_in_ids and organizes the tasks by criteria name.
-    """
-    api_response = ApiResponse(data=[], message="", success=False)
-
-    try:
-        tasks_by_criteria_by_account_id = (
-            app.async_fetch_tasks_by_account_ids_from_date_not_in_ids(
-                account_ids, start, criteria, [], salesforce_user_ids
-            )
-        )
-        tasks_by_criteria = {}
-
-        if hasattr(tasks_by_criteria_by_account_id, "data") and isinstance(
-            tasks_by_criteria_by_account_id.data, dict
-        ):
-            items_to_iterate = tasks_by_criteria_by_account_id.data.items()
-        else:
-            raise TypeError(
-                "Unexpected type returned from async_fetch_tasks_by_account_ids_from_date_not_in_ids"
-            )
-
-        for account_id, tasks_by_criteria_name in items_to_iterate:
-            for criteria_name, tasks in tasks_by_criteria_name.items():
-                if criteria_name not in tasks_by_criteria:
-                    tasks_by_criteria[criteria_name] = []
-                tasks_by_criteria[criteria_name].extend(tasks)
-
-        api_response.data = tasks_by_criteria
-        api_response.success = True
-    except Exception as e:
-        raise Exception(format_error_message(e))
-
-    return api_response
-
-
 def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
     """
     Fetches Salesforce users from Salesforce.
@@ -190,136 +110,316 @@ def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
     return api_response
 
 
-async def fetch_tasks_by_account_ids_from_date_not_in_ids(
-    account_ids: List[str],
+def fetch_any_prospecting_activity_from_date(
+    start: str, criteria: List[FilterContainer], salesforce_user_ids: List[str]
+) -> List[Dict]:
+    joined_user_ids = "','".join(salesforce_user_ids)
+    base_query = f"SELECT WhoId FROM Task WHERE CreatedDate >= {start} AND OwnerId IN ('{joined_user_ids}') AND "
+
+    all_tasks = []
+    for filter_container in criteria:
+        combined_conditions = _construct_where_clause_from_filter(filter_container)
+        full_query = f"{base_query} {combined_conditions}"
+
+        tasks = _fetch_sobjects(full_query, get_credentials())
+        all_tasks.extend(tasks)
+
+    return all_tasks
+
+
+async def fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(
     start: str,
     criteria: List[FilterContainer],
     already_counted_task_ids: List[str],
     salesforce_user_ids: List[str],
 ) -> ApiResponse:
-    api_response = ApiResponse(data=[], message="", success=False)
+    api_response = ApiResponse(data={}, message="", success=False)
 
-    contacts = fetch_contacts_by_account_ids(account_ids)
-    contact_by_id = {contact.id: contact for contact in contacts.data}
-    contact_ids = list(pluck(contacts.data, "id"))
+    # 1. Fetch all tasks meeting any criteria
+    all_tasks = fetch_all_matching_tasks(start, criteria, salesforce_user_ids).data
 
-    batch_size = 150
-    tasks_by_criteria_name = {}
+    # 2. Group tasks by WhoId
+    tasks_by_who_id = group_by(all_tasks, "WhoId")
 
-    async def process_batch(batch_contact_ids, session):
-        additional_filter = "WhoId IN ({})".format(
-            ", ".join(map(lambda id: f"'{id}'", batch_contact_ids))
-        )
-        batch_tasks = await fetch_contact_tasks_by_criteria_from_date_async(
-            criteria, start, additional_filter, salesforce_user_ids, session
-        )
-        return batch_tasks
+    # 3. Fetch contacts for these WhoIds
+    contact_by_id = await fetch_contact_by_id_map(list(tasks_by_who_id.keys()))
 
-    async with aiohttp.ClientSession() as session:
-        batches = [
-            contact_ids[i : i + batch_size]
-            for i in range(0, len(contact_ids), batch_size)
-        ]
-        batch_results = await asyncio.gather(
-            *[process_batch(batch, session) for batch in batches]
-        )
+    # 4 & 5. Group tasks by AccountId and criteria
+    tasks_by_account_and_criteria = group_tasks_by_account_and_criteria(
+        tasks_by_who_id, contact_by_id, criteria, already_counted_task_ids
+    )
 
-    for batch_result in batch_results:
-        for criteria_name, tasks in batch_result.items():
-            if criteria_name not in tasks_by_criteria_name:
-                tasks_by_criteria_name[criteria_name] = []
-            tasks_by_criteria_name[criteria_name].extend(tasks)
-
-    criteria_group_tasks_by_account_id = {account_id: {} for account_id in account_ids}
-
-    for criteria_name, tasks in tasks_by_criteria_name.items():
-        for task in tasks:
-            if task.get("Id") in already_counted_task_ids:
-                continue
-            contact = contact_by_id.get(task.get("WhoId"))
-            if contact:
-                account_id = contact.account_id
-                if criteria_name not in criteria_group_tasks_by_account_id[account_id]:
-                    criteria_group_tasks_by_account_id[account_id][criteria_name] = []
-                criteria_group_tasks_by_account_id[account_id][criteria_name].append(
-                    task
-                )
-
-    api_response.data = criteria_group_tasks_by_account_id
+    api_response.data = tasks_by_account_and_criteria
     api_response.success = True
-    api_response.message = "Tasks fetched and organized successfully."
+    api_response.message = "Tasks fetched and organized successfully"
 
     return api_response
 
 
-async def fetch_contact_tasks_by_criteria_from_date_async(
-    criteria,
-    from_datetime,
-    additional_filter=None,
-    salesforce_user_ids: List[str] = [],
-    session=None,
-) -> Dict[str, List[Dict]]:
-    joined_user_ids = "','".join(salesforce_user_ids)
-    soql_query = f"SELECT Id, WhoId, OwnerId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND OwnerId IN ('{joined_user_ids}') AND "
-    if additional_filter:
-        soql_query += f"{additional_filter} AND "
-    tasks_by_filter_name = {}
+def fetch_all_matching_tasks(
+    start: str, criteria: List[FilterContainer], salesforce_user_ids: List[str]
+) -> List[Dict]:
+    combined_criteria = " OR ".join(
+        [_construct_where_clause_from_filter(fc) for fc in criteria]
+    )
+    soql_query = f"""
+    SELECT Id, WhoId, OwnerId, Priority, WhatId, Subject, Status, CallDurationInSeconds, CallType, CallDisposition, CreatedDate, CreatedById, TaskSubtype
+    FROM Task
+    WHERE CreatedDate >= {start}
+    AND OwnerId IN ('{("','".join(salesforce_user_ids))}')
+    AND ({combined_criteria})
+    """
+    return _fetch_sobjects(soql_query, get_credentials())
 
-    for filter_container in criteria:
-        combined_conditions = _construct_where_clause_from_filter(filter_container)
-        full_query = f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC"
 
-        contact_task_models = await _fetch_sobjects_async(
-            full_query, get_credentials(), session
+async def fetch_contacts_by_account_ids(account_ids: List[str]) -> List[Contact]:
+    contact_batch_size = 300
+    composite_batch_size = 5
+    account_batches = [
+        account_ids[i : i + contact_batch_size]
+        for i in range(0, len(account_ids), contact_batch_size)
+    ]
+    composite_batches = [
+        account_batches[i : i + composite_batch_size]
+        for i in range(0, len(account_batches), composite_batch_size)
+    ]
+
+    async with aiohttp.ClientSession() as session:
+        contact_fetch_jobs = [
+            fetch_contact_composite_batch_by_account(batch, session)
+            for batch in composite_batches
+        ]
+        results = await asyncio.gather(*contact_fetch_jobs)
+
+    contacts = []
+    for result in results:
+        for batch_result in result:
+            contacts.extend(batch_result)
+
+    return contacts
+
+
+async def fetch_contact_composite_batch_by_account(
+    account_batches: List[List[str]], session: aiohttp.ClientSession
+) -> List[List[Contact]]:
+    access_token, instance_url = get_credentials()
+    if not access_token or not instance_url:
+        raise Exception("Session expired")
+
+    composite_request = {"allOrNone": False, "compositeRequest": []}
+
+    for i, batch in enumerate(account_batches):
+        account_id_filter = "','".join(batch)
+        composite_request["compositeRequest"].append(
+            {
+                "method": "GET",
+                "url": f"/services/data/v55.0/query/?q=SELECT Id,FirstName,LastName,AccountId FROM Contact WHERE AccountId IN ('{account_id_filter}')",
+                "referenceId": f"ContactQuery{i}",
+            }
         )
 
-        tasks_by_filter_name[filter_container.name] = [
-            task
-            for task in contact_task_models
-            if task.get("WhoId", "")
-            and not task.get("WhoId", "").upper().startswith("00Q")
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    async with session.post(
+        f"{instance_url}/services/data/v55.0/composite",
+        json=composite_request,
+        headers=headers,
+    ) as response:
+        if response.status != 200:
+            raise Exception(f"API request failed: {await response.text()}")
+
+        data = await response.json()
+        results = []
+        for response in data["compositeResponse"]:
+            contacts = response["body"]["records"]
+            result = [
+                Contact(
+                    id=contact["Id"],
+                    first_name=contact["FirstName"] or "",
+                    last_name=contact["LastName"] or "",
+                    account_id=contact["AccountId"],
+                )
+                for contact in contacts
+            ]
+            results.append(result)
+        return results
+
+
+async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
+    contact_batch_size = 300
+    composite_batch_size = 5
+    contact_batches = [
+        contact_ids[i : i + contact_batch_size]
+        for i in range(0, len(contact_ids), contact_batch_size)
+    ]
+    composite_batches = [
+        contact_batches[i : i + composite_batch_size]
+        for i in range(0, len(contact_batches), composite_batch_size)
+    ]
+
+    async with aiohttp.ClientSession() as session:
+        contact_fetch_jobs = [
+            fetch_contact_composite_batch(batch, session) for batch in composite_batches
         ]
+        results = await asyncio.gather(*contact_fetch_jobs)
 
-    return tasks_by_filter_name
+    account_by_contact_id = {}
+    for result in results:
+        for batch_result in result:
+            account_by_contact_id.update(batch_result)
+
+    return account_by_contact_id
 
 
-async def _fetch_sobjects_async(soql_query, credentials, session):
-    try:
-        print(f"Debug: session in _fetch_sobjects_async: {session}")
-        access_token, instance_url = credentials
-        if not access_token or not instance_url:
-            raise Exception(SESSION_EXPIRED)
+async def fetch_contact_composite_batch(
+    contact_batches: List[List[str]], session: aiohttp.ClientSession
+) -> List[Dict[str, Account]]:
+    access_token, instance_url = get_credentials()
+    if not access_token or not instance_url:
+        raise Exception("Session expired")
 
-        headers = {"Authorization": f"Bearer {access_token}"}
-        url = f"{instance_url}/services/data/v55.0/query"
+    composite_request = {"allOrNone": False, "compositeRequest": []}
 
-        all_records = []
-        next_records_url = None
+    account_fields = _fetch_object_fields("Account", get_credentials()).data
 
-        while True:
-            if next_records_url:
-                async with session.get(next_records_url, headers=headers) as response:
-                    response.raise_for_status()
-                    data = await response.json()
-            else:
-                async with session.get(
-                    url, headers=headers, params={"q": soql_query}
-                ) as response:
-                    response.raise_for_status()
-                    data = await response.json()
+    blacklist = {
+        "isdeleted",
+        "masterrecordid",
+        "parentid",
+        "billinglatitude",
+        "billinglongitude",
+        "billingcodegeoaccuracy",
+        "shippinglatitude",
+        "shippinglongitude",
+        "photourl",
+        "dandbcompanyid",
+    }
 
-            all_records.extend(data["records"])
+    # Filter out fields whose 'type' contains 'date' or 'reference' and those in the blacklist
+    filtered_account_fields = [
+        field["name"]
+        for field in account_fields
+        if "reference" not in field["type"].lower()
+        and field["name"].lower() not in blacklist
+    ]
+    filtered_account_fields.extend(["Owner.FirstName", "Owner.LastName", "Owner.Id"])
 
-            if data.get("done", True):
-                break
+    account_fields_str = ", ".join(
+        [f"Account.{field}" for field in filtered_account_fields]
+    )
 
-            next_records_url = f"{instance_url}{data['nextRecordsUrl']}"
+    for i, batch in enumerate(contact_batches):
+        contact_id_filter = "','".join(batch)
+        composite_request["compositeRequest"].append(
+            {
+                "method": "GET",
+                "url": f"/services/data/v55.0/query/?q=SELECT Id,FirstName,LastName,AccountId, {account_fields_str} FROM Contact WHERE Id IN ('{contact_id_filter}')",
+                "referenceId": f"ContactQuery{i}",
+            }
+        )
 
-        return all_records
-    except aiohttp.ClientError as e:
-        raise Exception(f"API request failed: {format_error_message(e)}")
-    except Exception as e:
-        raise Exception(format_error_message(e))
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+    }
+
+    async with session.post(
+        f"{instance_url}/services/data/v55.0/composite",
+        json=composite_request,
+        headers=headers,
+    ) as response:
+        if response.status != 200:
+            raise Exception(f"API request failed: {await response.text()}")
+
+        data = await response.json()
+        results = []
+        for response in data["compositeResponse"]:
+            contacts = response["body"]["records"]
+            result = {}
+            for contact in contacts:
+                if contact.get("AccountId"):
+                    account_data = contact["Account"]
+                    result[contact["Id"]] = Contact(
+                        id=contact["Id"],
+                        first_name=contact["FirstName"] or "",
+                        last_name=contact["LastName"] or "",
+                        account_id=contact["AccountId"],
+                        account=Account(
+                            id=account_data.get("Id"),
+                            name=account_data.get("Name"),
+                            owner_id=account_data.get("Owner", {}).get("Id"),
+                            created_date=account_data.get("CreatedDate"),
+                            owner=(
+                                UserModel(
+                                    id=account_data.get("Owner", {}).get("Id"),
+                                    firstName=account_data.get("Owner", {}).get(
+                                        "FirstName"
+                                    ),
+                                    lastName=account_data.get("Owner", {}).get(
+                                        "LastName"
+                                    ),
+                                )
+                                if account_data.get("Owner")
+                                else None
+                            ),
+                        ),
+                    )
+            results.append(result)
+        return results
+
+
+def group_tasks_by_account_and_criteria(
+    tasks_by_who_id: Dict[str, List[Dict]],
+    contact_by_id: Dict[str, Contact],
+    criteria: List[FilterContainer],
+    already_counted_task_ids: List[str],
+) -> Dict[str, Dict[str, Dict[str, List[Dict]]]]:
+    tasks_by_account_and_criteria = {}
+
+    def process_criterion(criterion):
+        criterion_results = {}
+        for who_id, tasks in tasks_by_who_id.items():
+            contact = contact_by_id.get(who_id)
+            account = contact.account
+            if not contact:
+                continue
+            for task in tasks:
+                if task["Id"] in already_counted_task_ids:
+                    continue
+                if criterion.matches(task):
+                    # Assign the Account to the task
+                    task["Account"] = account
+                    task["Contact"] = contact
+                    if account.id not in criterion_results:
+                        criterion_results[account.id] = {}
+                    if who_id not in criterion_results[account.id]:
+                        criterion_results[account.id][who_id] = {}
+                    if criterion.name not in criterion_results[account.id][who_id]:
+                        criterion_results[account.id][who_id][criterion.name] = []
+                    criterion_results[account.id][who_id][criterion.name].append(task)
+        return criterion_results
+
+    with concurrent.futures.ThreadPoolExecutor() as executor:
+        future_to_criterion = {
+            executor.submit(process_criterion, criterion): criterion
+            for criterion in criteria
+        }
+        for future in concurrent.futures.as_completed(future_to_criterion):
+            criterion_results = future.result()
+            for account_id, who_id_data in criterion_results.items():
+                if account_id not in tasks_by_account_and_criteria:
+                    tasks_by_account_and_criteria[account_id] = {}
+                for who_id, criteria_data in who_id_data.items():
+                    if who_id not in tasks_by_account_and_criteria[account_id]:
+                        tasks_by_account_and_criteria[account_id][who_id] = {}
+                    tasks_by_account_and_criteria[account_id][who_id].update(
+                        criteria_data
+                    )
+
+    return tasks_by_account_and_criteria
 
 
 def fetch_tasks_by_user_ids(user_ids: List[str], limit: int = None):
@@ -353,58 +453,6 @@ def fetch_tasks_by_user_ids(user_ids: List[str], limit: int = None):
         error_msg = format_error_message(e)
         print(error_msg)
         raise Exception(error_msg)
-
-    return api_response
-
-
-def fetch_contact_tasks_by_criteria_from_date(
-    criteria, from_datetime, additional_filter=None, salesforce_user_ids: List[str] = []
-) -> Dict[str, List[Dict]]:
-    """
-    Fetches tasks from Salesforce based on a list of filtering criteria.
-
-    Parameters:
-    - criteria (list[FilterContainer]): A list of FilterContainer objects. Each FilterContainer object contains
-      a list of filters and a filter_logic string. The filters are used to construct the WHERE clause of the SOQL query,
-      and the filter_logic string specifies how these filters should be combined.
-    - from_datetime (string): An ISO string representing the createddate of the last task fetched. Crucial to minimizing the size of query results.
-    - additional_filter (string): An optional additional filter to apply to the SOQL query.
-
-    Returns:
-    - dict: A dictionary where each key is the name of a filter container and each value is a list of Task objects fetched from Salesforce.
-
-    Throws:
-    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
-    """
-    api_response = ApiResponse(data=[], message="", success=False)
-    joined_user_ids = "','".join(salesforce_user_ids)
-    soql_query = f"SELECT Id, WhoId, OwnerId, WhatId, Subject, Status, CreatedDate, CreatedById FROM Task WHERE CreatedDate >= {from_datetime} AND OwnerId IN ('{joined_user_ids}') AND "
-    if additional_filter:
-        soql_query += f"{additional_filter} AND "
-    tasks_by_filter_name = {}
-
-    try:
-        for filter_container in criteria:
-            combined_conditions = _construct_where_clause_from_filter(filter_container)
-
-            contact_task_models = []
-            print("fetching tasks for filter", filter_container.name)
-            for task in _fetch_sobjects(
-                f"{soql_query} {combined_conditions} ORDER BY CreatedDate ASC",
-                get_credentials(),
-            ).data:
-                if not task.get("WhoId", "") or task.get(
-                    "WhoId", ""
-                ).upper().startswith("00Q"):
-                    continue
-                contact_task_models.append(task)
-
-            tasks_by_filter_name[filter_container.name] = contact_task_models
-
-        api_response.data = tasks_by_filter_name
-        api_response.success = True
-    except Exception as e:
-        raise Exception(format_error_message(e))
 
     return api_response
 
@@ -467,94 +515,55 @@ def fetch_events_by_user_ids(user_ids: List[str], limit: int = None):
     return api_response
 
 
-def fetch_events_by_account_ids_from_date(
-    account_ids,
-    start,
+def fetch_events_by_contact_ids_from_date(
+    contact_ids: List[str],
+    start: str,
     salesforce_user_ids: List[str],
     meetings_criteria: FilterContainer,
 ):
     """
-    Fetches events from Salesforce based on a list of account IDs.
+    Fetches events from Salesforce and post-processes them to match the given contact IDs.
 
     Parameters:
-    - account_ids (list[str]): A list of account IDs to fetch events for
+    - contact_ids (list[str]): A list of contact IDs to fetch events for
     - start (str): The start date for filtering events via CreatedDate, in ISO format
     - salesforce_user_ids (list[str]): A list of Salesforce user IDs to filter events by
+    - meetings_criteria (FilterContainer): Criteria for filtering meetings
 
     Returns:
-    - dict: A dictionary where each key is an account ID and each value is the list of events fetched from Salesforce
-      for that account. The events are represented as dictionaries with keys corresponding to the fields selected in the SOQL query.
+    - ApiResponse: An ApiResponse object containing a dictionary where each key is a contact ID
+      and each value is the list of events for that contact.
 
     Throws:
     - Exception: Raises an exception with a formatted error message if any error occurs during the fetch
     """
     api_response = ApiResponse(data={}, message="", success=True)
-    batch_size = 150
-
-    contacts = fetch_contacts_by_account_ids(account_ids)
-    contact_by_id = {contact.id: contact for contact in contacts.data}
-    contact_ids = list(contact_by_id.keys())
-
-    events_by_account_id = {}
 
     try:
         meeting_criteria_filter = _construct_where_clause_from_filter(meetings_criteria)
-        # Process the contact IDs in batches of 150
-        for i in range(0, len(contact_ids), batch_size):
-            batch_contact_ids = contact_ids[i : i + batch_size]
-            joined_contact_ids = "','".join(batch_contact_ids)
-            joined_user_ids = "','".join(salesforce_user_ids)
+        joined_user_ids = "','".join(salesforce_user_ids)
 
-            soql_query = f"SELECT Id, WhoId, WhatId, Subject, CreatedDate, StartDateTime, EndDateTime FROM Event WHERE WhoId IN ('{joined_contact_ids}') AND CreatedDate >= {start} AND CreatedById IN ('{joined_user_ids}') AND ({meeting_criteria_filter}) ORDER BY StartDateTime ASC"
+        soql_query = f"""
+        SELECT Id, WhoId, WhatId, Subject, CreatedDate, StartDateTime, EndDateTime 
+        FROM Event 
+        WHERE CreatedDate >= {start} 
+        AND CreatedById IN ('{joined_user_ids}') 
+        AND ({meeting_criteria_filter}) 
+        ORDER BY StartDateTime ASC
+        """
 
-            response = _fetch_sobjects(soql_query, get_credentials())
-            for event in response.data:
-                account_id = contact_by_id.get(event.get("WhoId")).account_id
-                if account_id not in events_by_account_id:
-                    events_by_account_id[account_id] = []
-                events_by_account_id[account_id].append(event)
+        response = _fetch_sobjects(soql_query, get_credentials())
 
-        api_response.data = events_by_account_id
-        api_response.message = "Events fetched successfully."
-    except Exception as e:
-        raise Exception(format_error_message(e))
+        events_by_contact_id = {}
+        for event in response.data:
+            who_id = event.get("WhoId")
+            if who_id in contact_ids:
+                if who_id not in events_by_contact_id:
+                    events_by_contact_id[who_id] = []
+                events_by_contact_id[who_id].append(event)
 
-    return api_response
-
-
-def fetch_opportunities_by_account_ids_from_date(
-    account_ids, start, salesforce_user_ids: List[str]
-) -> List[Dict]:
-    """
-    Fetches opportunities from Salesforce based on a list of account IDs, querying in batches of 150.
-
-    Parameters:
-    - account_ids (list[str]): A list of account IDs to fetch opportunities for.
-    - start (str): The start date for filtering opportunities, in ISO format.
-
-    Returns:
-    - ApiResponse: An ApiResponse object containing the fetched opportunities as a list of Opportunity objects.
-
-    Throws:
-    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
-    """
-    api_response = ApiResponse(data=[], message="", success=True)
-    batch_size = 150
-
-    try:
-        # Process the account IDs in batches of 150
-        for i in range(0, len(account_ids), batch_size):
-            batch_ids = account_ids[i : i + batch_size]
-            joined_ids = ",".join([f"'{id}'" for id in batch_ids])
-            joined_user_ids = "','".join(salesforce_user_ids)
-            soql_query = f"SELECT Id, AccountId, Amount, CreatedDate, StageName, Name, CloseDate FROM Opportunity WHERE CreatedDate >= {start} AND AccountId IN ({joined_ids}) AND CreatedById IN ('{joined_user_ids}') ORDER BY CreatedDate ASC"
-
-            response = _fetch_sobjects(soql_query, get_credentials())
-            for opportunity in response.data:
-                api_response.data.append(opportunity)
-
-        api_response.success = True
-        api_response.message = "Opportunities fetched successfully."
+        api_response.data = events_by_contact_id
+        api_response.message = "Events fetched and filtered successfully."
     except Exception as e:
         api_response.success = False
         api_response.message = format_error_message(e)
@@ -563,148 +572,35 @@ def fetch_opportunities_by_account_ids_from_date(
     return api_response
 
 
-def fetch_contacts_by_account_ids(account_ids):
+def fetch_opportunities_by_account_ids_from_date(
+    account_ids, start, salesforce_user_ids: List[str]
+) -> List[Dict]:
     """
-    Fetches contacts from Salesforce based on a list of account IDs, querying in batches of 150.
-
-    Parameters:
-    - account_ids (list[str]): A list of account IDs to fetch contacts for.
-
-    Returns:
-    - ApiResponse: An ApiResponse object containing the fetched contacts as a list of Contact objects.
-
-    Throws:
-    - Exception: Raises an exception with a formatted error message if any error occurs during the fetch operation.
+    Fetches opportunities from Salesforce based on a list of account IDs, querying once and filtering.
     """
     api_response = ApiResponse(data=[], message="", success=True)
-    batch_size = 150
-    contact_models = []
 
     try:
-        # Process the account IDs in batches of 150
-        for i in range(0, len(account_ids), batch_size):
-            batch_ids = account_ids[i : i + batch_size]
-            joined_ids = ",".join([f"'{id}'" for id in batch_ids])
-            soql_query = f"SELECT Id, FirstName, LastName, AccountId, Account.Name FROM Contact WHERE AccountId IN ({joined_ids})"
+        joined_user_ids = "','".join(salesforce_user_ids)
+        soql_query = f"""
+        SELECT Id, AccountId, Amount, CreatedDate, StageName, Name, CloseDate 
+        FROM Opportunity 
+        WHERE CreatedDate >= {start} 
+        AND CreatedById IN ('{joined_user_ids}') 
+        ORDER BY CreatedDate ASC
+        """
 
-            response = _fetch_sobjects(soql_query, get_credentials())
-            for contact in response.data:
-                contact_models.append(
-                    Contact(
-                        id=contact.get("Id"),
-                        first_name=(
-                            contact.get("FirstName")
-                            if contact.get("FirstName") != None
-                            else ""
-                        ),
-                        last_name=contact.get("LastName"),
-                        account_id=contact.get("AccountId"),
-                        account=Account(
-                            id=contact.get("AccountId"),
-                            name=contact.get("Account").get("Name"),
-                        ),
-                    )
-                )
-
-        api_response.data = contact_models
-    except Exception as e:
-        raise Exception(format_error_message(e))
-
-    return api_response
-
-
-def fetch_contacts_by_ids_and_non_null_accounts(contact_ids) -> ApiResponse:
-    """
-    Fetches contacts by their IDs from Salesforce and returns them as Contact model instances.
-
-    Parameters:
-    - contact_ids (list of str): A list of contact ID strings to fetch from Salesforce.
-
-    Returns:
-    - ApiResponse: An ApiResponse object containing a list of Contact model instances if the fetch is successful,
-      or an error message if not. The ApiResponse's `success` attribute indicates the operation's success.
-
-    Raises:
-    - Exception: If the access tokens are missing or expired, or if an error occurs during the API request or data processing.
-    """
-    api_response = ApiResponse(data=[], message="", success=True)
-    batch_size = 150
-    contact_models = []
-
-    try:
-        account_fields = _fetch_object_fields("Account", get_credentials()).data
-
-        blacklist = {
-            "isdeleted",
-            "masterrecordid",
-            "parentid",
-            "billinglatitude",
-            "billinglongitude",
-            "billingcodegeoaccuracy",
-            "shippinglatitude",
-            "shippinglongitude",
-            "photourl",
-            "dandbcompanyid",
-        }
-
-        # Filter out fields whose 'type' contains 'date' or 'reference' and those in the blacklist
-        filtered_account_fields = [
-            field["name"]
-            for field in account_fields
-            if "reference" not in field["type"].lower()
-            and field["name"].lower() not in blacklist
+        response = _fetch_sobjects(soql_query, get_credentials())
+        api_response.data = [
+            opp for opp in response.data if opp.get("AccountId") in account_ids
         ]
-        filtered_account_fields.extend(["Owner.FirstName", "Owner.LastName", "Owner.Id"])
 
-        account_fields_str = ", ".join(
-            [f"Account.{field}" for field in filtered_account_fields]
-        )
-        # Process the contact IDs in batches of 150
-        for i in range(0, len(contact_ids), batch_size):
-            batch_ids = contact_ids[i : i + batch_size]
-            joined_ids = ",".join([f"'{id}'" for id in batch_ids])
-
-            soql_query = f"SELECT Id, FirstName, LastName, AccountId, {account_fields_str} FROM Contact WHERE Id IN ({joined_ids}) AND AccountId != null"
-
-            for contact in _fetch_sobjects(soql_query, get_credentials()).data:
-                contact_models.append(
-                    Contact(
-                        id=contact.get("Id"),
-                        first_name=(
-                            contact.get("FirstName")
-                            if contact.get("FirstName") != None
-                            else ""
-                        ),
-                        last_name=contact.get("LastName"),
-                        account_id=contact.get("AccountId"),
-                        account=Account(
-                            id=contact.get("AccountId"),
-                            name=contact.get("Account").get("Name"),
-                            owner_id=contact.get("Account").get("Owner").get("Id"),
-                            owner=UserModel(
-                                id=contact.get("Account").get("Owner").get("Id"),
-                                firstName=contact.get("Account").get("Owner").get(
-                                    "FirstName"
-                                ),
-                                lastName=contact.get("Account").get("Owner").get(
-                                    "LastName"
-                                ),
-                            ),
-                            industry=contact.get("Account").get("Industry"),
-                            annual_revenue=contact.get("Account").get("AnnualRevenue"),
-                            number_of_employees=contact.get("Account").get(
-                                "NumberOfEmployees"
-                            ),
-                            created_date=contact.get("Account").get("CreatedDate"),
-                        ),
-                    )
-                )
-
-        api_response.data = contact_models
-        api_response.message = "Contacts fetched successfully."
         api_response.success = True
+        api_response.message = "Opportunities fetched and filtered successfully."
     except Exception as e:
-        raise Exception(format_error_message(e))
+        api_response.success = False
+        api_response.message = format_error_message(e)
+        raise Exception(api_response.message)
 
     return api_response
 

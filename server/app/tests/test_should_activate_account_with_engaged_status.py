@@ -9,7 +9,7 @@ from app.data_models import TokenData
 from app.database.dml import save_session, delete_session
 from app.database.supabase_connection import get_supabase_admin_client
 from app.tests.mocks import (
-    mock_fetch_sobjects_async,
+    mock_fetch_contact_by_id_map,
     response_based_on_query,
     get_five_mock_accounts,
     get_two_mock_contacts_per_account,
@@ -17,6 +17,7 @@ from app.tests.mocks import (
     get_n_mock_tasks_per_contact_for_contains_content_crieria_query,
     add_mock_response,
     clear_mocks,
+    set_mock_contacts_for_map,
 )
 from app.tests.test_helpers import (
     do_onboarding_flow,
@@ -91,18 +92,16 @@ class TestActivationWithEngagedStatus:
         add_mock_response("fetch_logged_in_salesforce_user", {"Id": mock_user_id})
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch("app.salesforce_api.fetch_contact_by_id_map", side_effect=mock_fetch_contact_by_id_map)
     async def test_should_activate_account_with_engaged_status_given_sufficient_outbound_activity_and_a_single_inbound_activity(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self, mock_fetch_contact_composite, mock_sobject_fetch
     ):
         with self.app.app_context():
             # Setup mock data
             mock_account = get_five_mock_accounts()[0]
             mock_contacts = get_two_mock_contacts_per_account([mock_account])
+            set_mock_contacts_for_map(mock_contacts)
             mock_outbound_tasks = (
                 get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query(
                     3, mock_contacts, mock_user_id
@@ -110,7 +109,7 @@ class TestActivationWithEngagedStatus:
             )
             for task in mock_outbound_tasks:
                 task["Id"] = f"mock_outbound_task_id_{random.randint(1000, 9999)}"
-                
+
             mock_inbound_task = (
                 get_n_mock_tasks_per_contact_for_contains_content_crieria_query(
                     1, [mock_contacts[0]], mock_user_id
@@ -118,26 +117,24 @@ class TestActivationWithEngagedStatus:
             )
             # set mock_inbound_task CreatedDate to be 1 hour later than the outbound tasks
             mock_inbound_task[0]["CreatedDate"] = (
-                datetime.strptime(mock_outbound_tasks[0]["CreatedDate"], "%Y-%m-%dT%H:%M:%S.000+0000") + timedelta(hours=1)
+                datetime.strptime(
+                    mock_outbound_tasks[0]["CreatedDate"], "%Y-%m-%dT%H:%M:%S.000+0000"
+                )
+                + timedelta(hours=1)
             ).strftime("%Y-%m-%dT%H:%M:%S.000+0000")
-            mock_inbound_task[0]["Id"] = f"mock_inbound_task_id_{random.randint(1000, 9999)}"
-            
+            mock_inbound_task[0][
+                "Id"
+            ] = f"mock_inbound_task_id_{random.randint(1000, 9999)}"
+
             # Setup mock responses
             add_mock_response(
                 "fetch_salesforce_users",
                 [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
             )
-            add_mock_response("fetch_accounts_not_in_ids", [mock_account])
-            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-            add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-            add_mock_response(
-                "unique_values_content_criteria_query", mock_outbound_tasks
-            )
-            add_mock_response("contains_content_criteria_query", mock_inbound_task)
+            add_mock_response("fetch_events_by_contact_ids_from_date", [])
             add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
-            add_mock_response("fetch_events_by_account_ids_from_date", [])
             add_mock_response(
-                "fetch_contacts_by_ids_and_non_null_accounts", mock_contacts
+                "fetch_all_matching_tasks", mock_outbound_tasks + mock_inbound_task
             )
 
             # Fetch prospecting activity
@@ -170,7 +167,9 @@ class TestActivationWithEngagedStatus:
 
             # Validate prospecting metadata
             metadata = activation["prospecting_metadata"]
-            assert len(metadata) == 1, "Expected one metadata entry since only one outbound task criteria was met"
+            assert (
+                len(metadata) == 1
+            ), "Expected one metadata entry since only one outbound task criteria was met"
 
             unique_content_metadata = next(
                 m for m in metadata if m["name"] == "Unique Content"

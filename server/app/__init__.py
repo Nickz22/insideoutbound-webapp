@@ -53,24 +53,5 @@ def create_app():
             f"style-src 'self' 'unsafe-inline' {SERVER_URL} {REACT_APP_URL}"
         )
         return response
-    
-    def get_salesforce_api_function():
-        from app.salesforce_api import fetch_tasks_by_account_ids_from_date_not_in_ids
-        return fetch_tasks_by_account_ids_from_date_not_in_ids
-
-    async def async_fetch_tasks_by_account_ids_from_date_not_in_ids(*args, **kwargs):
-        func = get_salesforce_api_function()
-        return await func(*args, **kwargs)
-
-    def run_async_task_fetcher(*args):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(
-            async_fetch_tasks_by_account_ids_from_date_not_in_ids(*args)
-        )
-        loop.close()
-        return result
-
-    app.async_fetch_tasks_by_account_ids_from_date_not_in_ids = run_async_task_fetcher
 
     return app

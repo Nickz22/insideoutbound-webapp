@@ -1,3 +1,4 @@
+import time
 from datetime import datetime
 
 from app.services.activation_service import (
@@ -6,11 +7,8 @@ from app.services.activation_service import (
     find_unresponsive_activations,
 )
 from app.salesforce_api import (
-    fetch_criteria_tasks_by_account_ids_from_date,
-    fetch_accounts_not_in_ids,
-    fetch_contacts_by_ids_and_non_null_accounts,
+    fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids,
 )
-from app.constants import WHO_ID
 from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
@@ -19,13 +17,12 @@ from app.database.dml import upsert_activations, save_settings
 from app.data_models import ApiResponse, Settings
 from app.utils import (
     add_days,
-    pluck,
     get_team_member_salesforce_ids,
-    get_utc_now_for_supabase,
 )
+import asyncio
 
 
-def update_activation_states():
+async def update_activation_states():
     api_response = ApiResponse(data=[], message="", success=False)
 
     settings = load_settings()
@@ -37,53 +34,48 @@ def update_activation_states():
 
     unresponsive_activations = None
     if len(active_activations) > 0:
-        unresponsive_activations = find_unresponsive_activations(
+        async_response = await find_unresponsive_activations(
             active_activations, settings
-        ).data
+        )
+        unresponsive_activations = async_response.data
 
     if unresponsive_activations and len(unresponsive_activations) > 0:
         upsert_activations(unresponsive_activations)
 
     active_activations = [
-        a for a in active_activations if a.id not in [u.id for u in unresponsive_activations]
+        a
+        for a in active_activations
+        if a.id not in [u.id for u in unresponsive_activations]
     ]
 
     if len(active_activations) > 0:
-        incremented_activations = increment_existing_activations(
+        async_response = await increment_existing_activations(
             active_activations, settings
-        ).data
+        )
+        incremented_activations = async_response.data
         upsert_activations(incremented_activations)
 
-    active_account_ids = list(pluck(active_activations, "account.id"))
-    activatable_account_ids = list(
-        pluck(fetch_accounts_not_in_ids(active_account_ids).data, "id")
-    )
-
-    prospecting_tasks_by_filter_name = fetch_criteria_tasks_by_account_ids_from_date(
-        activatable_account_ids,
+    relevant_task_criteria = settings.criteria
+    if settings.meeting_object == "Task":
+        relevant_task_criteria = settings.criteria + [settings.meetings_criteria]
+    async_response = await fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(
         f"{get_threshold_date_for_activatable_tasks(settings)}T00:00:00Z",
-        settings.criteria,
+        relevant_task_criteria,
+        [],
         salesforce_user_ids,
-    ).data
-
-    contact_ids = set()
-    for criteria_name in prospecting_tasks_by_filter_name:
-        contact_ids.update(pluck(prospecting_tasks_by_filter_name[criteria_name], WHO_ID))
-
-    contacts = (
-        fetch_contacts_by_ids_and_non_null_accounts(list(contact_ids)).data
-        if len(contact_ids) > 0
-        else []
     )
 
-    new_activations = compute_activated_accounts(
-        prospecting_tasks_by_filter_name, contacts, settings
-    ).data
+    prospecting_tasks_by_criteria_name_by_account_id = async_response.data
+
+    async_response = await compute_activated_accounts(
+        prospecting_tasks_by_criteria_name_by_account_id, settings
+    )
+    new_activations = async_response.data
 
     if len(new_activations) > 0:
         upsert_activations(new_activations)
 
-    settings.latest_date_queried = get_utc_now_for_supabase()
+    settings.latest_date_queried = time.strftime("%Y-%m-%d %H:%M:%S%z", time.gmtime())
     save_settings(settings)
 
     api_response.data = (
