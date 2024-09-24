@@ -102,10 +102,29 @@ def delete_all_activations():
     try:
         team_member_ids = get_salesforce_team_ids(load_settings())
         supabase = get_supabase_admin_client()
-        supabase.table("Activations").delete().in_(
-            "activated_by_id", team_member_ids
-        ).execute()
+        BATCH_SIZE = 100
+
+        while True:
+            # Fetch a batch of activation IDs to delete
+            activations = supabase.table("Activations") \
+                .select("id") \
+                .in_("activated_by_id", team_member_ids) \
+                .limit(BATCH_SIZE) \
+                .execute()
+
+            activation_ids = [activation['id'] for activation in activations.data]
+
+            if not activation_ids:
+                break  # No more activations to delete
+
+            # Delete the fetched batch of activations
+            supabase.table("Activations") \
+                .delete() \
+                .in_("id", activation_ids) \
+                .execute()
+
         return True
+
     except Exception as e:
         print(f"An error occurred: {e}")
         return False

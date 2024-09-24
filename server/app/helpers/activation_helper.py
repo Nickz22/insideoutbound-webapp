@@ -210,6 +210,7 @@ def create_activation(
         ),
         event_ids=[qualifying_event["Id"]] if qualifying_event else None,
         task_ids=outbound_task_ids,
+        tasks=all_tasks_under_account,  # Add this line
         status=activation_status,
         prospecting_metadata=create_prospecting_metadata(
             task_ids=outbound_task_ids,
@@ -444,7 +445,7 @@ def create_prospecting_metadata(
                     first_occurrence=first_occurrence,
                     last_occurrence=last_occurrence,
                     total=len(matching_task_ids),
-                    tasks=matching_tasks,
+                    task_ids=list(matching_task_ids),  # Add this line
                 )
             )
 

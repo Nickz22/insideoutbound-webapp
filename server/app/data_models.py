@@ -103,6 +103,7 @@ class Account(SerializableModel):
     created_date: Optional[datetime] = None
     owner: Optional[UserModel] = None
 
+
 class Contact(SerializableModel):
     id: str
     first_name: str
@@ -110,6 +111,8 @@ class Contact(SerializableModel):
     account_id: str
     account: Account
     owner_id: Optional[str] = None
+
+
 class Task(SerializableModel):
     id: str
     created_date: datetime
@@ -182,7 +185,7 @@ class ProspectingMetadata(SerializableModel):
     total: int
     first_occurrence: Optional[date] = None
     last_occurrence: Optional[date] = None
-    tasks: List[TaskSObject] = []
+    task_ids: List[str] = []  # Change this line
 
 
 class ProspectingEffort(SerializableModel):
@@ -200,6 +203,7 @@ class Activation(SerializableModel):
     active_contact_ids: Set[str]
     active_contacts: List[Contact]
     task_ids: Set[str]
+    tasks: List[Dict]  # Add this line
     activated_by_id: Optional[str] = None
     active_contact_count: Optional[int] = None
     activated_date: Optional[date] = None
@@ -304,7 +308,9 @@ class FilterContainer(SerializableModel):
             # Replace condition numbers with their boolean values
             for i, condition in condition_map.items():
                 replace_condition_number = f"_{i}_"
-                logic = re.sub(r"\b" + replace_condition_number + r"\b", str(condition), logic)
+                logic = re.sub(
+                    r"\b" + replace_condition_number + r"\b", str(condition), logic
+                )
             return eval(logic, {"__builtins__": {}}, condition_map)
         except Exception as e:
             print(f"Error evaluating logic: {e}")
