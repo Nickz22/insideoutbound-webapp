@@ -13,7 +13,7 @@ def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResp
     supabase_client = get_supabase_admin_client()
     team_member_ids = get_salesforce_team_ids(load_settings())
 
-    page_size = 1000
+    page_size = 100  # Changed from 1000 to 100
     current_page = 0
     all_activations = []
 
