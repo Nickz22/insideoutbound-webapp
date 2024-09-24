@@ -5,6 +5,7 @@ from app.middleware import authenticate
 from app.utils import format_error_message, log_error
 from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
+    load_activations_by_period,
 )
 from app.database.settings_selector import load_settings
 from app.database.supabase_user_selector import fetch_supabase_user
@@ -248,17 +249,17 @@ def get_prospecting_activities():
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        query_response = (
-            load_active_activations_order_by_first_prospecting_activity_asc()
-        )
+        period = request.args.get("period", "All")
+        query_response = load_activations_by_period(period)
+
         if not query_response.success:
             raise Exception(query_response.message)
+
+        activations = query_response.data
         response.data = [
             {
-                "summary": generate_summary(query_response.data),
-                "raw_data": [
-                    activation.to_dict() for activation in query_response.data
-                ],
+                "summary": generate_summary(activations),
+                "raw_data": [activation.to_dict() for activation in activations],
             }
         ]
         response.success = True
