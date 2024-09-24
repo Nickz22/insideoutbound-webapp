@@ -164,6 +164,9 @@ def supabase_dict_to_python_activation(row: Dict) -> Activation:
         row["active_contacts"] = [
             Contact(**item) for item in json.loads(row["active_contacts"])
         ]
+    
+    if "tasks" in row and row["tasks"]:
+        row["tasks"] = json.loads(row["tasks"])
 
     # Convert array fields to sets
     for field in ["active_contact_ids", "task_ids", "event_ids"]:
@@ -199,6 +202,9 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
     
     if "active_contacts" in activation_dict:
         activation_dict["active_contacts"] = json.dumps(activation_dict["active_contacts"])
+        
+    if "tasks" in activation_dict:
+        activation_dict["tasks"] = json.dumps(activation_dict["tasks"])
 
     if "task_ids" in activation_dict:
         activation_dict["task_ids"] = list(activation_dict["task_ids"])
@@ -240,6 +246,7 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
         "active_contact_ids",
         "active_contacts",
         "task_ids",
+        "tasks",
         "activated_date",
         "first_prospecting_activity",
         "last_prospecting_activity",

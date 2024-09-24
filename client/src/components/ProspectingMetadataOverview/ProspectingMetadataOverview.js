@@ -1,15 +1,23 @@
 import React from "react";
-import { Grid, Card, CardHeader, CardContent, Avatar, Typography, Link } from "@mui/material";
-import PersonIcon from '@mui/icons-material/Person';
-import { styled } from '@mui/material/styles';
+import {
+  Grid,
+  Card,
+  CardHeader,
+  CardContent,
+  Avatar,
+  Typography,
+  Link,
+} from "@mui/material";
+import PersonIcon from "@mui/icons-material/Person";
+import { styled } from "@mui/material/styles";
 
 // Look at this beautiful abomination
 const BorderedCard = styled(Card)(({ theme }) => ({
   border: `2px solid ${theme.palette.divider}`,
   borderRadius: theme.shape.borderRadius,
   boxShadow: `0 0 10px ${theme.palette.action.hover}`,
-  transition: 'box-shadow 0.3s ease-in-out',
-  '&:hover': {
+  transition: "box-shadow 0.3s ease-in-out",
+  "&:hover": {
     boxShadow: `0 0 15px ${theme.palette.primary.light}`,
   },
 }));
@@ -20,7 +28,11 @@ const ProspectingMetadataOverview = ({ activation, instanceUrl }) => {
       (m) => m.name === metadataName
     );
     if (!metadata) return 0;
-    return metadata.tasks.filter((task) => task.WhoId === contactId).length;
+
+    const metadataTaskIds = new Set(metadata.task_ids);
+    return activation.tasks.filter(
+      (task) => task.WhoId === contactId && metadataTaskIds.has(task.Id)
+    ).length;
   };
 
   return (
@@ -35,7 +47,11 @@ const ProspectingMetadataOverview = ({ activation, instanceUrl }) => {
                 </Avatar>
               }
               title={
-                <Link href={`${instanceUrl}/${contact.id}`} target="_blank" rel="noopener noreferrer">
+                <Link
+                  href={`${instanceUrl}/${contact.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
                   {`${contact.first_name} ${contact.last_name}`}
                 </Link>
               }
@@ -43,7 +59,8 @@ const ProspectingMetadataOverview = ({ activation, instanceUrl }) => {
             <CardContent>
               {activation.prospecting_metadata.map((metadata) => (
                 <Typography key={metadata.name} variant="body2">
-                  {metadata.name}: {getTaskCountForContact(contact.id, metadata.name)}
+                  {metadata.name}:{" "}
+                  {getTaskCountForContact(contact.id, metadata.name)}
                 </Typography>
               ))}
             </CardContent>
