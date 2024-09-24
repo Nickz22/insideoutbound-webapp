@@ -111,7 +111,7 @@ const DataFilter = ({ onFilter, rawData }) => {
       <Box
         sx={{
           position: "fixed",
-          left: open ? "12%" : "-25%",
+          left: open ? "240px" : "-25%", // 240px is sidebar width
           top: 0,
           width: "25%",
           height: "100%",
@@ -120,6 +120,7 @@ const DataFilter = ({ onFilter, rawData }) => {
           p: 4,
           transition: "left 0.3s ease-in-out",
           overflowY: "auto",
+          zIndex: 10
         }}
       >
         <IconButton
