@@ -136,15 +136,19 @@ async def fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(
     api_response = ApiResponse(data={}, message="", success=False)
 
     # 1. Fetch all tasks meeting any criteria
+    print("Fetching all matching tasks")
     all_tasks = fetch_all_matching_tasks(start, criteria, salesforce_user_ids).data
 
     # 2. Group tasks by WhoId
+    print("Grouping tasks by WhoId")
     tasks_by_who_id = group_by(all_tasks, "WhoId")
 
     # 3. Fetch contacts for these WhoIds
+    print("Fetching contacts for these WhoIds")
     contact_by_id = await fetch_contact_by_id_map(list(tasks_by_who_id.keys()))
 
     # 4 & 5. Group tasks by AccountId and criteria
+    print("Grouping tasks by AccountId and criteria")
     tasks_by_account_and_criteria = group_tasks_by_account_and_criteria(
         tasks_by_who_id, contact_by_id, criteria, already_counted_task_ids
     )
@@ -233,19 +237,43 @@ async def fetch_contact_composite_batch_by_account(
 
         data = await response.json()
         results = []
-        for response in data["compositeResponse"]:
-            contacts = response["body"]["records"]
-            result = [
-                Contact(
-                    id=contact["Id"],
-                    first_name=contact["FirstName"] or "",
-                    last_name=contact["LastName"] or "",
-                    account_id=contact["AccountId"],
-                )
-                for contact in contacts
-            ]
+        for composite_response in data["compositeResponse"]:
+            result = []
+            contacts = composite_response["body"]["records"]
+
+            # Process initial batch of contacts
+            result.extend(_process_contacts(contacts))
+
+            # Fetch and process remaining contacts if any
+            next_records_url = composite_response["body"].get("nextRecordsUrl")
+            while next_records_url:
+                async with session.get(
+                    f"{instance_url}{next_records_url}", headers=headers
+                ) as next_response:
+                    if next_response.status != 200:
+                        raise Exception(
+                            f"API request failed: {await next_response.text()}"
+                        )
+
+                    next_data = await next_response.json()
+                    result.extend(_process_contacts(next_data["records"]))
+                    next_records_url = next_data.get("nextRecordsUrl")
+
             results.append(result)
         return results
+
+
+def _process_contacts(contacts):
+    return [
+        Contact(
+            id=contact["Id"],
+            first_name=contact["FirstName"] or "",
+            last_name=contact["LastName"] or "",
+            account_id=contact["AccountId"],
+        )
+        for contact in contacts
+        if contact.get("AccountId")
+    ]
 
 
 async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
@@ -266,12 +294,12 @@ async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
         ]
         results = await asyncio.gather(*contact_fetch_jobs)
 
-    account_by_contact_id = {}
+    contact_by_id = {}
     for result in results:
         for batch_result in result:
-            account_by_contact_id.update(batch_result)
+            contact_by_id.update(batch_result)
 
-    return account_by_contact_id
+    return contact_by_id
 
 
 async def fetch_contact_composite_batch(
@@ -336,39 +364,60 @@ async def fetch_contact_composite_batch(
 
         data = await response.json()
         results = []
-        for response in data["compositeResponse"]:
-            contacts = response["body"]["records"]
+        for composite_response in data["compositeResponse"]:
             result = {}
+            contacts = composite_response["body"]["records"]
+
+            # Process initial batch of contacts
             for contact in contacts:
                 if contact.get("AccountId"):
-                    account_data = contact["Account"]
-                    result[contact["Id"]] = Contact(
-                        id=contact["Id"],
-                        first_name=contact["FirstName"] or "",
-                        last_name=contact["LastName"] or "",
-                        account_id=contact["AccountId"],
-                        account=Account(
-                            id=account_data.get("Id"),
-                            name=account_data.get("Name"),
-                            owner_id=account_data.get("Owner", {}).get("Id"),
-                            created_date=account_data.get("CreatedDate"),
-                            owner=(
-                                UserModel(
-                                    id=account_data.get("Owner", {}).get("Id"),
-                                    firstName=account_data.get("Owner", {}).get(
-                                        "FirstName"
-                                    ),
-                                    lastName=account_data.get("Owner", {}).get(
-                                        "LastName"
-                                    ),
-                                )
-                                if account_data.get("Owner")
-                                else None
-                            ),
-                        ),
-                    )
+                    result[contact["Id"]] = _process_contact(contact)
+
+            # Fetch and process remaining contacts if any
+            next_records_url = composite_response["body"].get("nextRecordsUrl")
+            while next_records_url:
+                async with session.get(
+                    f"{instance_url}{next_records_url}", headers=headers
+                ) as next_response:
+                    if next_response.status != 200:
+                        raise Exception(
+                            f"API request failed: {await next_response.text()}"
+                        )
+
+                    next_data = await next_response.json()
+                    for contact in next_data["records"]:
+                        if contact.get("AccountId"):
+                            result[contact["Id"]] = _process_contact(contact)
+
+                    next_records_url = next_data.get("nextRecordsUrl")
+
             results.append(result)
         return results
+
+
+def _process_contact(contact):
+    account_data = contact["Account"]
+    return Contact(
+        id=contact["Id"],
+        first_name=contact["FirstName"] or "",
+        last_name=contact["LastName"] or "",
+        account_id=contact["AccountId"],
+        account=Account(
+            id=account_data.get("Id"),
+            name=account_data.get("Name"),
+            owner_id=account_data.get("Owner", {}).get("Id"),
+            created_date=account_data.get("CreatedDate"),
+            owner=(
+                UserModel(
+                    id=account_data.get("Owner", {}).get("Id"),
+                    firstName=account_data.get("Owner", {}).get("FirstName"),
+                    lastName=account_data.get("Owner", {}).get("LastName"),
+                )
+                if account_data.get("Owner")
+                else None
+            ),
+        ),
+    )
 
 
 def group_tasks_by_account_and_criteria(

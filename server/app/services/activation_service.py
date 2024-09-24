@@ -439,13 +439,17 @@ async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, set
     async def fetch_account_data(
         settings, criteria_tasks_by_who_id_by_account_id, first_prospecting_activity
     ):
+        print("Fetching account data")
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
+        print("Fetching salesforce users")
         salesforce_user_by_id = group_by(
             fetch_salesforce_users(salesforce_user_ids).data, "id"
         )
+        print("Fetching first prospecting activity date")
         first_prospecting_activity = get_first_prospecting_activity_date(
             criteria_tasks_by_who_id_by_account_id
         )
+        print("Fetching opportunities by account id")
         opportunity_by_account_id = group_by(
             fetch_opportunities_by_account_ids_from_date(
                 list(criteria_tasks_by_who_id_by_account_id.keys()),
@@ -455,17 +459,20 @@ async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, set
             "AccountId",
         )
 
+        print("Fetching meetings by account id")
         meetings_by_account_id = await get_meetings_by_account_id(
             settings,
             criteria_tasks_by_who_id_by_account_id,
             first_prospecting_activity,
             salesforce_user_ids,
         )
+        print("Account data fetched successfully")
         return salesforce_user_by_id, opportunity_by_account_id, meetings_by_account_id
 
     response = ApiResponse(data=[], message="", success=True)
 
     try:
+        print("Fetching account data")
         salesforce_user_by_id, opportunity_by_account_id, meetings_by_account_id = (
             await fetch_account_data(
                 settings,
@@ -476,6 +483,7 @@ async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, set
             )
         )
 
+        print("Getting task ids by criteria name")
         task_ids_by_criteria_name = get_task_ids_by_criteria_name(
             criteria_tasks_by_who_id_by_account_id
         )
@@ -819,11 +827,14 @@ def extract_contacts_from_account_criteria_task_map(
     criteria_tasks_by_who_id_by_account_id,
 ):
     contacts = []
+    contact_ids = set()
     for account_tasks in criteria_tasks_by_who_id_by_account_id.values():
         for contact_id, criteria_tasks in account_tasks.items():
-            for tasks in criteria_tasks.values():
-                for task in tasks:
-                    contact = task.get("Contact")
-                    if contact and contact not in contacts:
+            if contact_id not in contact_ids:
+                for tasks in criteria_tasks.values():
+                    contact = tasks[0].get("Contact")
+                    if contact and contact.id not in contact_ids:
                         contacts.append(contact)
+                        contact_ids.add(contact.id)
+                        break
     return contacts

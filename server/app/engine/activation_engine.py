@@ -65,15 +65,22 @@ async def update_activation_states():
         salesforce_user_ids,
     )
 
+    print("Tasks fetched and organized successfully")
+
     prospecting_tasks_by_criteria_name_by_account_id = async_response.data
 
+    print("Computing activated accounts")
     async_response = await compute_activated_accounts(
         prospecting_tasks_by_criteria_name_by_account_id, settings
     )
     new_activations = async_response.data
 
+    print("New activations computed")
+
     if len(new_activations) > 0:
         upsert_activations(new_activations)
+
+    print("New activations upserted")
 
     settings.latest_date_queried = time.strftime("%Y-%m-%d %H:%M:%S%z", time.gmtime())
     save_settings(settings)
