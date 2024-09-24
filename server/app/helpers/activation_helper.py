@@ -50,9 +50,7 @@ def generate_summary(activations: list[Activation]) -> dict:
         if activation.opportunity:
             summary["total_deals"] += 1
             summary["total_pipeline_value"] += activation.opportunity.amount
-            if (
-                activation.opportunity.stage == "Closed Won"
-            ):
+            if activation.opportunity.stage == "Closed Won":
                 summary["closed_won_opportunity_value"] += activation.opportunity.amount
         if activation.status == "Engaged":
             summary["engaged_activations"] += 1
@@ -76,7 +74,7 @@ def generate_summary(activations: list[Activation]) -> dict:
     return summary
 
 
-def update_prospecting_metadata(prospecting_effort, task, criteria_name):
+def increment_prospecting_effort_metadata(prospecting_effort, task, criteria_name):
     metadata = next(
         (m for m in prospecting_effort.prospecting_metadata if m.name == criteria_name),
         None,
@@ -129,7 +127,6 @@ def get_new_status(
 
 
 def create_activation(
-    contact_by_id,
     account_first_prospecting_activity,
     active_contact_ids,
     last_valid_task_creator,
@@ -187,13 +184,12 @@ def create_activation(
             else (StatusEnum.engaged if engaged_date else StatusEnum.activated)
         )
     )
+    
+    contact_by_id = {task['Contact'].id: task['Contact'] for task in all_tasks_under_account if task['Contact']}
+    
     activation = Activation(
         id=generate_unique_id(),
-        account=(
-            contact_by_id[active_contact_ids[0]].account
-            if active_contact_ids
-            else next(iter(contact_by_id.values())).account
-        ),
+        account=all_tasks_under_account[0]["Account"],
         activated_date=activated_date,
         days_activated=(today - activated_date).days,
         engaged_date=engaged_date.date() if engaged_date else None,
@@ -493,18 +489,20 @@ def get_filtered_tasks_under_account(
     return filtered_tasks
 
 
-def get_first_prospecting_activity_date(tasks_by_criteria):
+def get_first_prospecting_activity_date(tasks_by_account):
     first_prospecting_activity = None
-    for criteria_key, tasks in tasks_by_criteria.items():
-        for task in tasks:
-            task_created_date = parse_datetime_string_with_timezone(
-                task.get("CreatedDate")
-            )
-            first_prospecting_activity = (
-                task_created_date
-                if not first_prospecting_activity
-                else min(first_prospecting_activity, task_created_date)
-            )
+    for account_tasks in tasks_by_account.values():
+        for contact_tasks in account_tasks.values():
+            for tasks in contact_tasks.values():
+                for task in tasks:
+                    task_created_date = parse_datetime_string_with_timezone(
+                        task.get("CreatedDate")
+                    )
+                    first_prospecting_activity = (
+                        task_created_date
+                        if not first_prospecting_activity
+                        else min(first_prospecting_activity, task_created_date)
+                    )
     if not first_prospecting_activity:
         first_prospecting_activity = datetime.now()
     return convert_date_to_salesforce_datetime_format(first_prospecting_activity.date())

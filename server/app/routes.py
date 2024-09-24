@@ -40,6 +40,7 @@ from app.database.supabase_connection import (
 )
 from app.database.session_selector import fetch_supabase_session
 import stripe
+import asyncio
 
 stripe.api_key = Config.STRIPE_SECRET_KEY
 
@@ -223,7 +224,6 @@ def generate_filters():
     return final_response
 
 
-# get_instance_url
 @bp.route("/get_instance_url", methods=["GET"])
 @authenticate
 def get_instance_url():
@@ -324,32 +324,39 @@ def fetch_prospecting_activity():
     from app.data_models import ApiResponse
 
     api_response = ApiResponse(data=[], message="", success=False)
-    try:
-        response = update_activation_states()
+    print("fetching!")
 
-        if response.success:
-            activations = response.data
+    async def process_request():
+        try:
+            response = await update_activation_states()
 
-            api_response.data = [
-                {
-                    "summary": generate_summary(activations),
-                    "raw_data": [activation.to_dict() for activation in activations],
-                }
-            ]
-            api_response.success = True
-            api_response.message = "Prospecting activity data loaded successfully"
-        else:
-            api_response.message = response.message
+            if response.success:
+                activations = response.data
 
-        status_code = get_status_code(api_response)
-    except Exception as e:
-        log_error(e)
-        api_response.message = (
-            f"Failed to load prospecting activities data: {format_error_message(e)}"
-        )
-        status_code = get_status_code(api_response)
+                api_response.data = [
+                    {
+                        "summary": generate_summary(activations),
+                        "raw_data": [
+                            activation.to_dict() for activation in activations
+                        ],
+                    }
+                ]
+                api_response.success = True
+                api_response.message = "Prospecting activity data loaded successfully"
+            else:
+                api_response.message = response.message
 
-    return jsonify(api_response.to_dict()), status_code
+            status_code = get_status_code(api_response)
+        except Exception as e:
+            log_error(e)
+            api_response.message = (
+                f"Failed to load prospecting activities data: {format_error_message(e)}"
+            )
+            status_code = get_status_code(api_response)
+
+        return jsonify(api_response.to_dict()), status_code
+
+    return asyncio.run(process_request())
 
 
 @bp.route("/delete_all_prospecting_activity", methods=["POST"])

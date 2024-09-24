@@ -8,7 +8,7 @@ import MemberIcon from "../icons/MemberIcon";
 import DocumentIcon from "../icons/DocumentIcon";
 import PaidIcon from "../icons/PaidIcon";
 
-const hintInterval = 3000;
+const hintInterval = 5000;
 
 const HintsShowOnLoading = () => {
   const hints = [
