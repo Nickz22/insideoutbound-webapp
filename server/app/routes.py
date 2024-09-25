@@ -259,7 +259,16 @@ def get_prospecting_activities():
         response.data = [
             {
                 "summary": generate_summary(activations),
-                "raw_data": [activation.to_dict() for activation in activations],
+                "raw_data": [
+                    {
+                        "id": activation.id,
+                        "activated_by_id": activation.activated_by_id,
+                        "activated_by": activation.activated_by.to_dict(),
+                        "account": activation.account.to_dict(),
+                        "last_prospecting_activity": activation.last_prospecting_activity
+                    }
+                    for activation in activations
+                ],
             }
         ]
         response.success = True
@@ -283,7 +292,7 @@ def get_prospecting_activities_filtered_by_ids():
         activation_ids = request.args.getlist("activation_ids[]")
         if not activation_ids:
             response.data = {
-                "total_activations": len(activations),
+                "total_activations": 0,
                 "activations_today": 0,
                 "total_tasks": 0,
                 "total_events": 0,
@@ -306,7 +315,13 @@ def get_prospecting_activities_filtered_by_ids():
                 {
                     "summary": generate_summary(filtered_activations),
                     "raw_data": [
-                        activation.to_dict() for activation in filtered_activations
+                        {   "id": activation.id,
+                            "activated_by_id": activation.activated_by_id,
+                            "activated_by": activation.activated_by.to_dict(),
+                            "account": activation.account.to_dict(),
+                            "last_prospecting_activity": activation.last_prospecting_activity
+                        }
+                        for activation in filtered_activations
                     ],
                 }
             ]
@@ -339,7 +354,14 @@ def fetch_prospecting_activity():
                     {
                         "summary": generate_summary(activations),
                         "raw_data": [
-                            activation.to_dict() for activation in activations
+                            {
+                                "id": activation.id,
+                                "activated_by_id": activation.activated_by_id,
+                                "activated_by": activation.activated_by.to_dict(),
+                                "account": activation.account.to_dict(),
+                                "last_prospecting_activity": activation.last_prospecting_activity
+                            }
+                            for activation in activations
                         ],
                     }
                 ]
