@@ -63,10 +63,20 @@ api.interceptors.response.use(
     }
     return response;
   },
-  (error) => {
-    // For actual errors (network issues, etc.), just log them
-    console.error("Axios error:", error);
-    return Promise.reject(error);
+  async (error) => {
+    if (error.response) {
+      // The server responded with a status code outside the 2xx range
+      console.error("Server error:", error.response.status, error.response.data);
+      return Promise.reject(error.response.data);
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error("No response received:", error.request);
+      return Promise.reject(new Error("No response from server"));
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error("Request setup error:", error.message);
+      return Promise.reject(error);
+    }
   }
 );
 
@@ -109,10 +119,13 @@ export const getRefreshToken = async () => {
 
 /**
  * Fetches prospecting activities
+ * @param {"All" | "This Week" | "Last Week" | "This Month" | "Last Month" | "This Quarter" | "Last Quarter"} period
  * @returns {Promise<ApiResponse>}
  */
-export const fetchProspectingActivities = async () => {
-  const response = await api.get("/get_prospecting_activities");
+export const fetchProspectingActivities = async (period) => {
+  const response = await api.get("/get_prospecting_activities", {
+    params: { period: period },
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -137,9 +150,10 @@ export const saveSettings = async (settings) => {
 
 /**
  * Fetches and updates prospecting activity data
+ * @param {string} period
  * @returns {Promise<ApiResponse>}
  */
-export const fetchAndUpdateProspectingActivity = async () => {
+export const fetchAndUpdateProspectingActivity = async (period) => {
   try {
     const response = await api.post("/fetch_prospecting_activity");
     return { ...response.data, statusCode: response.status };

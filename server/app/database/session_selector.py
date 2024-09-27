@@ -1,7 +1,9 @@
 from app.database.supabase_connection import get_supabase_admin_client
 from app.data_models import AuthenticationError
 
+from app.database.supabase_retry import retry_on_temporary_unavailable
 
+@retry_on_temporary_unavailable()
 def fetch_supabase_session(session_id: str):
     try:
         service_supabase = get_supabase_admin_client()

@@ -12,16 +12,18 @@ from app.database.activation_selector import (
 )
 from app.database.supabase_connection import get_supabase_admin_client
 from app.tests.mocks import (
-    mock_fetch_sobjects_async,
+    mock_fetch_contact_by_id_map,
+    mock_fetch_contacts_by_account_ids,
     response_based_on_query,
     add_mock_response,
     clear_mocks,
 )
 from app.tests.test_helpers import (
     do_onboarding_flow,
-    setup_thirty_tasks_across_ten_contacts_and_five_accounts,
+    setup_thirty_tasks_across_ten_contacts_and_five_accounts_for_start_of_test,
     setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events,
     assert_and_return_payload,
+    get_mock_token_data
 )
 from contextlib import contextmanager
 import logging
@@ -59,14 +61,7 @@ class TestUnresponsiveActivationLogic:
         self.app.testing = True
         self.client = self.app.test_client()
 
-        mock_token_data = TokenData(
-            access_token="mock_access_token",
-            refresh_token="mock_refresh_token",
-            instance_url="https://mock_instance_url.com",
-            id="mock_user_id",
-            token_type="mock_token_type",
-            issued_at="mock_issued_at",
-        )
+        mock_token_data: TokenData = get_mock_token_data()
 
         with context_tracker(self.app):
             token = save_session(mock_token_data, True)
@@ -91,16 +86,22 @@ class TestUnresponsiveActivationLogic:
         add_mock_response("fetch_logged_in_salesforce_user", {"Id": mock_user_id})
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
+    @patch(
+        "app.services.activation_service.fetch_contacts_by_account_ids",
+        side_effect=mock_fetch_contacts_by_account_ids,
+    )
     async def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self, mock_sobject_fetch, mock_fetch_contact_composite, mock_fetch_contacts_by_account_ids
     ):
         with self.app.app_context():
-            setup_thirty_tasks_across_ten_contacts_and_five_accounts(mock_user_id)
+            setup_thirty_tasks_across_ten_contacts_and_five_accounts_for_start_of_test(
+                mock_user_id
+            )
             response = await asyncio.to_thread(
                 self.client.post, "/fetch_prospecting_activity", headers=self.api_header
             )

@@ -25,7 +25,7 @@ def log_error(exception):
     error_msg = format_error_message(exception)
     try:
         session_state = get_session_state()
-        set_user({"id": session_state["salesforce_id"]})
+        set_user({"id": session_state["salesforce_id"], "username": session_state["username"]})
         capture_exception(exception)
         logger.error(
             f"[{datetime.now()}] User ID: {session_state['salesforce_id']} - {error_msg}"

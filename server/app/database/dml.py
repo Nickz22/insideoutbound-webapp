@@ -10,6 +10,7 @@ from app.database.supabase_connection import (
 from app.data_models import (
     Activation,
     ApiResponse,
+    SessionState,
     Settings,
     UserModel,
     TokenData,
@@ -77,15 +78,23 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool) -> str:
 def upsert_activations(new_activations: list[Activation]):
     api_response = ApiResponse(data=[], message="", success=False)
     supabase = get_supabase_admin_client()
-    supabase_activations = [
-        {
-            **python_activation_to_supabase_dict(activation),
-        }
-        for activation in new_activations
-    ]
 
-    supabase.table("Activations").upsert(supabase_activations).execute()
+    CHUNK_SIZE = 100
+
+    for i in range(0, len(new_activations), CHUNK_SIZE):
+        chunk = new_activations[i : i + CHUNK_SIZE]
+        supabase_activations = [
+            python_activation_to_supabase_dict(activation) for activation in chunk
+        ]
+
+        try:
+            supabase.table("Activations").upsert(supabase_activations).execute()
+        except Exception as e:
+            api_response.message = f"Error upserting chunk {i//CHUNK_SIZE}: {str(e)}"
+            return api_response
+
     api_response.success = True
+    api_response.message = f"Successfully upserted {len(new_activations)} activations"
     return api_response
 
 
@@ -93,10 +102,29 @@ def delete_all_activations():
     try:
         team_member_ids = get_salesforce_team_ids(load_settings())
         supabase = get_supabase_admin_client()
-        supabase.table("Activations").delete().in_(
-            "activated_by_id", team_member_ids
-        ).execute()
+        BATCH_SIZE = 100
+
+        while True:
+            # Fetch a batch of activation IDs to delete
+            activations = supabase.table("Activations") \
+                .select("id") \
+                .in_("activated_by_id", team_member_ids) \
+                .limit(BATCH_SIZE) \
+                .execute()
+
+            activation_ids = [activation['id'] for activation in activations.data]
+
+            if not activation_ids:
+                break  # No more activations to delete
+
+            # Delete the fetched batch of activations
+            supabase.table("Activations") \
+                .delete() \
+                .in_("id", activation_ids) \
+                .execute()
+
         return True
+
     except Exception as e:
         print(f"An error occurred: {e}")
         return False
@@ -125,7 +153,7 @@ def delete_session(session_token: str):
     return True
 
 
-def save_session(token_data: TokenData, is_sandbox: bool):
+def save_session(token_data: TokenData, is_sandbox: bool, extra_state: dict = {}):
     ## TODO: change the invokers of save_session to provide a token_data every time
     if isinstance(token_data, dict):
         token_dict = token_data
@@ -133,16 +161,17 @@ def save_session(token_data: TokenData, is_sandbox: bool):
         token_dict = token_data.to_dict()
     session_token = str(uuid4())
     salesforce_id = token_dict.get("id").split("/")[-1]
-    org_id = token_dict.get("org_id")
+    org_id = token_dict.get("id").split("/")[-2]
     refresh_token = token_dict.get("refresh_token")
-    session_state = {
-        "salesforce_id": salesforce_id,
-        "access_token": token_dict["access_token"],
-        "refresh_token": refresh_token,
-        "instance_url": token_dict["instance_url"],
-        "org_id": org_id,
-        "is_sandbox": is_sandbox,
-    }
+    session_state = SessionState(
+        salesforce_id=salesforce_id,
+        access_token=token_dict["access_token"],
+        refresh_token=refresh_token,
+        instance_url=token_dict["instance_url"],
+        org_id=org_id,
+        is_sandbox=is_sandbox,
+        **extra_state,
+    ).to_dict()
     set_session_state(session_state)
     # Store session data in Supabase
     now = datetime.now(timezone.utc).astimezone()

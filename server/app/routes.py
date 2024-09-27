@@ -5,6 +5,7 @@ from app.middleware import authenticate
 from app.utils import format_error_message, log_error
 from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
+    load_activations_by_period,
 )
 from app.database.settings_selector import load_settings
 from app.database.supabase_user_selector import fetch_supabase_user
@@ -40,6 +41,7 @@ from app.database.supabase_connection import (
 )
 from app.database.session_selector import fetch_supabase_session
 import stripe
+import asyncio
 
 stripe.api_key = Config.STRIPE_SECRET_KEY
 
@@ -79,8 +81,11 @@ def oauth_callback():
         response = requests.post(token_url, data=payload)
         if response.status_code == 200:
             token_data = response.json()
-            session_token = save_session(token_data, is_sandbox)
+            save_session(token_data, is_sandbox)
             user: UserModel = fetch_logged_in_salesforce_user().data
+            session_token = save_session(
+                token_data, is_sandbox, {"username": user.username}
+            )
             settings = load_settings()
             if not settings:
                 upsert_supabase_user(user=user, is_sandbox=is_sandbox)
@@ -223,7 +228,6 @@ def generate_filters():
     return final_response
 
 
-# get_instance_url
 @bp.route("/get_instance_url", methods=["GET"])
 @authenticate
 def get_instance_url():
@@ -247,16 +251,25 @@ def get_prospecting_activities():
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        query_response = (
-            load_active_activations_order_by_first_prospecting_activity_asc()
-        )
+        period = request.args.get("period", "All")
+        query_response = load_activations_by_period(period)
+
         if not query_response.success:
             raise Exception(query_response.message)
+
+        activations = query_response.data
         response.data = [
             {
-                "summary": generate_summary(query_response.data),
+                "summary": generate_summary(activations),
                 "raw_data": [
-                    activation.to_dict() for activation in query_response.data
+                    {
+                        "id": activation.id,
+                        "activated_by_id": activation.activated_by_id,
+                        "activated_by": activation.activated_by.to_dict(),
+                        "account": activation.account.to_dict(),
+                        "last_prospecting_activity": activation.last_prospecting_activity,
+                    }
+                    for activation in activations
                 ],
             }
         ]
@@ -281,7 +294,61 @@ def get_prospecting_activities_filtered_by_ids():
         activation_ids = request.args.getlist("activation_ids[]")
         if not activation_ids:
             response.data = {
-                "total_activations": len(activations),
+                "total_activations": 0,
+                "activations_today": 0,
+                "total_tasks": 0,
+                "total_events": 0,
+                "total_contacts": 0,
+                "total_accounts": 0,
+                "total_deals": 0,
+                "total_pipeline_value": 0,
+            }
+            response.success = True
+        else:
+            activations = (
+                load_active_activations_order_by_first_prospecting_activity_asc().data
+            )
+            filtered_activations = [
+                activation
+                for activation in activations
+                if activation.id in activation_ids
+            ]
+            response.data = [
+                {
+                    "summary": generate_summary(filtered_activations),
+                    "raw_data": [
+                        {
+                            "id": activation.id,
+                            "activated_by_id": activation.activated_by_id,
+                            "activated_by": activation.activated_by.to_dict(),
+                            "account": activation.account.to_dict(),
+                            "last_prospecting_activity": activation.last_prospecting_activity,
+                        }
+                        for activation in filtered_activations
+                    ],
+                }
+            ]
+            response.success = True
+    except Exception as e:
+        log_error(e)
+        response.message = (
+            f"Failed to retrieve prospecting activities: {format_error_message(e)}"
+        )
+
+    return jsonify(response.to_dict()), get_status_code(response)
+
+
+@bp.route("/get_full_prospecting_activities_filtered_by_ids", methods=["GET"])
+@authenticate
+def get_full_prospecting_activities_filtered_by_ids():
+    from app.data_models import ApiResponse
+
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        activation_ids = request.args.getlist("activation_ids[]")
+        if not activation_ids:
+            response.data = {
+                "total_activations": 0,
                 "activations_today": 0,
                 "total_tasks": 0,
                 "total_events": 0,
@@ -312,7 +379,7 @@ def get_prospecting_activities_filtered_by_ids():
     except Exception as e:
         log_error(e)
         response.message = (
-            f"Failed to retrieve prospecting activities: {format_error_message(e)}"
+            f"Failed to retrieve full prospecting activities: {format_error_message(e)}"
         )
 
     return jsonify(response.to_dict()), get_status_code(response)
@@ -324,32 +391,46 @@ def fetch_prospecting_activity():
     from app.data_models import ApiResponse
 
     api_response = ApiResponse(data=[], message="", success=False)
-    try:
-        response = update_activation_states()
+    print("fetching!")
 
-        if response.success:
-            activations = response.data
+    async def process_request():
+        try:
+            response = await update_activation_states()
 
-            api_response.data = [
-                {
-                    "summary": generate_summary(activations),
-                    "raw_data": [activation.to_dict() for activation in activations],
-                }
-            ]
-            api_response.success = True
-            api_response.message = "Prospecting activity data loaded successfully"
-        else:
-            api_response.message = response.message
+            if response.success:
+                activations = response.data
 
-        status_code = get_status_code(api_response)
-    except Exception as e:
-        log_error(e)
-        api_response.message = (
-            f"Failed to load prospecting activities data: {format_error_message(e)}"
-        )
-        status_code = get_status_code(api_response)
+                api_response.data = [
+                    {
+                        "summary": generate_summary(activations),
+                        "raw_data": [
+                            {
+                                "id": activation.id,
+                                "activated_by_id": activation.activated_by_id,
+                                "activated_by": activation.activated_by.to_dict(),
+                                "account": activation.account.to_dict(),
+                                "last_prospecting_activity": activation.last_prospecting_activity,
+                            }
+                            for activation in activations
+                        ],
+                    }
+                ]
+                api_response.success = True
+                api_response.message = "Prospecting activity data loaded successfully"
+            else:
+                api_response.message = response.message
 
-    return jsonify(api_response.to_dict()), status_code
+            status_code = get_status_code(api_response)
+        except Exception as e:
+            log_error(e)
+            api_response.message = (
+                f"Failed to load prospecting activities data: {format_error_message(e)}"
+            )
+            status_code = get_status_code(api_response)
+
+        return jsonify(api_response.to_dict()), status_code
+
+    return asyncio.run(process_request())
 
 
 @bp.route("/delete_all_prospecting_activity", methods=["POST"])

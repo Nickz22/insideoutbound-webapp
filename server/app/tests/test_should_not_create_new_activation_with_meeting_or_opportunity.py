@@ -1,7 +1,6 @@
 import pytest
 import os
 import asyncio
-from datetime import datetime
 from unittest.mock import patch
 from app import create_app
 from app.data_models import TokenData
@@ -11,17 +10,20 @@ from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
 )
 from app.tests.mocks import (
-    mock_fetch_sobjects_async,
     response_based_on_query,
     add_mock_response,
     clear_mocks,
     get_five_mock_accounts,
     get_two_mock_contacts_per_account,
     get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query,
-    get_mock_opportunity_for_account
+    get_mock_opportunity_for_account,
+    mock_fetch_contact_by_id_map,
+    mock_fetch_contacts_by_account_ids,
+    set_mock_contacts_for_map,
 )
 from app.tests.test_helpers import (
     do_onboarding_flow,
+    get_mock_token_data,
     setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account,
     assert_and_return_payload_async,
     get_salesforce_compatible_datetime_now,
@@ -63,14 +65,7 @@ class TestNoNewActivationWithMeetingOrOpportunity:
         self.app.testing = True
         self.client = self.app.test_client()
 
-        mock_token_data = TokenData(
-            access_token="mock_access_token",
-            refresh_token="mock_refresh_token",
-            instance_url="https://mock_instance_url.com",
-            id="mock_user_id",
-            token_type="mock_token_type",
-            issued_at="mock_issued_at",
-        )
+        mock_token_data: TokenData = get_mock_token_data()
 
         with context_tracker(self.app):
             token = save_session(mock_token_data, True)
@@ -93,13 +88,13 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 clear_mocks()
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
     async def test_should_not_create_new_activation_when_activate_by_meeting_and_activate_by_opportunity_are_false(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self, mock_sobject_fetch, mock_fetch_contact_composite
     ):
         with self.app.app_context():
             setup_one_activity_per_contact_with_staggered_created_dates_and_one_event_under_a_single_account_and_one_opportunity_for_a_different_account(
@@ -125,13 +120,20 @@ class TestNoNewActivationWithMeetingOrOpportunity:
             ), "Expected no activations in the database, but found some"
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
+    @patch(
+        "app.services.activation_service.fetch_contacts_by_account_ids",
+        side_effect=mock_fetch_contacts_by_account_ids,
+    )
     async def test_should_change_status_when_new_meeting_is_added_while_activate_by_meeting_is_false(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self,
+        mock_sobject_fetch,
+        mock_fetch_contact_composite,
+        mock_fetch_contacts_by_account_ids,
     ):
         with self.app.app_context():
             # Setup initial activation
@@ -143,10 +145,13 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 )
             )
 
-            add_mock_response("fetch_events_by_account_ids_from_date", [])
+            set_mock_contacts_for_map(mock_contacts)
+            add_mock_response("fetch_all_matching_tasks", mock_tasks)
             add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
-            self._setup_initial_activation_mock_responses(
-                mock_account, mock_contacts, mock_tasks
+            add_mock_response("fetch_events_by_contact_ids_from_date", [])
+            add_mock_response(
+                "fetch_salesforce_users",
+                [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
             )
 
             # Create initial activation
@@ -155,20 +160,31 @@ class TestNoNewActivationWithMeetingOrOpportunity:
             # Now, let's add a meeting
             mock_event = {
                 "Id": "mock_event_id",
-                "WhoId": mock_contacts[0]["Id"],
+                "WhoId": mock_contacts[0].id,
                 "WhatId": mock_account["Id"],
                 "Subject": "Mock Event",
                 "StartDateTime": "2023-05-01T10:00:00.000+0000",
                 "EndDateTime": "2023-05-01T11:00:00.000+0000",
             }
 
-            add_mock_response("fetch_events_by_account_ids_from_date", [mock_event])
+            # unresponsive flow
+            add_mock_response("fetch_all_matching_tasks", [])
+            # increment flow
+            add_mock_response("fetch_all_matching_tasks", [])
+            # increment flow
             add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
-            self._setup_initial_activation_mock_responses(
-                mock_account, mock_contacts, mock_tasks
+            # compute activation flow
+            add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
+            # increment flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", [mock_event])
+            # compute activation flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", [mock_event])
+            add_mock_response(
+                "fetch_salesforce_users",
+                [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
             )
 
-            # Fetch prospecting activity again
+            # Fetch updated prospecting activity
             updated_activation = await self._fetch_updated_activation()
 
             # Assertions
@@ -183,13 +199,20 @@ class TestNoNewActivationWithMeetingOrOpportunity:
             ), "Activation should not have an opportunity"
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
+    @patch(
+        "app.services.activation_service.fetch_contacts_by_account_ids",
+        side_effect=mock_fetch_contacts_by_account_ids,
+    )
     async def test_should_change_activation_status_when_new_opportunity_added_and_activate_by_opportunity_is_false(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self,
+        mock_sobject_fetch,
+        mock_fetch_contact_composite,
+        mock_fetch_contacts_by_account_ids,
     ):
         with self.app.app_context():
             # Setup initial activation
@@ -201,10 +224,13 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 )
             )
 
-            add_mock_response("fetch_events_by_account_ids_from_date", [])
+            set_mock_contacts_for_map(mock_contacts)
+            add_mock_response("fetch_all_matching_tasks", mock_tasks)
             add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
-            self._setup_initial_activation_mock_responses(
-                mock_account, mock_contacts, mock_tasks
+            add_mock_response("fetch_events_by_contact_ids_from_date", [])
+            add_mock_response(
+                "fetch_salesforce_users",
+                [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
             )
 
             # Create initial activation
@@ -220,12 +246,25 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 "StageName": "Prospecting",
             }
 
-            add_mock_response("fetch_events_by_account_ids_from_date", [])
+            # unresponsive flow
+            add_mock_response("fetch_all_matching_tasks", [])
+            # increment flow
+            add_mock_response("fetch_all_matching_tasks", [])
+            # compute activation flow
+            add_mock_response("fetch_all_matching_tasks", [])
+            # increment flow
             add_mock_response(
                 "fetch_opportunities_by_account_ids_from_date", [mock_opportunity]
             )
-            self._setup_initial_activation_mock_responses(
-                mock_account, mock_contacts, mock_tasks
+            # compute activation flow
+            add_mock_response("fetch_opportunities_by_account_ids_from_date", [])
+            # increment flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", [])
+            # compute activation flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", [])
+            add_mock_response(
+                "fetch_salesforce_users",
+                [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
             )
 
             # Fetch prospecting activity again
@@ -246,13 +285,20 @@ class TestNoNewActivationWithMeetingOrOpportunity:
             ), "Opportunity amount should be 10000"
 
     @pytest.mark.asyncio
-    @patch(
-        "app.salesforce_api._fetch_sobjects_async",
-        side_effect=mock_fetch_sobjects_async,
-    )
     @patch("requests.get", side_effect=response_based_on_query)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
+    @patch(
+        "app.services.activation_service.fetch_contacts_by_account_ids",
+        side_effect=mock_fetch_contacts_by_account_ids,
+    )
     async def test_should_roll_up_existing_meeting_and_opportunity_when_creating_activation(
-        self, mock_sobject_fetch, async_mock_sobject_fetch
+        self,
+        mock_sobject_fetch,
+        mock_fetch_contact_composite,
+        mock_fetch_contacts_by_account_ids,
     ):
         with self.app.app_context():
             # Setup initial activation with existing meeting and opportunity
@@ -268,14 +314,10 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 mock_task["Id"] = "mock_task_id_" + mock_task["Id"]
                 mock_task["CreatedDate"] = get_salesforce_compatible_datetime_now()
 
-            self._setup_initial_activation_mock_responses(
-                mock_account, mock_contacts, mock_tasks
-            )
-
             # Add a mock event (meeting)
             mock_event = {
                 "Id": "mock_event_id",
-                "WhoId": mock_contacts[0]["Id"],
+                "WhoId": mock_contacts[0].id,
                 "WhatId": mock_account["Id"],
                 "Subject": "Existing Mock Event",
                 "StartDateTime": get_salesforce_compatible_datetime_now(),
@@ -286,8 +328,17 @@ class TestNoNewActivationWithMeetingOrOpportunity:
             mock_opportunity = get_mock_opportunity_for_account(mock_account["Id"])
             mock_opportunity["Amount"] = 15000
             mock_opportunity["CreatedDate"] = get_salesforce_compatible_datetime_now()
-            
-            add_mock_response("fetch_events_by_account_ids_from_date", [mock_event])
+
+            set_mock_contacts_for_map(mock_contacts)
+            # compute activation flow
+            add_mock_response("fetch_all_matching_tasks", mock_tasks)
+            add_mock_response(
+                "fetch_salesforce_users",
+                [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
+            )
+            # compute activation flow
+            add_mock_response("fetch_events_by_contact_ids_from_date", [mock_event])
+            # compute activation flow
             add_mock_response(
                 "fetch_opportunities_by_account_ids_from_date", [mock_opportunity]
             )
@@ -319,34 +370,6 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 activation["opportunity"]["id"] == mock_opportunity["Id"]
             ), "Opportunity ID should match the mock opportunity"
 
-    def _setup_initial_activation_mock_responses(
-        self, mock_account, mock_contacts, mock_tasks
-    ):
-        add_mock_response(
-            "fetch_salesforce_users",
-            [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
-        )
-        add_mock_response("fetch_accounts_not_in_ids", [mock_account])
-        add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-        add_mock_response("fetch_contacts_by_account_ids", mock_contacts)
-        add_mock_response("unique_values_content_criteria_query", mock_tasks)
-        add_mock_response("contains_content_criteria_query", [])
-        add_mock_response("fetch_contacts_by_ids_and_non_null_accounts", mock_contacts)
-
-    def _setup_initial_activation(self):
-        mock_account = get_five_mock_accounts()[0]
-        mock_contacts = get_two_mock_contacts_per_account([mock_account])
-        mock_tasks = (
-            get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query(
-                3, mock_contacts, mock_user_id
-            )
-        )
-
-        self._setup_initial_activation_mock_responses(
-            mock_account, mock_contacts, mock_tasks
-        )
-
-        return mock_account, mock_contacts, mock_tasks
 
     async def _create_initial_activation(self):
         response = await asyncio.to_thread(

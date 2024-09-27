@@ -5,8 +5,9 @@ from app.database.supabase_connection import (
 from app.data_models import Settings
 from app.mapper.mapper import supabase_dict_to_python_settings
 from typing import Optional
+from app.database.supabase_retry import retry_on_temporary_unavailable
 
-
+@retry_on_temporary_unavailable()
 def load_settings() -> Optional[Settings]:
     try:
         supabase = get_supabase_admin_client()

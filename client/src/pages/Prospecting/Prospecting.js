@@ -1,4 +1,4 @@
-import React, {
+Íimport React, {
   useState,
   useEffect,
   useRef,
@@ -93,7 +93,7 @@ const AntSwitch = styled(Switch)(({ theme }) => ({
 
 
 const Prospecting = () => {
-  const [period, setPeriod] = useState("All");
+  const [period, setPeriod] = useState("This Week");
   const [isSummary, setIsSummary] = useState(true);
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -150,14 +150,14 @@ const Prospecting = () => {
   }, []);
 
   const fetchData = useCallback(
-    async (isRefresh = false) => {
+    async (isRefresh = false, selectedPeriod = period) => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;
       setLoading(true);
       try {
         const response = isRefresh
-          ? await fetchAndUpdateProspectingActivity()
-          : await fetchProspectingActivities();
+          ? await fetchAndUpdateProspectingActivity(selectedPeriod)
+          : await fetchProspectingActivities(selectedPeriod);
 
         switch (response.statusCode) {
           case 200:
@@ -184,7 +184,7 @@ const Prospecting = () => {
         inFlightRef.current = false;
       }
     },
-    [navigate]
+    [navigate, period]
   );
 
   useEffect(() => {
@@ -223,8 +223,17 @@ const Prospecting = () => {
     fetchData(true);
   };
 
-  const handlePeriodChange = (event) => {
-    setPeriod(event.target.value);
+  const handlePeriodChange = useCallback(
+    (event) => {
+      const newPeriod = event.target.value;
+      setPeriod(newPeriod);
+      fetchData(false, newPeriod);
+    },
+    [fetchData]
+  );
+
+  const handleViewChange = (event) => {
+    setView(event.target.value);
   };
 
   const filterDataByPeriod = useCallback((data, selectedPeriod) => {
@@ -329,8 +338,8 @@ const Prospecting = () => {
   };
 
   const handleColumnsChange = (newColumns) => {
-    setColumnShows(newColumns)
-  }
+    setColumnShows(newColumns);
+  };
 
   const filteredData = useMemo(() => {
     let filtered = originalRawData;
