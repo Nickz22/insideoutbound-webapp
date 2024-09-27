@@ -83,7 +83,9 @@ def oauth_callback():
             token_data = response.json()
             save_session(token_data, is_sandbox)
             user: UserModel = fetch_logged_in_salesforce_user().data
-            session_token = save_session(token_data, is_sandbox, {"username": user.username})
+            session_token = save_session(
+                token_data, is_sandbox, {"username": user.username}
+            )
             settings = load_settings()
             if not settings:
                 upsert_supabase_user(user=user, is_sandbox=is_sandbox)
@@ -265,7 +267,7 @@ def get_prospecting_activities():
                         "activated_by_id": activation.activated_by_id,
                         "activated_by": activation.activated_by.to_dict(),
                         "account": activation.account.to_dict(),
-                        "last_prospecting_activity": activation.last_prospecting_activity
+                        "last_prospecting_activity": activation.last_prospecting_activity,
                     }
                     for activation in activations
                 ],
@@ -315,11 +317,12 @@ def get_prospecting_activities_filtered_by_ids():
                 {
                     "summary": generate_summary(filtered_activations),
                     "raw_data": [
-                        {   "id": activation.id,
+                        {
+                            "id": activation.id,
                             "activated_by_id": activation.activated_by_id,
                             "activated_by": activation.activated_by.to_dict(),
                             "account": activation.account.to_dict(),
-                            "last_prospecting_activity": activation.last_prospecting_activity
+                            "last_prospecting_activity": activation.last_prospecting_activity,
                         }
                         for activation in filtered_activations
                     ],
@@ -330,6 +333,53 @@ def get_prospecting_activities_filtered_by_ids():
         log_error(e)
         response.message = (
             f"Failed to retrieve prospecting activities: {format_error_message(e)}"
+        )
+
+    return jsonify(response.to_dict()), get_status_code(response)
+
+
+@bp.route("/get_full_prospecting_activities_filtered_by_ids", methods=["GET"])
+@authenticate
+def get_full_prospecting_activities_filtered_by_ids():
+    from app.data_models import ApiResponse
+
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        activation_ids = request.args.getlist("activation_ids[]")
+        if not activation_ids:
+            response.data = {
+                "total_activations": 0,
+                "activations_today": 0,
+                "total_tasks": 0,
+                "total_events": 0,
+                "total_contacts": 0,
+                "total_accounts": 0,
+                "total_deals": 0,
+                "total_pipeline_value": 0,
+            }
+            response.success = True
+        else:
+            activations = (
+                load_active_activations_order_by_first_prospecting_activity_asc().data
+            )
+            filtered_activations = [
+                activation
+                for activation in activations
+                if activation.id in activation_ids
+            ]
+            response.data = [
+                {
+                    "summary": generate_summary(filtered_activations),
+                    "raw_data": [
+                        activation.to_dict() for activation in filtered_activations
+                    ],
+                }
+            ]
+            response.success = True
+    except Exception as e:
+        log_error(e)
+        response.message = (
+            f"Failed to retrieve full prospecting activities: {format_error_message(e)}"
         )
 
     return jsonify(response.to_dict()), get_status_code(response)
@@ -359,7 +409,7 @@ def fetch_prospecting_activity():
                                 "activated_by_id": activation.activated_by_id,
                                 "activated_by": activation.activated_by.to_dict(),
                                 "account": activation.account.to_dict(),
-                                "last_prospecting_activity": activation.last_prospecting_activity
+                                "last_prospecting_activity": activation.last_prospecting_activity,
                             }
                             for activation in activations
                         ],

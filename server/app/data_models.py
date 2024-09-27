@@ -203,7 +203,7 @@ class Activation(SerializableModel):
     active_contact_ids: Set[str]
     active_contacts: List[Contact]
     task_ids: Set[str]
-    tasks: List[Dict]  # Add this line
+    tasks: Optional[List[Dict]] = None  # Add this line
     activated_by_id: Optional[str] = None
     active_contact_count: Optional[int] = None
     activated_date: Optional[date] = None
