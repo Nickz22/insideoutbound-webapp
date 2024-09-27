@@ -40,12 +40,14 @@ def generate_summary(activations: list[Activation]) -> dict:
         if activation.activated_date == today:
             summary["activations_today"] += 1
 
-        summary["total_tasks"] += len(activation.task_ids)
+        if activation.task_ids:
+            summary["total_tasks"] += len(activation.task_ids)
         summary["total_events"] += (
             len(activation.event_ids) if activation.event_ids else 0
         )
         account_id = activation.account.id
-        account_contacts[account_id].update(activation.active_contact_ids)
+        if activation.active_contact_ids:
+            account_contacts[account_id].update(activation.active_contact_ids)
 
         if activation.opportunity:
             summary["total_deals"] += 1

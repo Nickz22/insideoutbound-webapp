@@ -450,7 +450,7 @@ async def increment_existing_activations(
     return response
 
 
-async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, settings):
+async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, settings) -> ApiResponse:
     """
     This function, `compute_activated_accounts`, is designed to process a collection of tasks, contacts, and settings to identify and construct activations for accounts.
     It aggregates tasks by account and contact, evaluates these tasks against a set of criteria defined in the settings, and determines whether an account has been activated within a specific tracking period.
