@@ -432,9 +432,9 @@ def group_tasks_by_account_and_criteria(
         criterion_results = {}
         for who_id, tasks in tasks_by_who_id.items():
             contact = contact_by_id.get(who_id)
-            account = contact.account
             if not contact:
                 continue
+            account = contact.account
             for task in tasks:
                 if task["Id"] in already_counted_task_ids:
                     continue
