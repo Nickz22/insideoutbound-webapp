@@ -200,9 +200,9 @@ class Activation(SerializableModel):
     id: str
     account: Account
     activated_by: UserModel
-    active_contact_ids: Set[str]
-    active_contacts: List[Contact]
-    task_ids: Set[str]
+    task_ids: Optional[Set[str]] = None
+    active_contact_ids: Optional[Set[str]] = None
+    active_contacts: Optional[List[Contact]] = None
     tasks: Optional[List[Dict]] = None  # Add this line
     activated_by_id: Optional[str] = None
     active_contact_count: Optional[int] = None

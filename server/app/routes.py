@@ -4,6 +4,7 @@ from urllib.parse import unquote
 from app.middleware import authenticate
 from app.utils import format_error_message, log_error
 from app.database.activation_selector import (
+    load_active_activations_minimal_by_ids,
     load_active_activations_order_by_first_prospecting_activity_asc,
     load_activations_by_period,
 )
@@ -305,27 +306,13 @@ def get_prospecting_activities_filtered_by_ids():
             }
             response.success = True
         else:
-            activations = (
-                load_active_activations_order_by_first_prospecting_activity_asc().data
+            filtered_activations = (
+                load_active_activations_minimal_by_ids(activation_ids).data
             )
-            filtered_activations = [
-                activation
-                for activation in activations
-                if activation.id in activation_ids
-            ]
             response.data = [
                 {
                     "summary": generate_summary(filtered_activations),
-                    "raw_data": [
-                        {
-                            "id": activation.id,
-                            "activated_by_id": activation.activated_by_id,
-                            "activated_by": activation.activated_by.to_dict(),
-                            "account": activation.account.to_dict(),
-                            "last_prospecting_activity": activation.last_prospecting_activity,
-                        }
-                        for activation in filtered_activations
-                    ],
+                    "raw_data": [activation.to_dict() for activation in filtered_activations],
                 }
             ]
             response.success = True

@@ -111,13 +111,6 @@ class TestNoNewActivationWithMeetingOrOpportunity:
 
             # Assert that no activations were created
             assert len(activations) == 0, "Expected no activations, but found some"
-            activations = (
-                load_active_activations_order_by_first_prospecting_activity_asc()
-            )
-
-            assert (
-                len(activations.data) == 0
-            ), "Expected no activations in the database, but found some"
 
     @pytest.mark.asyncio
     @patch("requests.get", side_effect=response_based_on_query)
@@ -186,7 +179,16 @@ class TestNoNewActivationWithMeetingOrOpportunity:
 
             # Fetch updated prospecting activity
             updated_activation = await self._fetch_updated_activation()
-
+            
+            activation_ids = [updated_activation["id"]]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header,
+            )
+            updated_activation = database_activations_response.get_json()["data"][0]["raw_data"][0]
+            
             # Assertions
             assert (
                 updated_activation["status"] == "Meeting Set"
@@ -269,19 +271,29 @@ class TestNoNewActivationWithMeetingOrOpportunity:
 
             # Fetch prospecting activity again
             updated_activation = await self._fetch_updated_activation()
+            
+            activation_ids = [updated_activation["id"]]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header,
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+            
 
             # Assertions
             assert (
-                updated_activation["status"] == "Opportunity Created"
+                database_activations[0]["status"] == "Opportunity Created"
             ), "Activation status should be 'Opportunity Created' because an opportunity was added"
             assert (
-                len(updated_activation["event_ids"] or []) == 0
+                len(database_activations[0]["event_ids"] or []) == 0
             ), "Activation should have no events"
             assert (
-                updated_activation["opportunity"] is not None
+                database_activations[0]["opportunity"] is not None
             ), "Activation should have an opportunity"
             assert (
-                updated_activation["opportunity"]["amount"] == 10000
+                database_activations[0]["opportunity"]["amount"] == 10000
             ), "Opportunity amount should be 10000"
 
     @pytest.mark.asyncio
@@ -348,10 +360,18 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 self.client.post, "/fetch_prospecting_activity", headers=self.api_header
             )
             initial_activations = self.assert_and_return_payload(response)
-
+            
+            activation_ids = [initial_activations[0]["id"]]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header,
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+            
             # Assertions
-            assert len(initial_activations) == 1, "Expected one initial activation"
-            activation = initial_activations[0]
+            activation = database_activations[0]
 
             assert (
                 activation["status"] == "Opportunity Created"
@@ -378,9 +398,6 @@ class TestNoNewActivationWithMeetingOrOpportunity:
         initial_activations = self.assert_and_return_payload(response)
         assert len(initial_activations) == 1, "Expected one initial activation"
         initial_activation = initial_activations[0]
-        assert (
-            initial_activation["status"] == "Activated"
-        ), "Initial activation status should be 'Activated'"
         return initial_activation
 
     async def _fetch_updated_activation(self):

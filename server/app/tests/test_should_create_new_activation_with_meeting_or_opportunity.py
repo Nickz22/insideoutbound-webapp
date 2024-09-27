@@ -8,8 +8,8 @@ from app.database.dml import save_session, delete_session, save_settings
 from app.database.settings_selector import load_settings
 from app.database.supabase_connection import (
     get_supabase_admin_client,
-    set_session_state,
 )
+from app.utils import pluck
 from app.tests.mocks import (
     mock_fetch_contact_by_id_map,
     response_based_on_query,
@@ -106,15 +106,25 @@ class TestNewActivationWithMeetingOrOpportunity:
                     headers=self.api_header,
                 )
             )
+            
+            activation_ids = [activation['id'] for activation in activations]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+
             assert (
-                len(activations) == 2
+                len(database_activations) == 2
             ), "Expected two activations to be created since two Accounts were setup with an Event and Opportunity respectively"
 
             meeting_set_activation = next(
-                a for a in activations if a["status"] == "Meeting Set"
+                a for a in database_activations if a["status"] == "Meeting Set"
             )
             opportunity_created_activation = next(
-                a for a in activations if a["status"] == "Opportunity Created"
+                a for a in database_activations if a["status"] == "Opportunity Created"
             )
 
             assert len(meeting_set_activation["event_ids"]) == 1
@@ -163,11 +173,20 @@ class TestNewActivationWithMeetingOrOpportunity:
                 len(activations) == 2
             ), "Expected two activations to be created since two Accounts were setup with an Event and Opportunity respectively"
 
+            activation_ids = [activation['id'] for activation in activations]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+
             meeting_set_activation = next(
-                a for a in activations if a["status"] == "Meeting Set"
+                a for a in database_activations if a["status"] == "Meeting Set"
             )
             opportunity_created_activation = next(
-                a for a in activations if a["status"] == "Opportunity Created"
+                a for a in database_activations if a["status"] == "Opportunity Created"
             )
 
             assert len(meeting_set_activation["event_ids"]) == 1

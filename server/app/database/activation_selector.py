@@ -107,7 +107,7 @@ def load_activations_by_period(period: str) -> ApiResponse:
 
     query = (
         supabase_client.table("Activations")
-        .select("*")
+        .select("id, activated_by_id, activated_by, activated_date, account, last_prospecting_activity")
         .neq("status", "Unresponsive")
         .in_("activated_by_id", team_member_ids)
         .order("first_prospecting_activity", desc=False)
@@ -122,3 +122,34 @@ def load_activations_by_period(period: str) -> ApiResponse:
 
     activations = [supabase_dict_to_python_activation(row) for row in response.data]
     return ApiResponse(data=activations, success=True)
+
+
+@retry_on_temporary_unavailable()
+def load_active_activations_minimal_by_ids(activation_ids: List[str]) -> ApiResponse:
+    supabase_client = get_supabase_admin_client()
+    team_member_ids = get_salesforce_team_ids(load_settings())
+
+    try:
+        response = (
+            supabase_client.table("Activations")
+            .select(
+                "id, activated_by_id, activated_by, activated_date, account, last_prospecting_activity"
+            )
+            .neq("status", "Unresponsive")
+            .in_("activated_by_id", team_member_ids)
+            .in_("id", activation_ids)
+            .order("first_prospecting_activity", desc=False)
+            .execute()
+        )
+
+        minimal_activations = [
+            supabase_dict_to_python_activation(row) for row in response.data
+        ]
+
+        return ApiResponse(data=minimal_activations, success=True)
+    except Exception as e:
+        error_msg = format_error_message(e)
+        return ApiResponse(
+            success=False,
+            message=f"Failed to load minimal activations: {str(error_msg)}",
+        )
