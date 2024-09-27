@@ -21,6 +21,16 @@ from app.tests.mocks import (
 from app.mapper.mapper import convert_settings_model_to_settings
 import json
 from typing import List
+from app.data_models import TokenData
+def get_mock_token_data() -> TokenData:
+    return TokenData(
+        access_token="mock_access_token",
+        refresh_token="mock_refresh_token",
+        instance_url="https://mock_instance_url.com",
+        id="https://mock_instance_url.com/mock_org_id/mock_user_id",
+        token_type="mock_token_type",
+        issued_at="mock_issued_at",
+    )
 
 def do_onboarding_flow(client, api_header):
     """

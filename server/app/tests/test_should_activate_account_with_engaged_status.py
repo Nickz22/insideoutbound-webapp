@@ -23,6 +23,7 @@ from app.tests.test_helpers import (
     do_onboarding_flow,
     assert_and_return_payload,
     validate_prospecting_effort,
+    get_mock_token_data,
 )
 from contextlib import contextmanager
 import logging
@@ -60,14 +61,7 @@ class TestActivationWithEngagedStatus:
         self.app.testing = True
         self.client = self.app.test_client()
 
-        mock_token_data = TokenData(
-            access_token="mock_access_token",
-            refresh_token="mock_refresh_token",
-            instance_url="https://mock_instance_url.com",
-            id="mock_user_id",
-            token_type="mock_token_type",
-            issued_at="mock_issued_at",
-        )
+        mock_token_data: TokenData = get_mock_token_data()
 
         with context_tracker(self.app):
             token = save_session(mock_token_data, True)

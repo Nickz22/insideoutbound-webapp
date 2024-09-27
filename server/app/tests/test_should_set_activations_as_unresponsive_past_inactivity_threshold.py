@@ -23,6 +23,7 @@ from app.tests.test_helpers import (
     setup_thirty_tasks_across_ten_contacts_and_five_accounts_for_start_of_test,
     setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events,
     assert_and_return_payload,
+    get_mock_token_data
 )
 from contextlib import contextmanager
 import logging
@@ -60,14 +61,7 @@ class TestUnresponsiveActivationLogic:
         self.app.testing = True
         self.client = self.app.test_client()
 
-        mock_token_data = TokenData(
-            access_token="mock_access_token",
-            refresh_token="mock_refresh_token",
-            instance_url="https://mock_instance_url.com",
-            id="mock_user_id",
-            token_type="mock_token_type",
-            issued_at="mock_issued_at",
-        )
+        mock_token_data: TokenData = get_mock_token_data()
 
         with context_tracker(self.app):
             token = save_session(mock_token_data, True)

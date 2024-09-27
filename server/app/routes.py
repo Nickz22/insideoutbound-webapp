@@ -80,8 +80,9 @@ def oauth_callback():
         response = requests.post(token_url, data=payload)
         if response.status_code == 200:
             token_data = response.json()
-            session_token = save_session(token_data, is_sandbox)
+            save_session(token_data, is_sandbox)
             user: UserModel = fetch_logged_in_salesforce_user().data
+            session_token = save_session(token_data, is_sandbox, {"username": user.username})
             settings = load_settings()
             if not settings:
                 upsert_supabase_user(user=user, is_sandbox=is_sandbox)

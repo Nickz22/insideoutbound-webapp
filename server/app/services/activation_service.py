@@ -1,4 +1,5 @@
 import os, sys
+import traceback
 from app.data_models import (
     Settings,
     Activation,
@@ -11,6 +12,7 @@ from app.data_models import (
 from typing import List, Dict
 from flask import current_app as app
 import asyncio
+from sentry_sdk import capture_exception, set_context
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 from app.salesforce_api import (
@@ -58,7 +60,7 @@ async def find_unresponsive_activations(
     2. Filters out activations that have not had any prospecting activity within the threshold period defined in the settings.
     3. Fetches tasks associated with the filtered activations that are not already counted and groups them by account ID.
     4. For each account, it checks if there are any new prospecting activities within the threshold period. If not, the activation status is updated to "Unresponsive".
-    5. Returns a collection of activations that have been marked as unresponsive.
+    5. Returns a collection of activations that have been marked as unresponsive based on the lack of recent prospecting activity.
 
     Parameters:
         activations (list): A list of activation objects. Each activation object must have attributes for prospecting activity dates, account ID, and task IDs.
@@ -121,16 +123,40 @@ async def find_unresponsive_activations(
         }
 
         account_ids_with_activity = set()
-        for account_id in criteria_group_tasks_by_account_id:
-
+        for account_id, contacts_tasks in criteria_group_tasks_by_account_id.items():
             activation = activations_by_account_id.get(account_id)
             criteria_name_by_task_id = {}
             all_tasks = []
 
-            for criteria in criteria_group_tasks_by_account_id[account_id]:
-                for task in criteria_group_tasks_by_account_id[account_id][criteria]:
-                    criteria_name_by_task_id[task.get("Id")] = criteria
-                    all_tasks.append(task)
+            for contact_id, criteria_tasks in contacts_tasks.items():
+                for criteria, tasks in criteria_tasks.items():
+                    for task in tasks:
+                        try:
+                            task_id = task.get("Id")
+                            if task_id:
+                                criteria_name_by_task_id[task_id] = criteria
+                                all_tasks.append(task)
+                            else:
+                                print(
+                                    f"Warning: Task without Id found for account {account_id}, contact {contact_id}"
+                                )
+                        except Exception as e:
+                            set_context(
+                                "problematic_task",
+                                {
+                                    "task": task,
+                                    "account_id": account_id,
+                                    "contact_id": contact_id,
+                                    "criteria": criteria,
+                                    "error": str(e),
+                                    "error_type": type(e).__name__,
+                                },
+                            )
+                            capture_exception(e)
+                            print(f"Error processing task: {task}")
+                            traceback.print_exc()
+                            # Continue to the next task instead of raising
+                            continue
 
             last_prospecting_activity_naive = datetime.combine(
                 activation.last_prospecting_activity, datetime.min.time()
@@ -157,6 +183,7 @@ async def find_unresponsive_activations(
         response.data = activations_to_inactivate
         response.success = True
     except Exception as e:
+        capture_exception(e)
         raise Exception(format_error_message(e))
 
     return response
