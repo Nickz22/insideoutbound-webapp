@@ -368,7 +368,6 @@ class DataType(str, Enum):
     SELECT = "select"
     IMAGE = "image"
 
-
 class SObjectFieldModel(SerializableModel):
     type: str
     name: str
@@ -383,10 +382,20 @@ class TableColumn(SerializableModel):
 
 class TokenData(SerializableModel):
     access_token: str
+    refresh_token: str
     instance_url: str
     id: str
     token_type: str
     issued_at: str
+    
+class SessionState(SerializableModel):
+    salesforce_id: str
+    access_token: str
+    refresh_token: str
+    instance_url: str
+    org_id: str
+    is_sandbox: bool
+    username: Optional[str] = None
 
 
 class AuthenticationError(Exception):

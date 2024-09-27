@@ -16,7 +16,7 @@ from app.tests.mocks import (
     clear_mocks,
     set_mock_contacts_for_map
 )
-from app.tests.test_helpers import do_onboarding_flow  # Import the new helper
+from app.tests.test_helpers import do_onboarding_flow, get_mock_token_data  # Import the new helper
 from contextlib import contextmanager
 import logging
 
@@ -53,14 +53,7 @@ class TestActivationLogic:
         self.app.testing = True
         self.client = self.app.test_client()
 
-        mock_token_data = TokenData(
-            access_token="mock_access_token",
-            refresh_token="mock_refresh_token",
-            instance_url="https://mock_instance_url.com",
-            id="mock_user_id",
-            token_type="mock_token_type",
-            issued_at="mock_issued_at",
-        )
+        mock_token_data: TokenData = get_mock_token_data()
 
         with context_tracker(self.app):
             token = save_session(mock_token_data, True)
