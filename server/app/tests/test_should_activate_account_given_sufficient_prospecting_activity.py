@@ -20,6 +20,8 @@ from app.tests.test_helpers import do_onboarding_flow, get_mock_token_data  # Im
 from contextlib import contextmanager
 import logging
 
+from server.app.routes import get_full_prospecting_activities_filtered_by_ids
+
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
@@ -108,10 +110,15 @@ class TestActivationLogic:
                 self.client.post, "/fetch_prospecting_activity", headers=self.api_header
             )
             activations = self.assert_and_return_payload(response)
-
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?activation_ids[]={activations[0]['id']}",
+                headers=self.api_header
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
             # Assertions
-            assert len(activations) == 1, "Expected one activation to be created"
-            activation = activations[0]
+            assert len(database_activations) == 1, "Expected one activation to be created"
+            activation = database_activations[0]
             assert (
                 activation["status"] == "Activated"
             ), "Activation status should be 'Activated'"

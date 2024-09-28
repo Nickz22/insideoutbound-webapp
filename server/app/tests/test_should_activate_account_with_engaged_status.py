@@ -137,9 +137,15 @@ class TestActivationWithEngagedStatus:
             )
             activations = assert_and_return_payload(response)
 
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?activation_ids[]={activations[0]['id']}",
+                headers=self.api_header
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
             # Assertions
-            assert len(activations) == 1, "Expected one activation to be created"
-            activation = activations[0]
+            assert len(database_activations) == 1, "Expected one activation to be created"
+            activation = database_activations[0]
             assert (
                 activation["status"] == "Engaged"
             ), "Activation status should be 'Engaged'"

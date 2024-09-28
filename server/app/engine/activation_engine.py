@@ -1,5 +1,6 @@
 import time
 from datetime import datetime
+from typing import List
 
 from app.services.activation_service import (
     compute_activated_accounts,
@@ -14,7 +15,7 @@ from app.database.activation_selector import (
 )
 from app.database.settings_selector import load_settings
 from app.database.dml import upsert_activations, save_settings
-from app.data_models import ApiResponse, Settings
+from app.data_models import ApiResponse, FilterContainer, Settings
 from app.utils import (
     add_days,
     get_team_member_salesforce_ids,
@@ -55,7 +56,7 @@ async def update_activation_states():
         incremented_activations = async_response.data
         upsert_activations(incremented_activations)
 
-    relevant_task_criteria = settings.criteria
+    relevant_task_criteria: List[FilterContainer] = settings.criteria
     if settings.meeting_object == "Task":
         relevant_task_criteria = settings.criteria + [settings.meetings_criteria]
     async_response = await fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(

@@ -107,9 +107,18 @@ class TestUpdateActivationStatusToOpportunityCreated:
                     headers=self.api_header,
                 )
             )
+            
+            activation_ids = [initial_activations[0]["id"]]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header,
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
 
             meeting_set_activation = next(
-                a for a in initial_activations if a["status"] == "Meeting Set"
+                a for a in database_activations if a["status"] == "Meeting Set"
             )
 
             # Create a new opportunity for the account with "Meeting Set" status
@@ -148,11 +157,20 @@ class TestUpdateActivationStatusToOpportunityCreated:
                 )
             )
 
+            activation_ids = [updated_activations[0]["id"]]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header,
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+            
             # Find the activation that should have been updated
             updated_activation = next(
                 (
                     a
-                    for a in updated_activations
+                    for a in database_activations
                     if a["account"]["id"] == meeting_set_activation["account"]["id"]
                 ),
                 None,

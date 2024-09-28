@@ -31,8 +31,7 @@ current_branch = (
 # Push the current branch to the remote
 subprocess.run(["git", "push", "--set-upstream", "origin", current_branch])
 
-# Base branch: Use sys.argv[1] if provided, otherwise fall back to EPIC_BRANCH_NAME environment variable
-base_branch = "main"
+base_branch = sys.argv[1] if len(sys.argv) > 1 else "main"
 
 summary = current_branch  # Default summary is the branch name
 

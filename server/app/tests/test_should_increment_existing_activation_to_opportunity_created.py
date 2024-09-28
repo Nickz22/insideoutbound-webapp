@@ -87,13 +87,19 @@ class TestIncrementExistingActivationToOpportunityCreated:
 
     @pytest.mark.asyncio
     @patch("requests.get", side_effect=response_based_on_query)
-    @patch("app.salesforce_api.fetch_contact_by_id_map", side_effect=mock_fetch_contact_by_id_map)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
     @patch(
         "app.services.activation_service.fetch_contacts_by_account_ids",
         side_effect=mock_fetch_contacts_by_account_ids,
     )
     async def test_should_increment_existing_activation_to_opportunity_created_status_when_opportunity_is_created_under_previously_activated_account(
-        self, mock_sobject_fetch, mock_fetch_contact_composite, mock_fetch_contacts_by_account_ids
+        self,
+        mock_sobject_fetch,
+        mock_fetch_contact_composite,
+        mock_fetch_contacts_by_account_ids,
     ):
         with self.app.app_context():
             # setup mock api responses for one account activated via meeting set and another via opportunity created
@@ -109,8 +115,19 @@ class TestIncrementExistingActivationToOpportunityCreated:
                 )
             )
 
+            activation_ids = [activation["id"] for activation in activations]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header,
+            )
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
+
             meeting_set_activation: Activation = next(
-                a for a in activations if a["status"] == "Meeting Set"
+                a for a in database_activations if a["status"] == "Meeting Set"
             )
 
             mock_contacts_for_more_tasks = [
@@ -121,13 +138,15 @@ class TestIncrementExistingActivationToOpportunityCreated:
                     account_id=meeting_set_activation["account"]["id"],
                     account=Account(
                         id=meeting_set_activation["account"]["id"],
-                        name="Mock Account Name"
-                    )
+                        name="Mock Account Name",
+                    ),
                 )
                 for contact_id in meeting_set_activation["active_contact_ids"]
             ]
-                
-            set_mock_contacts_for_map(get_mock_contacts_for_map()+mock_contacts_for_more_tasks)
+
+            set_mock_contacts_for_map(
+                get_mock_contacts_for_map() + mock_contacts_for_more_tasks
+            )
             # setup mock api response to return an opportunity for the account activated via meeting set
             mock_opportunity = get_mock_opportunity_for_account(
                 meeting_set_activation["account"]["id"]
@@ -177,10 +196,25 @@ class TestIncrementExistingActivationToOpportunityCreated:
                 )
             )
 
+            updated_activation_ids = [
+                activation["id"] for activation in updated_activations
+            ]
+            query_params = "&".join(
+                [f"activation_ids[]={id}" for id in updated_activation_ids]
+            )
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header,
+            )
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
+
             # Isolate the activation which meets the criteria
             activation_with_opportunity_created = [
                 activation
-                for activation in updated_activations
+                for activation in database_activations
                 if activation["status"] == "Opportunity Created"
                 and activation["event_ids"]
             ]

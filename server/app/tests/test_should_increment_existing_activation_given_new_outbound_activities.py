@@ -129,8 +129,18 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
                 )
             )
 
+            activation_ids = [initial_activations[0]["id"]]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+            
+            initial_activation = database_activations[0]
+
             assert len(initial_activations) == 1, "Expected one activation"
-            initial_activation = initial_activations[0]
             assert initial_activation["status"] == "Activated"
 
             # Set up new outbound activities
@@ -168,7 +178,17 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
             )
 
             assert len(updated_activations) == 1, "Still expected one activation"
-            updated_activation = updated_activations[0]
+
+            activation_ids = [updated_activations[0]["id"]]
+            query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
+                headers=self.api_header
+            )
+            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+
+            updated_activation = database_activations[0]
 
             # Assert status is still "Activated"
             assert (
