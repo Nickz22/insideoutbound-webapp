@@ -232,10 +232,6 @@ const Prospecting = () => {
     [fetchData]
   );
 
-  const handleViewChange = (event) => {
-    setView(event.target.value);
-  };
-
   const filterDataByPeriod = useCallback((data, selectedPeriod) => {
     if (selectedPeriod === "All") return data;
 
@@ -605,6 +601,7 @@ const Prospecting = () => {
                 columns: columnShows,
                 data: filteredData.map((item) => ({
                   ...item,
+                  "account.owner.status": item.account?.owner?.status,
                   "account.name": (
                     <Link
                       href={`${instanceUrl}/${item.account?.id}`}

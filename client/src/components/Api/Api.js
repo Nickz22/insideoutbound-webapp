@@ -148,12 +148,12 @@ export const saveSettings = async (settings) => {
   return { ...response.data, statusCode: response.status };
 };
 
-/**
- * Fetches and updates prospecting activity data
- * @param {string} period
- * @returns {Promise<ApiResponse>}
- */
-export const fetchAndUpdateProspectingActivity = async (period) => {
+// /**
+//  * Fetches and updates prospecting activity data
+//  * @param {string} period
+//  * @returns {Promise<ApiResponse>}
+//  */
+export const fetchAndUpdateProspectingActivity = async () => {
   try {
     const response = await api.post("/fetch_prospecting_activity");
     return { ...response.data, statusCode: response.status };
@@ -319,7 +319,7 @@ export const generateCriteria = async (tasksOrEvents, columns) => {
  */
 export const generateActivationSummary = async (activation_ids) => {
   const response = await api.get(
-    "/get_prospecting_activities_filtered_by_ids",
+    "/get_full_prospecting_activities_filtered_by_ids",
     {
       params: { activation_ids: activation_ids },
     }
