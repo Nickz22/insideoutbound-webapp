@@ -588,17 +588,99 @@ async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, set
                     task_ids.append(task.get("Id"))
 
                 if not is_task_in_tracking_period:
-                    active_contact_ids = get_active_contact_ids(
-                        valid_task_ids_by_who_id, settings.activities_per_contact
-                    )
+                    try:
+                        active_contact_ids = get_active_contact_ids(
+                            valid_task_ids_by_who_id, settings.activities_per_contact
+                        )
 
-                    is_account_active_for_tracking_period = (
-                        len(active_contact_ids) >= settings.contacts_per_account
-                        or (qualifying_event and settings.activate_by_meeting)
-                        or (qualifying_opportunity and settings.activate_by_opportunity)
-                    )
-                    if not is_account_active_for_tracking_period:
-                        ## reset tracking
+                        is_account_active_for_tracking_period = (
+                            len(active_contact_ids) >= settings.contacts_per_account
+                            or (qualifying_event and settings.activate_by_meeting)
+                            or (
+                                qualifying_opportunity
+                                and settings.activate_by_opportunity
+                            )
+                        )
+                        if not is_account_active_for_tracking_period:
+                            ## reset tracking
+                            start_tracking_period = add_days(
+                                start_tracking_period,
+                                settings.tracking_period
+                                + settings.inactivity_threshold,
+                            )
+                            valid_task_ids_by_who_id.clear()
+                            account_first_prospecting_activity = None
+                            task_ids.clear()
+                            if is_model_date_field_within_window(
+                                task, start_tracking_period, settings.tracking_period
+                            ):
+                                valid_task_ids_by_who_id[task.get("WhoId")] = [
+                                    task.get("Id")
+                                ]
+                                account_first_prospecting_activity = (
+                                    parse_datetime_string_with_timezone(
+                                        task.get("CreatedDate")
+                                    ).date()
+                                )
+                                task_ids = [task.get("Id")]
+                                last_valid_task_assignee_id = task.get("OwnerId")
+                            continue
+
+                        last_prospecting_activity = parse_datetime_string_with_timezone(
+                            task.get("CreatedDate")
+                        ).date()
+
+                        is_active_via_meeting_or_opportunity = (
+                            len(active_contact_ids) < settings.contacts_per_account
+                        )
+                        active_contact_ids = (
+                            list(valid_task_ids_by_who_id.keys())
+                            if is_active_via_meeting_or_opportunity
+                            else active_contact_ids
+                        )
+
+                        # Get inbound tasks within the current tracking period
+                        inbound_tasks_in_period = get_inbound_tasks_within_period(
+                            all_inbound_tasks,
+                            start_tracking_period,
+                            settings.tracking_period,
+                        )
+                        engaged_date = (
+                            parse_datetime_string_with_timezone(
+                                inbound_tasks_in_period[0].get("CreatedDate")
+                            )
+                            if len(inbound_tasks_in_period) > 0
+                            else None
+                        )
+
+                        if not last_valid_task_assignee_id in salesforce_user_by_id:
+                            for task in all_tasks_under_account:
+                                if task.get("OwnerId") in salesforce_user_by_id:
+                                    last_valid_task_assignee_id = task.get("OwnerId")
+                                    break
+                            else:
+                                print(
+                                    f"Warning: No valid Salesforce user found for account {account_id}"
+                                )
+                                continue  # Skip this activation if no valid user is found
+
+                        activation = create_activation(
+                            account_first_prospecting_activity=account_first_prospecting_activity,
+                            active_contact_ids=active_contact_ids,
+                            last_valid_task_creator=salesforce_user_by_id.get(
+                                last_valid_task_assignee_id
+                            )[0],
+                            last_prospecting_activity=last_prospecting_activity,
+                            outbound_task_ids=task_ids,
+                            qualifying_opportunity=qualifying_opportunity,
+                            qualifying_event=qualifying_event,
+                            task_ids_by_criteria_name=task_ids_by_criteria_name,
+                            settings=settings,
+                            all_tasks_under_account=all_tasks_under_account,
+                            engaged_date=engaged_date,
+                        )
+                        activations.append(activation)
+                        ## reset tracking period
                         start_tracking_period = add_days(
                             start_tracking_period,
                             settings.tracking_period + settings.inactivity_threshold,
@@ -606,72 +688,19 @@ async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, set
                         valid_task_ids_by_who_id.clear()
                         account_first_prospecting_activity = None
                         task_ids.clear()
-                        if is_model_date_field_within_window(
-                            task, start_tracking_period, settings.tracking_period
-                        ):
-                            valid_task_ids_by_who_id[task.get("WhoId")] = [
-                                task.get("Id")
-                            ]
-                            account_first_prospecting_activity = (
-                                parse_datetime_string_with_timezone(
-                                    task.get("CreatedDate")
-                                ).date()
-                            )
-                            task_ids = [task.get("Id")]
-                            last_valid_task_assignee_id = task.get("OwnerId")
-                        continue
-
-                    last_prospecting_activity = parse_datetime_string_with_timezone(
-                        task.get("CreatedDate")
-                    ).date()
-
-                    is_active_via_meeting_or_opportunity = (
-                        len(active_contact_ids) < settings.contacts_per_account
-                    )
-                    active_contact_ids = (
-                        list(valid_task_ids_by_who_id.keys())
-                        if is_active_via_meeting_or_opportunity
-                        else active_contact_ids
-                    )
-
-                    # Get inbound tasks within the current tracking period
-                    inbound_tasks_in_period = get_inbound_tasks_within_period(
-                        all_inbound_tasks,
-                        start_tracking_period,
-                        settings.tracking_period,
-                    )
-                    engaged_date = (
-                        parse_datetime_string_with_timezone(
-                            inbound_tasks_in_period[0].get("CreatedDate")
+                    except Exception as e:
+                        set_context(
+                            "activation_service.compute_activated_accounts",
+                            {
+                                "last_valid_task_assignee_id": last_valid_task_assignee_id,
+                                "salesforce_user_by_id": salesforce_user_by_id,
+                                "qualifying_event": qualifying_event,
+                                "qualifying_opportunity": qualifying_opportunity,
+                                "account_id": account_id,
+                                "task": task,
+                            },
                         )
-                        if len(inbound_tasks_in_period) > 0
-                        else None
-                    )
-
-                    activation = create_activation(
-                        account_first_prospecting_activity=account_first_prospecting_activity,
-                        active_contact_ids=active_contact_ids,
-                        last_valid_task_creator=salesforce_user_by_id.get(
-                            last_valid_task_assignee_id
-                        )[0],
-                        last_prospecting_activity=last_prospecting_activity,
-                        outbound_task_ids=task_ids,
-                        qualifying_opportunity=qualifying_opportunity,
-                        qualifying_event=qualifying_event,
-                        task_ids_by_criteria_name=task_ids_by_criteria_name,
-                        settings=settings,
-                        all_tasks_under_account=all_tasks_under_account,
-                        engaged_date=engaged_date,
-                    )
-                    activations.append(activation)
-                    ## reset tracking period
-                    start_tracking_period = add_days(
-                        start_tracking_period,
-                        settings.tracking_period + settings.inactivity_threshold,
-                    )
-                    valid_task_ids_by_who_id.clear()
-                    account_first_prospecting_activity = None
-                    task_ids.clear()
+                        raise e
 
             # this account's tasks have ended, check for activation
             active_contact_ids = get_active_contact_ids(
@@ -721,21 +750,36 @@ async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, set
                 if len(inbound_tasks_in_period) > 0
                 else None
             )
-            activation = create_activation(
-                account_first_prospecting_activity=account_first_prospecting_activity,
-                active_contact_ids=active_contact_ids,
-                last_valid_task_creator=salesforce_user_by_id.get(
-                    last_valid_task_assignee_id
-                )[0],
-                last_prospecting_activity=last_prospecting_activity,
-                outbound_task_ids=task_ids,
-                qualifying_opportunity=qualifying_opportunity,
-                qualifying_event=qualifying_event,
-                task_ids_by_criteria_name=task_ids_by_criteria_name,
-                settings=settings,
-                all_tasks_under_account=all_tasks_under_account,
-                engaged_date=engaged_date,
-            )
+            try:
+                activation = create_activation(
+                    account_first_prospecting_activity=account_first_prospecting_activity,
+                    active_contact_ids=active_contact_ids,
+                    last_valid_task_creator=salesforce_user_by_id.get(
+                        last_valid_task_assignee_id
+                    )[0],
+                    last_prospecting_activity=last_prospecting_activity,
+                    outbound_task_ids=task_ids,
+                    qualifying_opportunity=qualifying_opportunity,
+                    qualifying_event=qualifying_event,
+                    task_ids_by_criteria_name=task_ids_by_criteria_name,
+                    settings=settings,
+                    all_tasks_under_account=all_tasks_under_account,
+                    engaged_date=engaged_date,
+                )
+
+            except Exception as e:
+                set_context(
+                    "activation_service.compute_activated_accounts",
+                    {
+                        "last_valid_task_assignee_id": last_valid_task_assignee_id,
+                        "salesforce_user_by_id": salesforce_user_by_id,
+                        "qualifying_event": qualifying_event,
+                        "qualifying_opportunity": qualifying_opportunity,
+                        "account_id": account_id,
+                        "task": task,
+                    },
+                )
+                raise e
             activations.append(activation)
             response.data.extend(activations)
 
