@@ -92,7 +92,10 @@ class TestUpdateActivationStatusToOpportunityCreated:
         side_effect=mock_fetch_contacts_by_account_ids,
     )
     async def test_should_update_activation_status_to_opportunity_created_without_additional_task(
-        self, mock_sobject_fetch, mock_fetch_contact_composite, mock_fetch_contacts_by_account_ids
+        self,
+        mock_sobject_fetch,
+        mock_fetch_contact_composite,
+        mock_fetch_contacts_by_account_ids,
     ):
         with self.app.app_context():
             # Set up the initial activation
@@ -103,11 +106,11 @@ class TestUpdateActivationStatusToOpportunityCreated:
             initial_activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )
-            
+
             activation_ids = [initial_activations[0]["id"]]
             query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
             database_activations_response = await asyncio.to_thread(
@@ -115,7 +118,9 @@ class TestUpdateActivationStatusToOpportunityCreated:
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
                 headers=self.api_header,
             )
-            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
 
             meeting_set_activation = next(
                 a for a in database_activations if a["status"] == "Meeting Set"
@@ -152,7 +157,7 @@ class TestUpdateActivationStatusToOpportunityCreated:
             updated_activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )
@@ -164,8 +169,10 @@ class TestUpdateActivationStatusToOpportunityCreated:
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
                 headers=self.api_header,
             )
-            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
-            
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
+
             # Find the activation that should have been updated
             updated_activation = next(
                 (

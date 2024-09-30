@@ -109,7 +109,7 @@ class Contact(SerializableModel):
     first_name: str
     last_name: str
     account_id: str
-    account: Account
+    account: Optional[Account] = None
     owner_id: Optional[str] = None
 
 
@@ -177,6 +177,7 @@ class Opportunity(SerializableModel):
     name: str
     amount: float
     close_date: date
+    created_date: date
     stage: str
 
 
@@ -332,6 +333,7 @@ class Settings(SerializableModel):
     latest_date_queried: Optional[datetime] = None
     skip_account_criteria: Optional[FilterContainer] = None
     skip_opportunity_criteria: Optional[FilterContainer] = None
+    user_time_zone: Optional[str] = None
 
 
 class FilterModel(SerializableModel):
@@ -364,7 +366,7 @@ class SettingsModel(SerializableModel):
     salesforceUserId: Optional[str] = None
     skipAccountCriteria: Optional[FilterContainerModel] = None
     skipOpportunityCriteria: Optional[FilterContainerModel] = None
-
+    userTimeZone: Optional[str] = None
 
 class DataType(str, Enum):
     STRING = "string"

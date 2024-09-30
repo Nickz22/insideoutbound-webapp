@@ -18,6 +18,7 @@ export interface Settings {
   skipAccountCriteria?: FilterContainer;
   skipOpportunityCriteria?: FilterContainer;
   salesforceUserId?: string;
+  userTimeZone?: string;
 }
 
 export interface SettingStatus {

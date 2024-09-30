@@ -32,13 +32,42 @@ def generate_summary(activations: list[Activation]) -> dict:
         "engaged_activations": 0,
         "total_active_contacts": 0,
         "closed_won_opportunity_value": 0,  # New parameter
+        "avg_days_from_first_activity_to_opportunity": 0,  # New field
+        "avg_outbound_activities_to_inbound_response": 0,
+        "avg_number_approached_contacts_to_engage": 0,
+        "most_effective_prospecting_activity_for_engagement": None,
+        "most_effective_prospecting_activity_for_engagement_fraction": 0.0,
+        "most_effective_prospecting_activity_for_meeting": None,
+        "most_effective_prospecting_activity_for_meeting_fraction": 0.0,
+        "in_status_activated": 0,
+        "in_status_engaged": 0,
+        "in_status_meeting_set": 0,
+        "in_status_opportunity_created": 0,
     }
 
     account_contacts = defaultdict(set)
+    total_days_to_opportunity = 0
+    activations_with_opportunity = 0
+    total_outbound_activities_before_engagement = 0
+    engaged_accounts_contact_count = []
+    total_engaged_activations = 0
+
+    prospecting_activity_counts_engagement = defaultdict(int)
+    prospecting_activity_counts_meeting = defaultdict(int)
+    total_prospecting_activities_engagement = 0
+    total_prospecting_activities_meeting = 0
 
     for activation in activations:
         if activation.activated_date == today:
             summary["activations_today"] += 1
+        if activation.status == StatusEnum.activated:
+            summary["in_status_activated"] += 1
+        elif activation.status == StatusEnum.engaged:
+            summary["in_status_engaged"] += 1
+        elif activation.status == StatusEnum.meeting_set:
+            summary["in_status_meeting_set"] += 1
+        elif activation.status == StatusEnum.opportunity_created:
+            summary["in_status_opportunity_created"] += 1
 
         if activation.task_ids:
             summary["total_tasks"] += len(activation.task_ids)
@@ -54,24 +83,126 @@ def generate_summary(activations: list[Activation]) -> dict:
             summary["total_pipeline_value"] += activation.opportunity.amount
             if activation.opportunity.stage == "Closed Won":
                 summary["closed_won_opportunity_value"] += activation.opportunity.amount
+
+            # Calculate days from first activity to opportunity
+            first_activity_date = activation.first_prospecting_activity
+            opportunity_created_date = activation.opportunity.created_date
+            days_to_opportunity = (opportunity_created_date - first_activity_date).days
+            total_days_to_opportunity += days_to_opportunity
+            activations_with_opportunity += 1
+            total_outbound_activities_before_engagement += len(
+                activation.prospecting_effort[0].task_ids
+            )
         if activation.status == "Engaged":
             summary["engaged_activations"] += 1
+            engaged_accounts_contact_count.append(len(activation.active_contact_ids))
+
+        # Check if the activation has ever been engaged
+        ever_engaged = any(
+            effort.status == StatusEnum.engaged
+            for effort in activation.prospecting_effort
+        )
+        ever_meeting_set = any(
+            effort.status == StatusEnum.meeting_set
+            for effort in activation.prospecting_effort
+        )
+        
+        if ever_engaged:
+            total_engaged_activations += 1
+
+            # Find the effort just before engagement (i.e., the last "Activated" effort)
+            activated_effort = next(
+                (
+                    effort
+                    for effort in reversed(activation.prospecting_effort)
+                    if effort.status == StatusEnum.activated
+                ),
+                None,
+            )
+
+            if activated_effort:
+                for metadata in activated_effort.prospecting_metadata:
+                    prospecting_activity_counts_engagement[metadata.name] += metadata.total
+                    total_prospecting_activities_engagement += metadata.total
+
+        if ever_meeting_set:
+            # Find the effort just before meeting set (could be "Activated" or "Engaged")
+            pre_meeting_effort = next(
+                (
+                    effort
+                    for effort in reversed(activation.prospecting_effort)
+                    if effort.status in [StatusEnum.activated, StatusEnum.engaged]
+                ),
+                None,
+            )
+            
+            if pre_meeting_effort:
+                for metadata in pre_meeting_effort.prospecting_metadata:
+                    prospecting_activity_counts_meeting[metadata.name] += metadata.total
+                    total_prospecting_activities_meeting += metadata.total
 
     summary["total_contacts"] = sum(
         len(contacts) for contacts in account_contacts.values()
     )
     summary["total_active_contacts"] = len(account_contacts)
     summary["total_accounts"] = len(account_contacts)
-    summary["avg_tasks_per_contact"] = (
-        summary["total_tasks"] / summary["total_contacts"]
-        if summary["total_contacts"] > 0
+    summary["avg_tasks_per_contact"] = round(
+        (
+            summary["total_tasks"] / summary["total_contacts"]
+            if summary["total_contacts"] > 0
+            else 0
+        ),
+        2,
+    )
+    summary["avg_contacts_per_account"] = round(
+        (
+            summary["total_contacts"] / summary["total_accounts"]
+            if summary["total_accounts"] > 0
+            else 0
+        ),
+        2,
+    )
+    summary["avg_outbound_activities_to_inbound_response"] = (
+        round(
+            total_outbound_activities_before_engagement
+            / summary["engaged_activations"],
+            2,
+        )
+        if summary["engaged_activations"] > 0
         else 0
     )
-    summary["avg_contacts_per_account"] = (
-        summary["total_contacts"] / summary["total_accounts"]
-        if summary["total_accounts"] > 0
-        else 0
-    )
+
+    # Calculate average days from first activity to opportunity
+    if activations_with_opportunity > 0:
+        summary["avg_days_from_first_activity_to_opportunity"] = round(
+            total_days_to_opportunity / activations_with_opportunity, 2
+        )
+
+    # Calculate average number of approached contacts to engage
+    if total_engaged_activations > 0:
+        summary["avg_number_approached_contacts_to_engage"] = round(
+            sum(engaged_accounts_contact_count) / total_engaged_activations, 2
+        )
+
+    # Calculate for engagement
+    if prospecting_activity_counts_engagement:
+        most_effective_engagement = max(
+            prospecting_activity_counts_engagement, key=lambda x: x[1]
+        )
+        summary["most_effective_prospecting_activity_for_engagement"] = most_effective_engagement
+        summary["most_effective_prospecting_activity_for_engagement_fraction"] = round(
+            prospecting_activity_counts_engagement[most_effective_engagement] / total_prospecting_activities_engagement, 2
+        )
+
+    # Calculate for meeting set
+    if prospecting_activity_counts_meeting:
+        most_effective_meeting = max(
+            prospecting_activity_counts_meeting, key=prospecting_activity_counts_meeting.get
+        )
+        summary["most_effective_prospecting_activity_for_meeting"] = most_effective_meeting
+        summary["most_effective_prospecting_activity_for_meeting_fraction"] = round(
+            prospecting_activity_counts_meeting[most_effective_meeting] / total_prospecting_activities_meeting, 2
+        )
 
     return summary
 
@@ -186,9 +317,13 @@ def create_activation(
             else (StatusEnum.engaged if engaged_date else StatusEnum.activated)
         )
     )
-    
-    contact_by_id = {task['Contact'].id: task['Contact'] for task in all_tasks_under_account if task['Contact']}
-    
+
+    contact_by_id = {
+        task["Contact"].id: task["Contact"]
+        for task in all_tasks_under_account
+        if task["Contact"]
+    }
+
     activation = Activation(
         id=generate_unique_id(),
         account=all_tasks_under_account[0]["Account"],

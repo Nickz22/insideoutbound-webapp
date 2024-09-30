@@ -102,19 +102,21 @@ class TestNewActivationWithMeetingOrOpportunity:
             activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )
-            
-            activation_ids = [activation['id'] for activation in activations]
+
+            activation_ids = [activation["id"] for activation in activations]
             query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
             database_activations_response = await asyncio.to_thread(
                 self.client.get,
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
-                headers=self.api_header
+                headers=self.api_header,
             )
-            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
 
             assert (
                 len(database_activations) == 2
@@ -165,7 +167,7 @@ class TestNewActivationWithMeetingOrOpportunity:
             activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )
@@ -173,14 +175,16 @@ class TestNewActivationWithMeetingOrOpportunity:
                 len(activations) == 2
             ), "Expected two activations to be created since two Accounts were setup with an Event and Opportunity respectively"
 
-            activation_ids = [activation['id'] for activation in activations]
+            activation_ids = [activation["id"] for activation in activations]
             query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
             database_activations_response = await asyncio.to_thread(
                 self.client.get,
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
-                headers=self.api_header
+                headers=self.api_header,
             )
-            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
 
             meeting_set_activation = next(
                 a for a in database_activations if a["status"] == "Meeting Set"

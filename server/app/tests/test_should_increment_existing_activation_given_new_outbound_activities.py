@@ -86,13 +86,19 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
 
     @pytest.mark.asyncio
     @patch("requests.get", side_effect=response_based_on_query)
-    @patch("app.salesforce_api.fetch_contact_by_id_map", side_effect=mock_fetch_contact_by_id_map)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
     @patch(
         "app.services.activation_service.fetch_contacts_by_account_ids",
         side_effect=mock_fetch_contacts_by_account_ids,
     )
     async def test_should_increment_existing_activation_given_new_outbound_activities(
-        self, mock_sobject_fetch, mock_fetch_contact_composite, mock_fetch_contacts_by_account_ids
+        self,
+        mock_sobject_fetch,
+        mock_fetch_contact_composite,
+        mock_fetch_contacts_by_account_ids,
     ):
         with self.app.app_context():
             # Set up initial activation
@@ -124,7 +130,7 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
             initial_activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )
@@ -134,10 +140,12 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
             database_activations_response = await asyncio.to_thread(
                 self.client.get,
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
-                headers=self.api_header
+                headers=self.api_header,
             )
-            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
-            
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
+
             initial_activation = database_activations[0]
 
             assert len(initial_activations) == 1, "Expected one activation"
@@ -156,13 +164,27 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
                 task["Id"] = str(uuid.uuid4())
 
             # Setup mock responses for the second fetch
-            add_mock_response("fetch_all_matching_tasks", new_tasks) # increment existing activations flow
-            add_mock_response("fetch_all_matching_tasks", new_tasks) # unresponsive flow
-            add_mock_response("fetch_all_matching_tasks", new_tasks) # compute new activations flowå
-            add_mock_response("fetch_opportunities_by_account_ids_from_date", []) # increment existing activations flow
-            add_mock_response("fetch_events_by_contact_ids_from_date", []) # increment existing activations flow
-            add_mock_response("fetch_opportunities_by_account_ids_from_date", []) # compute new activations flow
-            add_mock_response("fetch_events_by_contact_ids_from_date", []) # compute new activations flow
+            add_mock_response(
+                "fetch_all_matching_tasks", new_tasks
+            )  # increment existing activations flow
+            add_mock_response(
+                "fetch_all_matching_tasks", new_tasks
+            )  # unresponsive flow
+            add_mock_response(
+                "fetch_all_matching_tasks", new_tasks
+            )  # compute new activations flowå
+            add_mock_response(
+                "fetch_opportunities_by_account_ids_from_date", []
+            )  # increment existing activations flow
+            add_mock_response(
+                "fetch_events_by_contact_ids_from_date", []
+            )  # increment existing activations flow
+            add_mock_response(
+                "fetch_opportunities_by_account_ids_from_date", []
+            )  # compute new activations flow
+            add_mock_response(
+                "fetch_events_by_contact_ids_from_date", []
+            )  # compute new activations flow
             add_mock_response(
                 "fetch_salesforce_users",
                 [{"Id": mock_user_id, "FirstName": "Mock", "LastName": "User"}],
@@ -172,7 +194,7 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
             updated_activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )
@@ -184,9 +206,11 @@ class TestIncrementExistingActivationWithNewOutboundActivities:
             database_activations_response = await asyncio.to_thread(
                 self.client.get,
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
-                headers=self.api_header
+                headers=self.api_header,
             )
-            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
 
             updated_activation = database_activations[0]
 

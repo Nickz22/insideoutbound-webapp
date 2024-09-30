@@ -14,7 +14,7 @@ def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResp
     supabase_client = get_supabase_admin_client()
     team_member_ids = get_salesforce_team_ids(load_settings())
 
-    page_size = 100
+    page_size = 50
     current_page = 0
     all_activations = []
 
@@ -82,6 +82,13 @@ def load_activations_by_period(period: str) -> ApiResponse:
 
     if period == "All":
         start_date = None
+    elif period == "Today":
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    elif period == "Yesterday":
+        start_date = (now - timedelta(days=1)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        )
+        end_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
     elif period == "This Week":
         start_date = now - timedelta(days=now.weekday())
     elif period == "Last Week":
@@ -107,7 +114,9 @@ def load_activations_by_period(period: str) -> ApiResponse:
 
     query = (
         supabase_client.table("Activations")
-        .select("id, activated_by_id, activated_by, activated_date, account, last_prospecting_activity")
+        .select(
+            "id, activated_by_id, status, activated_by, activated_date, account, first_prospecting_activity, prospecting_effort, last_prospecting_activity, active_contact_ids, opportunity, task_ids, event_ids"
+        )
         .neq("status", "Unresponsive")
         .in_("activated_by_id", team_member_ids)
         .order("first_prospecting_activity", desc=False)
@@ -120,7 +129,9 @@ def load_activations_by_period(period: str) -> ApiResponse:
 
     response = query.execute()
 
-    activations = [supabase_dict_to_python_activation(row) for row in response.data]
+    activations = [
+        supabase_dict_to_python_activation(row) for row in response.data
+    ] or []
     return ApiResponse(data=activations, success=True)
 
 
@@ -133,7 +144,7 @@ def load_active_activations_minimal_by_ids(activation_ids: List[str]) -> ApiResp
         response = (
             supabase_client.table("Activations")
             .select(
-                "id, activated_by_id, activated_by, activated_date, account, last_prospecting_activity"
+                "id, activated_by_id, activated_by, activated_date, account, first_prospecting_activity, prospecting_effort, last_prospecting_activity, active_contact_ids, opportunity, task_ids, event_ids"
             )
             .neq("status", "Unresponsive")
             .in_("activated_by_id", team_member_ids)
@@ -144,7 +155,7 @@ def load_active_activations_minimal_by_ids(activation_ids: List[str]) -> ApiResp
 
         minimal_activations = [
             supabase_dict_to_python_activation(row) for row in response.data
-        ]
+        ] or []
 
         return ApiResponse(data=minimal_activations, success=True)
     except Exception as e:

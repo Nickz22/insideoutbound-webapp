@@ -104,7 +104,7 @@ class TestNoNewActivationWithMeetingOrOpportunity:
             activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )
@@ -179,7 +179,7 @@ class TestNoNewActivationWithMeetingOrOpportunity:
 
             # Fetch updated prospecting activity
             updated_activation = await self._fetch_updated_activation()
-            
+
             activation_ids = [updated_activation["id"]]
             query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
             database_activations_response = await asyncio.to_thread(
@@ -187,8 +187,10 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
                 headers=self.api_header,
             )
-            updated_activation = database_activations_response.get_json()["data"][0]["raw_data"][0]
-            
+            updated_activation = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ][0]
+
             # Assertions
             assert (
                 updated_activation["status"] == "Meeting Set"
@@ -271,7 +273,7 @@ class TestNoNewActivationWithMeetingOrOpportunity:
 
             # Fetch prospecting activity again
             updated_activation = await self._fetch_updated_activation()
-            
+
             activation_ids = [updated_activation["id"]]
             query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
             database_activations_response = await asyncio.to_thread(
@@ -279,8 +281,9 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
                 headers=self.api_header,
             )
-            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
-            
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
 
             # Assertions
             assert (
@@ -357,10 +360,12 @@ class TestNoNewActivationWithMeetingOrOpportunity:
 
             # Create initial activation
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             initial_activations = self.assert_and_return_payload(response)
-            
+
             activation_ids = [initial_activations[0]["id"]]
             query_params = "&".join([f"activation_ids[]={id}" for id in activation_ids])
             database_activations_response = await asyncio.to_thread(
@@ -368,8 +373,10 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 f"/get_full_prospecting_activities_filtered_by_ids?{query_params}",
                 headers=self.api_header,
             )
-            database_activations = database_activations_response.get_json()["data"][0]["raw_data"]
-            
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
+
             # Assertions
             activation = database_activations[0]
 
@@ -390,10 +397,11 @@ class TestNoNewActivationWithMeetingOrOpportunity:
                 activation["opportunity"]["id"] == mock_opportunity["Id"]
             ), "Opportunity ID should match the mock opportunity"
 
-
     async def _create_initial_activation(self):
         response = await asyncio.to_thread(
-            self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+            self.client.post,
+            "/process_new_prospecting_activity",
+            headers=self.api_header,
         )
         initial_activations = self.assert_and_return_payload(response)
         assert len(initial_activations) == 1, "Expected one initial activation"
@@ -402,7 +410,9 @@ class TestNoNewActivationWithMeetingOrOpportunity:
 
     async def _fetch_updated_activation(self):
         response = await asyncio.to_thread(
-            self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+            self.client.post,
+            "/process_new_prospecting_activity",
+            headers=self.api_header,
         )
         updated_activations = self.assert_and_return_payload(response)
         assert (

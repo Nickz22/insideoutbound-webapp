@@ -11,7 +11,7 @@ from app.data_models import (
     Activation,
     ProspectingMetadata,
     ProspectingEffort,
-    UserModel
+    UserModel,
 )
 from typing import Dict
 from dateutil import parser
@@ -22,6 +22,7 @@ from app.utils import (
     surround_numbers_with_underscores,
     remove_underscores_from_numbers,
 )
+import pytz
 
 
 def convert_dict_to_opportunity(opportunity_dict: Dict) -> Opportunity:
@@ -31,9 +32,11 @@ def convert_dict_to_opportunity(opportunity_dict: Dict) -> Opportunity:
     close_date_str = opportunity_dict.get("CloseDate")
     close_date = date.fromisoformat(close_date_str) if close_date_str else None
     stage = opportunity_dict.get("StageName")
+    created_date_str = opportunity_dict.get("CreatedDate")
+    created_date = datetime.strptime(created_date_str, "%Y-%m-%dT%H:%M:%S.%f%z").date() if created_date_str else None
 
     return Opportunity(
-        id=id, name=name, amount=amount, close_date=close_date, stage=stage
+        id=id, name=name, amount=amount, close_date=close_date, stage=stage, created_date=created_date
     )
 
 
@@ -71,9 +74,16 @@ def supabase_dict_to_python_settings(row: Dict) -> Settings:
             fc = json.loads(row[field])
             row[field] = convert_dict_to_filter_container(fc)
 
-    # Convert ISO format string to datetime
+    # Convert ISO format string to datetime and apply user's time zone
     if "latest_date_queried" in row and row["latest_date_queried"]:
-        row["latest_date_queried"] = parser.isoparse(row["latest_date_queried"])
+        utc_time = parser.isoparse(row["latest_date_queried"])
+        if "user_time_zone" in row and row["user_time_zone"]:
+            user_tz = pytz.timezone(row["user_time_zone"])
+            row["latest_date_queried"] = utc_time.replace(tzinfo=pytz.UTC).astimezone(
+                user_tz
+            )
+        else:
+            row["latest_date_queried"] = utc_time
 
     # Convert team_member_ids from JSON string to list if it's not None
     if "team_member_ids" in row and row["team_member_ids"]:
@@ -126,13 +136,12 @@ def python_settings_to_supabase_dict(settings: Settings) -> Dict:
                 settings_dict[field] if settings_dict[field] else {}
             )
 
-    # Convert datetime to ISO format string
+    # Convert datetime to UTC ISO format string
     if "latest_date_queried" in settings_dict and isinstance(
         settings_dict["latest_date_queried"], datetime
     ):
-        settings_dict["latest_date_queried"] = settings_dict[
-            "latest_date_queried"
-        ].isoformat()
+        utc_time = settings_dict["latest_date_queried"].astimezone(pytz.UTC)
+        settings_dict["latest_date_queried"] = utc_time.isoformat()
 
     # Convert team_member_ids to JSON string if it's not None
     if (
@@ -159,12 +168,12 @@ def supabase_dict_to_python_activation(row: Dict) -> Activation:
         row["prospecting_effort"] = [
             ProspectingEffort(**item) for item in json.loads(row["prospecting_effort"])
         ]
-    
+
     if "active_contacts" in row and row["active_contacts"]:
         row["active_contacts"] = [
             Contact(**item) for item in json.loads(row["active_contacts"])
         ]
-    
+
     if "tasks" in row and row["tasks"]:
         row["tasks"] = json.loads(row["tasks"])
 
@@ -199,10 +208,12 @@ def python_activation_to_supabase_dict(activation: Activation) -> Dict:
         activation_dict["active_contact_ids"] = list(
             activation_dict["active_contact_ids"]
         )
-    
+
     if "active_contacts" in activation_dict:
-        activation_dict["active_contacts"] = json.dumps(activation_dict["active_contacts"])
-        
+        activation_dict["active_contacts"] = json.dumps(
+            activation_dict["active_contacts"]
+        )
+
     if "tasks" in activation_dict:
         activation_dict["tasks"] = json.dumps(activation_dict["tasks"])
 
@@ -331,6 +342,7 @@ def convert_settings_model_to_settings(sm: SettingsModel) -> Settings:
         team_member_ids=sm.teamMemberIds,
         salesforce_user_id=sm.salesforceUserId,
         latest_date_queried=sm.latestDateQueried,
+        user_time_zone=sm.userTimeZone,
     )
 
 
@@ -354,7 +366,9 @@ def convert_settings_to_settings_model(s: Settings) -> SettingsModel:
         teamMemberIds=s.team_member_ids,
         salesforceUserId=s.salesforce_user_id,
         latestDateQueried=s.latest_date_queried,
+        userTimeZone=s.user_time_zone,
     )
+
 
 def python_user_to_supabase_dict(user: UserModel) -> Dict:
     supabase_user = {
@@ -364,11 +378,12 @@ def python_user_to_supabase_dict(user: UserModel) -> Dict:
         "org_id": user.orgId if user.orgId else "",
         "is_sandbox": None,  # This information is not present in UserModel
         "photo_url": user.photoUrl if user.photoUrl else "",
-        "status": user.status or "not paid"
+        "status": user.status or "not paid",
     }
-    
+
     # Remove None values
     return {k: v for k, v in supabase_user.items() if v is not None}
+
 
 def supabase_user_to_python_user(row: Dict) -> UserModel:
     return UserModel(
@@ -377,5 +392,7 @@ def supabase_user_to_python_user(row: Dict) -> UserModel:
         orgId=row["org_id"],
         photoUrl=row["photo_url"],
         status=row["status"],
-        created_at=datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
+        created_at=(
+            datetime.fromisoformat(row["created_at"]) if row["created_at"] else None
+        ),
     )
