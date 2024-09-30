@@ -26,3 +26,9 @@ def get_session_state():
 
 def get_supabase_admin_client() -> Client:
     return supabase
+
+def get_supabase_url() -> str:
+    return url
+
+def get_supabase_key() -> str:
+    return admin_key

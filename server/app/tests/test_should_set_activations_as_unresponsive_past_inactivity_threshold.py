@@ -23,7 +23,7 @@ from app.tests.test_helpers import (
     setup_thirty_tasks_across_ten_contacts_and_five_accounts_for_start_of_test,
     setup_zero_new_prospecting_activities_and_zero_new_opportunities_and_zero_new_events,
     assert_and_return_payload,
-    get_mock_token_data
+    get_mock_token_data,
 )
 from contextlib import contextmanager
 import logging
@@ -96,14 +96,19 @@ class TestUnresponsiveActivationLogic:
         side_effect=mock_fetch_contacts_by_account_ids,
     )
     async def test_should_set_activations_without_prospecting_activities_past_inactivity_threshold_as_unresponsive(
-        self, mock_sobject_fetch, mock_fetch_contact_composite, mock_fetch_contacts_by_account_ids
+        self,
+        mock_sobject_fetch,
+        mock_fetch_contact_composite,
+        mock_fetch_contacts_by_account_ids,
     ):
         with self.app.app_context():
             setup_thirty_tasks_across_ten_contacts_and_five_accounts_for_start_of_test(
                 mock_user_id
             )
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             initial_activations = assert_and_return_payload(response)
 
@@ -124,7 +129,9 @@ class TestUnresponsiveActivationLogic:
             )
 
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             assert_and_return_payload(response)
 

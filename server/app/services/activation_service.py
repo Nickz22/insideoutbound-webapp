@@ -1,6 +1,7 @@
 import os, sys
 import traceback
 from app.data_models import (
+    FilterContainer,
     Settings,
     Activation,
     ProspectingMetadata,
@@ -190,16 +191,20 @@ async def find_unresponsive_activations(
 
 
 async def increment_existing_activations(
-    activations: List[Activation], settings: Settings
+    activations: List[Activation],
+    settings: Settings,
+    relevant_task_criteria: List[FilterContainer],
 ):
     response = ApiResponse(data=[], message="", success=False)
     try:
         today = date.today()
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
 
-        first_prospecting_activity = convert_date_to_salesforce_datetime_format(
-            min(activation.first_prospecting_activity for activation in activations)
+        # must be UTC since that's how Salesforce will filter against Task CreatedDate
+        benchmark_dt = convert_date_to_salesforce_datetime_format(
+            settings.latest_date_queried
         )
+
         activations.sort(key=lambda x: x.last_prospecting_activity, reverse=True)
         account_ids = list(set(activation.account.id for activation in activations))
         already_counted_task_ids = set(
@@ -208,8 +213,8 @@ async def increment_existing_activations(
 
         async_response = (
             await fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(
-                first_prospecting_activity,
-                settings.criteria,
+                benchmark_dt,
+                relevant_task_criteria,
                 already_counted_task_ids,
                 salesforce_user_ids,
             )
@@ -225,7 +230,7 @@ async def increment_existing_activations(
 
         opportunities_by_account_id: List[Dict] = group_by(
             fetch_opportunities_by_account_ids_from_date(
-                account_ids, first_prospecting_activity, salesforce_user_ids
+                account_ids, benchmark_dt, salesforce_user_ids
             ).data,
             "AccountId",
         )
@@ -235,21 +240,30 @@ async def increment_existing_activations(
                 settings,
                 activations,
                 criteria_group_tasks_by_account_id,
-                first_prospecting_activity,
+                benchmark_dt,
                 salesforce_user_ids,
             )
         )
 
         activations_by_account_id: Dict[str, Activation] = {
-            activation.account.id: activation for activation in activations
+            activation.account.id: activation
+            for activation in activations
+            if activation.account.id in criteria_group_tasks_by_account_id
+            or activation.account.id in opportunities_by_account_id
+            or activation.account.id in meetings_by_account_id
         }
 
         criterion_by_name = {
-            criterion.name: criterion for criterion in settings.criteria
+            criterion.name: criterion for criterion in relevant_task_criteria
         }
 
-        # New code: Process all activations, even if there are no tasks
+        changed_activations = []
+
         for account_id, activation in activations_by_account_id.items():
+            original_activation = (
+                activation.model_copy()
+            )  # Create a copy of the original activation
+
             opportunities = opportunities_by_account_id.get(account_id, [])
             meetings = meetings_by_account_id.get(account_id, [])
 
@@ -385,9 +399,9 @@ async def increment_existing_activations(
                         )
 
                     # Update engagement date if necessary
-                    if (
-                        not activation.engaged_date
-                        and criterion_by_name.get(criteria_name).direction.lower()
+                    if not activation.engaged_date and (
+                        criterion_by_name.get(criteria_name).name == "meetingsCriteria"
+                        or criterion_by_name.get(criteria_name).direction.lower()
                         == "inbound"
                     ):
                         activation.engaged_date = task_created_datetime.date()
@@ -400,9 +414,13 @@ async def increment_existing_activations(
 
             # Update opportunity if necessary
             activation.opportunity = (
-                convert_dict_to_opportunity(opportunities[0])
-                if opportunities and len(opportunities) > 0
-                else None
+                (
+                    convert_dict_to_opportunity(opportunities[0])
+                    if opportunities and len(opportunities) > 0
+                    else None
+                )
+                if not original_activation.opportunity
+                else original_activation.opportunity
             )
             if (
                 activation.opportunity
@@ -442,7 +460,11 @@ async def increment_existing_activations(
                 activation.prospecting_effort.append(new_pe)
                 current_prospecting_effort = new_pe
 
-        response.data = list(activations_by_account_id.values())
+            # Check if the activation has changed
+            if activation != original_activation:
+                changed_activations.append(activation)
+
+        response.data = changed_activations
         response.success = True
     except Exception as e:
         raise Exception(format_error_message(e))
@@ -450,7 +472,9 @@ async def increment_existing_activations(
     return response
 
 
-async def compute_activated_accounts(criteria_tasks_by_who_id_by_account_id, settings) -> ApiResponse:
+async def compute_activated_accounts(
+    criteria_tasks_by_who_id_by_account_id, settings
+) -> ApiResponse:
     """
     This function, `compute_activated_accounts`, is designed to process a collection of tasks, contacts, and settings to identify and construct activations for accounts.
     It aggregates tasks by account and contact, evaluates these tasks against a set of criteria defined in the settings, and determines whether an account has been activated within a specific tracking period.

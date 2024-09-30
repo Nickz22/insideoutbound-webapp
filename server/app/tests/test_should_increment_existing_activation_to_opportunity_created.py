@@ -110,7 +110,7 @@ class TestIncrementExistingActivationToOpportunityCreated:
             activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )
@@ -191,7 +191,7 @@ class TestIncrementExistingActivationToOpportunityCreated:
             updated_activations = await assert_and_return_payload_async(
                 asyncio.to_thread(
                     self.client.post,
-                    "/fetch_prospecting_activity",
+                    "/process_new_prospecting_activity",
                     headers=self.api_header,
                 )
             )

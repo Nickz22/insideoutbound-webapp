@@ -276,9 +276,14 @@ def _process_contacts(contacts):
     ]
 
 
+import time
+
 async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
+    start_time = time.time()
+    print(f"Starting fetch_contact_by_id_map for {len(contact_ids)} contacts")
+
     contact_batch_size = 300
-    composite_batch_size = 5
+    composite_batch_size = 3  # Reduced from 5 to 3
     contact_batches = [
         contact_ids[i : i + contact_batch_size]
         for i in range(0, len(contact_ids), contact_batch_size)
@@ -289,25 +294,81 @@ async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
     ]
 
     async with aiohttp.ClientSession() as session:
-        contact_fetch_jobs = [
-            fetch_contact_composite_batch(batch, session) for batch in composite_batches
-        ]
-        results = await asyncio.gather(*contact_fetch_jobs)
+        contact_by_id = {}
+        for i, batch in enumerate(composite_batches):
+            print(f"Processing composite batch {i+1} of {len(composite_batches)}")
+            results = await fetch_contact_composite_batch(batch, session)
+            for result in results:
+                contact_by_id.update(result)
+            
+            if i < len(composite_batches) - 1:  # Don't wait after the last batch
+                await asyncio.sleep(1)  # 1 second delay between composite batches
 
-    contact_by_id = {}
-    for result in results:
-        for batch_result in result:
-            contact_by_id.update(batch_result)
-
+    end_time = time.time()
+    print(f"Completed fetch_contact_by_id_map. Total contacts processed: {len(contact_by_id)}. Time taken: {end_time - start_time:.2f} seconds")
     return contact_by_id
+
+import logging
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+
+# Create logger
+logger = logging.getLogger(__name__)
+
 
 
 async def fetch_contact_composite_batch(
     contact_batches: List[List[str]], session: aiohttp.ClientSession
 ) -> List[Dict[str, Account]]:
+    MAX_RETRIES = 3
+    RETRY_DELAY = 2  # seconds
+    TIMEOUT = 10  # seconds
+
+    async def make_request_with_retry(request_func, *args, **kwargs):
+        for attempt in range(MAX_RETRIES):
+            try:
+                return await asyncio.wait_for(request_func(*args, **kwargs), timeout=TIMEOUT)
+            except asyncio.TimeoutError:
+                if attempt == MAX_RETRIES - 1:
+                    raise
+                logger.warning(f"Request timed out after {TIMEOUT} seconds. Retrying in {RETRY_DELAY} seconds... (Attempt {attempt + 1}/{MAX_RETRIES})")
+                await asyncio.sleep(RETRY_DELAY)
+            except Exception as e:
+                if attempt == MAX_RETRIES - 1:
+                    raise
+                logger.warning(f"Request failed: {str(e)}. Retrying in {RETRY_DELAY} seconds... (Attempt {attempt + 1}/{MAX_RETRIES})")
+                await asyncio.sleep(RETRY_DELAY)
+
+    async def make_composite_request():
+        async with session.post(
+            f"{instance_url}/services/data/v55.0/composite",
+            json=composite_request,
+            headers=headers
+        ) as response:
+            if response.status != 200:
+                raise Exception(f"API request failed: {await response.text()}")
+            return await response.json()
+
+    async def fetch_next_records(url):
+        await asyncio.sleep(0.5)  # 0.5 second delay before each pagination request
+        async with session.get(
+            f"{instance_url}{url}", 
+            headers=headers
+        ) as next_response:
+            if next_response.status != 200:
+                raise Exception(f"API request failed: {await next_response.text()}")
+            return await next_response.json()
+
     access_token, instance_url = get_credentials()
     if not access_token or not instance_url:
         raise Exception("Session expired")
+    
+    print(f"Fetching contacts for batch with {len(contact_batches)} batches")
 
     composite_request = {"allOrNone": False, "compositeRequest": []}
 
@@ -326,7 +387,6 @@ async def fetch_contact_composite_batch(
         "dandbcompanyid",
     }
 
-    # Filter out fields whose 'type' contains 'date' or 'reference' and those in the blacklist
     filtered_account_fields = [
         field["name"]
         for field in account_fields
@@ -354,45 +414,48 @@ async def fetch_contact_composite_batch(
         "Content-Type": "application/json",
     }
 
-    async with session.post(
-        f"{instance_url}/services/data/v55.0/composite",
-        json=composite_request,
-        headers=headers,
-    ) as response:
-        if response.status != 200:
-            raise Exception(f"API request failed: {await response.text()}")
+    start_time = time.time()
+    try:
+        data = await make_request_with_retry(make_composite_request)
+        logger.info(f"Composite request successful. Time taken: {time.time() - start_time:.2f} seconds")
+    except Exception as e:
+        logger.error(f"Composite request failed after {MAX_RETRIES} attempts: {str(e)}")
+        return []
 
-        data = await response.json()
-        results = []
-        for composite_response in data["compositeResponse"]:
-            result = {}
-            contacts = composite_response["body"]["records"]
+    results = []
+    for composite_response in data["compositeResponse"]:
+        result = {}
+        contacts = composite_response["body"]["records"]
 
-            # Process initial batch of contacts
-            for contact in contacts:
+        print(f"Processing {len(contacts)} contacts from initial batch")
+        for contact in contacts:
+            if contact.get("AccountId"):
+                result[contact["Id"]] = _process_contact(contact)
+
+        next_records_url = composite_response["body"].get("nextRecordsUrl")
+        page_count = 1
+        while next_records_url:
+            print(f"Fetching next records url (page {page_count}): {next_records_url}")
+            try:
+                next_data = await make_request_with_retry(fetch_next_records, next_records_url)
+                logger.info(f"Next records request successful. Time taken: {time.time() - start_time:.2f} seconds")
+            except Exception as e:
+                logger.error(f"Next records request failed after {MAX_RETRIES} attempts: {str(e)}")
+                break
+
+            print(f"Processing {len(next_data['records'])} contacts from page {page_count}")
+            for contact in next_data["records"]:
                 if contact.get("AccountId"):
                     result[contact["Id"]] = _process_contact(contact)
 
-            # Fetch and process remaining contacts if any
-            next_records_url = composite_response["body"].get("nextRecordsUrl")
-            while next_records_url:
-                async with session.get(
-                    f"{instance_url}{next_records_url}", headers=headers
-                ) as next_response:
-                    if next_response.status != 200:
-                        raise Exception(
-                            f"API request failed: {await next_response.text()}"
-                        )
+            next_records_url = next_data.get("nextRecordsUrl")
+            page_count += 1
 
-                    next_data = await next_response.json()
-                    for contact in next_data["records"]:
-                        if contact.get("AccountId"):
-                            result[contact["Id"]] = _process_contact(contact)
-
-                    next_records_url = next_data.get("nextRecordsUrl")
-
-            results.append(result)
-        return results
+        print(f"Finished processing batch. Total contacts: {len(result)}")
+        results.append(result)
+    
+    print(f"Completed fetch_contact_composite_batch. Total batches: {len(results)}")
+    return results
 
 
 def _process_contact(contact):
@@ -688,7 +751,7 @@ def fetch_logged_in_salesforce_user() -> ApiResponse:
         api_response.message = f"Failed to fetch logged in user ID: {str(e)}"
         if (
             isinstance(e, requests.exceptions.HTTPError)
-            and e.response.status_code == 401
+            and (e.response.status_code == 401 or e.response.status_code == 403)
         ):
             api_response.message = SESSION_EXPIRED
 
