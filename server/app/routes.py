@@ -299,8 +299,9 @@ def get_paginated_prospecting_activities():
         activation_ids = request.args.getlist("filter_ids[]")
         page = int(request.args.get('page', 0))
         rows_per_page = int(request.args.get('rows_per_page', 10))
+        search_term = request.args.get('search', '')
 
-        result = load_active_activations_paginated(page, rows_per_page, activation_ids)
+        result = load_active_activations_paginated(page, rows_per_page, activation_ids, search_term)
 
         if result.success:
             response.data = [{

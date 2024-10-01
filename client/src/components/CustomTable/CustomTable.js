@@ -59,8 +59,10 @@ const CustomTable = ({
   paginationConfig,
   onRowClick,
   isLoading,
+  onSearch, // Add this new prop
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
+
   const [page, setPage] = useState(paginationConfig?.page || 0);
   const [rowsPerPage, setRowsPerPage] = useState(paginationConfig?.rowsPerPage || 5);
   const [orderBy, setOrderBy] = useState("");
@@ -241,6 +243,13 @@ const CustomTable = ({
     [paginatedData, tableData.columns, tableData.selectedIds, orderBy, order, selectedRowId, isLoading]
   );
 
+  const handleSearch = (value) => {
+    setSearchTerm(value);
+    if (value.length >= 3 || value.length === 0) {
+      onSearch(value);
+    }
+  };
+
   return (
     <Box>
       <TextField
@@ -248,7 +257,7 @@ const CustomTable = ({
         variant="outlined"
         placeholder="Search..."
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={(e) => handleSearch(e.target.value)}
         margin="normal"
         InputProps={{
           startAdornment: (
@@ -258,7 +267,7 @@ const CustomTable = ({
           ),
           endAdornment: searchTerm && (
             <InputAdornment position="end">
-              <IconButton onClick={() => setSearchTerm("")} edge="end">
+              <IconButton onClick={() => handleSearch("")} edge="end">
                 <ClearIcon />
               </IconButton>
             </InputAdornment>

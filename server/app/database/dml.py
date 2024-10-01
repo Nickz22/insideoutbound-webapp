@@ -88,7 +88,20 @@ async def upsert_activations_async(new_activations: List[Activation]):
     async def upsert_chunk(session, chunk):
         if not chunk:  # Skip empty chunks
             return None
-        supabase_activations = [python_activation_to_supabase_dict(activation) for activation in chunk]
+        
+        ## we need clean JSON in Supabase so that we can filter jsonb fields
+        def parse_json_fields(activation):
+            json_fields = ['account', 'active_contacts', 'tasks', 'prospecting_metadata', 'prospecting_effort']
+            for field in json_fields:
+                if field in activation and isinstance(activation[field], str):
+                    try:
+                        activation[field] = json.loads(activation[field])
+                    except json.JSONDecodeError:
+                        print(f"Warning: Failed to parse JSON for field {field}")
+            return activation
+
+        supabase_activations = [parse_json_fields(python_activation_to_supabase_dict(activation)) for activation in chunk]
+        
         url = f"{get_supabase_url()}/rest/v1/Activations"
         headers = {
             "apikey": get_supabase_key(),

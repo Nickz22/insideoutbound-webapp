@@ -122,6 +122,7 @@ const Prospecting = () => {
   const [totalItems, setTotalItems] = useState(0);
   const [detailedActivationData, setDetailedActivationData] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     async function fetchUserAndInstanceUrl() {
@@ -278,14 +279,15 @@ const Prospecting = () => {
   }, [originalRawData, dataFilter]);
 
   const fetchPaginatedData = useCallback(
-    async (newPage, newRowsPerPage) => {
+    async (newPage, newRowsPerPage, newSearchTerm) => {
       setTableLoading(true);
       try {
         const filteredIds = filteredData.map((item) => item.id);
         const response = await getPaginatedProspectingActivities(
           filteredIds,
           newPage,
-          newRowsPerPage
+          newRowsPerPage,
+          newSearchTerm
         );
         if (response.statusCode === 200 && response.success) {
           setDetailedActivationData(response.data[0].raw_data || []);
@@ -317,9 +319,9 @@ const Prospecting = () => {
 
   useEffect(() => {
     if (filteredData.length > 0) {
-      debouncedFetchPaginatedData(page, rowsPerPage);
+      debouncedFetchPaginatedData(page, rowsPerPage, searchTerm);
     }
-  }, [debouncedFetchPaginatedData, page, rowsPerPage, filteredData]);
+  }, [debouncedFetchPaginatedData, page, rowsPerPage, filteredData, searchTerm]);
 
   const handlePageChange = (newPage, newRowsPerPage) => {
     setPage(newPage);
@@ -384,6 +386,12 @@ const Prospecting = () => {
       });
     }
   }, [dataFilter, period]);
+
+  const handleSearch = (newSearchTerm) => {
+    setSearchTerm(newSearchTerm);
+    setPage(0); // Reset to first page when searching
+    fetchPaginatedData(0, rowsPerPage, newSearchTerm);
+  };
 
   if (loading || summaryLoading || userLoading || urlLoading) {
     return <LoadingComponent message="We are fetching your activity..." />;
@@ -560,6 +568,7 @@ const Prospecting = () => {
               onRowClick={handleRowClick}
               onColumnsChange={handleColumnsChange}
               isLoading={tableLoading}
+              onSearch={handleSearch}
             />
 
             {selectedActivation && (

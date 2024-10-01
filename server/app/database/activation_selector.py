@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Optional
 from app.data_models import Activation
 from app.data_models import ApiResponse
 from app.database.supabase_connection import get_supabase_admin_client
@@ -7,6 +7,7 @@ from app.database.settings_selector import load_settings
 from app.utils import get_salesforce_team_ids, format_error_message
 
 from app.database.supabase_retry import retry_on_temporary_unavailable
+import logging
 
 
 @retry_on_temporary_unavailable()
@@ -167,7 +168,7 @@ def load_active_activations_minimal_by_ids(activation_ids: List[str]) -> ApiResp
 
 
 @retry_on_temporary_unavailable()
-def load_active_activations_paginated(page: int, rows_per_page: int, filter_ids: List[str] = None) -> ApiResponse:
+def load_active_activations_paginated(page: int, rows_per_page: int, filter_ids: Optional[List[str]] = None, search_term: Optional[str] = None) -> ApiResponse:
     supabase_client = get_supabase_admin_client()
     team_member_ids = get_salesforce_team_ids(load_settings())
 
@@ -180,20 +181,29 @@ def load_active_activations_paginated(page: int, rows_per_page: int, filter_ids:
             .order("first_prospecting_activity", desc=False)
         )
 
+        # Log query parameters
+        logging.debug(f"Query parameters: page={page}, rows_per_page={rows_per_page}, filter_ids={filter_ids}, search_term={search_term}")
+
         if filter_ids:
             query = query.in_("id", filter_ids)
+
+        if search_term:
+            query = query.filter("account->>name", "ilike", f"%{search_term}%")
 
         # Apply pagination
         start = page * rows_per_page
         end = start + rows_per_page - 1
         query = query.range(start, end)
 
+        # Execute the query and log the response
         response = query.execute()
+        logging.debug(f"Query response: data_length={len(response.data) if response.data else 0}, count={response.count if hasattr(response, 'count') else 'N/A'}")
 
         activations = [supabase_dict_to_python_activation(row) for row in response.data]
-        total_count = response.count
+        total_count = response.count if hasattr(response, 'count') else len(activations)
 
         return ApiResponse(data={"activations": activations, "total_count": total_count}, success=True)
     except Exception as e:
         error_msg = format_error_message(e)
+        logging.error(f"Error in load_active_activations_paginated: {error_msg}")
         return ApiResponse(success=False, message=f"Failed to load activations: {str(error_msg)}")
