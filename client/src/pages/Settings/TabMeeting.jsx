@@ -2,9 +2,15 @@ import { Box, Card, CardContent, Grid, MenuItem, Select, Typography } from '@mui
 import FilterContainer from 'src/components/FilterContainer/FilterContainer'
 import { FILTER_OPERATOR_MAPPING } from 'src/utils/c'
 import { useSettings } from './SettingProvider'
+import { debounce } from 'lodash'
 
 const TabMeeting = () => {
     const { settings, handleChange, filter: { eventFilterFields, taskFilterFields } } = useSettings();
+
+    const debounceValueChange = debounce((fieldName, newContainer) => {
+        handleChange(fieldName, newContainer)
+    }, 50)
+
 
     return (
         <Card id="meeting">
@@ -37,8 +43,7 @@ const TabMeeting = () => {
                         }
                         onValueChange={
                             /** @param {import('types/FilterContainer').FilterContainer} newContainer */
-                            (newContainer) =>
-                                handleChange("meetingsCriteria", newContainer)
+                            (newContainer) => debounceValueChange("meetingsCriteria", newContainer)
                         }
                         filterFields={
                             settings.meetingObject === "Event"
