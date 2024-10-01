@@ -2,7 +2,6 @@ import React from 'react'
 import { Box, Divider, Grid, Typography, Tooltip } from '@mui/material'
 import SummaryLineChartCard from 'src/components/SummaryCard/SummaryLineChartCard'
 import SummaryBarChartCard from 'src/components/SummaryCard/SummaryBarChartCard'
-import InfoIcon from '@mui/icons-material/Info';
 
 /**
  * @typedef {object} SummaryData

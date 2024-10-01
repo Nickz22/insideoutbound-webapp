@@ -155,27 +155,27 @@ def python_settings_to_supabase_dict(settings: Settings) -> Dict:
 
 def supabase_dict_to_python_activation(row: Dict) -> Activation:
 
-    row["account"] = Account(**json.loads(row["account"]))
+    row["account"] = Account(**row["account"])
 
     # Convert JSON strings back to Python objects
     if "prospecting_metadata" in row and row["prospecting_metadata"]:
         row["prospecting_metadata"] = [
             ProspectingMetadata(**item)
-            for item in json.loads(row["prospecting_metadata"])
+            for item in row["prospecting_metadata"]
         ]
 
     if "prospecting_effort" in row and row["prospecting_effort"]:
         row["prospecting_effort"] = [
-            ProspectingEffort(**item) for item in json.loads(row["prospecting_effort"])
+            ProspectingEffort(**item) for item in row["prospecting_effort"]
         ]
 
     if "active_contacts" in row and row["active_contacts"]:
         row["active_contacts"] = [
-            Contact(**item) for item in json.loads(row["active_contacts"])
+            Contact(**item) for item in row["active_contacts"]
         ]
 
     if "tasks" in row and row["tasks"]:
-        row["tasks"] = json.loads(row["tasks"])
+        row["tasks"] = row["tasks"]
 
     # Convert array fields to sets
     for field in ["active_contact_ids", "task_ids", "event_ids"]:

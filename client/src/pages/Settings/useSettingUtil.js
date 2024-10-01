@@ -3,8 +3,7 @@ import { debounce } from "lodash";
 import {
   saveSettings,
   deleteAllActivations,
-  fetchSalesforceUsers,
-  getUserTimezone
+  fetchSalesforceUsers
 } from "src/components/Api/Api";
 
 /** @typedef {import("types/Settings").SettingsContextValue} SettingsContextValue */

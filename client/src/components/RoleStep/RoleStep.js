@@ -260,7 +260,6 @@ const RoleStep = (props) => {
                                 onRowClick={() => { return; }}
                                 onSelectionChange={handleTableSelectionChange}
                                 onColumnsChange={handleColumnsChange}
-                                paginate={true}
                             />)}
                         {isLoading && (
                             <Box

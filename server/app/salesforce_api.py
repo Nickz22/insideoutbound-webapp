@@ -302,7 +302,7 @@ async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
                 contact_by_id.update(result)
             
             if i < len(composite_batches) - 1:  # Don't wait after the last batch
-                await asyncio.sleep(1)  # 1 second delay between composite batches
+                await asyncio.sleep(0.5)  # 0.5 second delay between composite batches
 
     end_time = time.time()
     print(f"Completed fetch_contact_by_id_map. Total contacts processed: {len(contact_by_id)}. Time taken: {end_time - start_time:.2f} seconds")

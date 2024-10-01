@@ -25,7 +25,7 @@ import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import TableHeader from "./TableHeader";
 import TableBody from "./TableBody";
-import { sortData, filterData } from "../../utils/data";
+import { sortData } from "../../utils/data";
 
 /**
  * @typedef {import('types').TableColumn} TableColumn
@@ -47,9 +47,10 @@ import { sortData, filterData } from "../../utils/data";
  *   tableData: TableData,
  *   onSelectionChange: (selectedIds: Set<string>) => void,
  *   onColumnsChange: (columns: TableColumn[]) => void,
- *   paginationConfig?: PaginationConfig,
+ *   paginationConfig?: PaginationConfig | undefined,
  *   onRowClick: (item: Record<string, any>) => void,
  *   isLoading: boolean
+ *   onSearch: (value: string) => void | undefined
  * }} props
  */
 const CustomTable = ({
@@ -62,7 +63,7 @@ const CustomTable = ({
   onSearch, // Add this new prop
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-
+  const [localFilteredData, setLocalFilteredData] = useState(tableData.data);
   const [page, setPage] = useState(paginationConfig?.page || 0);
   const [rowsPerPage, setRowsPerPage] = useState(paginationConfig?.rowsPerPage || 5);
   const [orderBy, setOrderBy] = useState("");
@@ -75,8 +76,8 @@ const CustomTable = ({
   const isServerSidePaginated = isPaginated && paginationConfig.type === "server-side";
 
   const filteredData = useMemo(() => {
-    return isServerSidePaginated ? tableData.data : filterData(tableData.data, searchTerm);
-  }, [tableData.data, searchTerm, isServerSidePaginated]);
+    return isServerSidePaginated ? tableData.data : localFilteredData;
+  }, [tableData.data, localFilteredData, isServerSidePaginated]);
 
   const sortedData = useMemo(() => {
     return isServerSidePaginated ? filteredData : sortData(filteredData, orderBy, order);
@@ -245,8 +246,19 @@ const CustomTable = ({
 
   const handleSearch = (value) => {
     setSearchTerm(value);
-    if (value.length >= 3 || value.length === 0) {
-      onSearch(value);
+    if (paginationConfig?.type === "server-side") {
+      if (value.length > 3 || value.length === 0) {
+        onSearch(value);
+      }
+    } else {
+      // Perform local wildcard search on all columns
+      const filtered = tableData.data.filter(item =>
+        Object.values(item).some(field =>
+          String(field).toLowerCase().includes(value.toLowerCase())
+        )
+      );
+      setLocalFilteredData(filtered);
+      setPage(0); // Reset to first page when filtering
     }
   };
 

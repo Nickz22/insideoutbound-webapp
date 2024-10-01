@@ -188,7 +188,8 @@ def load_active_activations_paginated(page: int, rows_per_page: int, filter_ids:
             query = query.in_("id", filter_ids)
 
         if search_term:
-            query = query.filter("account->>name", "ilike", f"%{search_term}%")
+            query = query.ilike('account->>name', f'%{search_term}%')
+
 
         # Apply pagination
         start = page * rows_per_page
