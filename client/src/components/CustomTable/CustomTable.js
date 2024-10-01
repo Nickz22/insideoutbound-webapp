@@ -32,11 +32,21 @@ import { sortData, filterData } from "../../utils/data";
  */
 
 /**
+ * @typedef {Object} PaginationConfig
+ * @property {"client-side" | "server-side"} type
+ * @property {number} [totalItems]
+ * @property {number} [page]
+ * @property {number} [rowsPerPage]
+ * @property {(page: number, rowsPerPage: number) => void} [onPageChange]
+ * @property {(rowsPerPage: number) => void} [onRowsPerPageChange]
+ */
+
+/**
  * @param {{
  *   tableData: TableData,
  *   onSelectionChange: (selectedIds: Set<string>) => void,
  *   onColumnsChange: (columns: TableColumn[]) => void,
- *   paginate?: boolean,
+ *   paginationConfig?: PaginationConfig,
  *   onRowClick: (item: Record<string, any>) => void
  * }} props
  */
@@ -44,31 +54,35 @@ const CustomTable = ({
   tableData,
   onSelectionChange,
   onColumnsChange,
-  paginate = false,
+  paginationConfig,
   onRowClick,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [page, setPage] = useState(paginationConfig?.page || 0);
+  const [rowsPerPage, setRowsPerPage] = useState(paginationConfig?.rowsPerPage || 10);
   const [orderBy, setOrderBy] = useState("");
   const [order, setOrder] = useState("asc");
   const [contextMenu, setContextMenu] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
 
+  const isPaginated = !!paginationConfig;
+  const isServerSidePaginated = isPaginated && paginationConfig.type === "server-side";
+
   const filteredData = useMemo(() => {
-    return filterData(tableData.data, searchTerm);
-  }, [tableData.data, searchTerm]);
+    return isServerSidePaginated ? tableData.data : filterData(tableData.data, searchTerm);
+  }, [tableData.data, searchTerm, isServerSidePaginated]);
 
   const sortedData = useMemo(() => {
-    return sortData(filteredData, orderBy, order);
-  }, [filteredData, orderBy, order]);
+    return isServerSidePaginated ? filteredData : sortData(filteredData, orderBy, order);
+  }, [filteredData, orderBy, order, isServerSidePaginated]);
 
   const paginatedData = useMemo(() => {
-    if (!paginate) return sortedData;
+    if (!isPaginated) return sortedData;
+    if (isServerSidePaginated) return sortedData;
     const startIndex = page * rowsPerPage;
     return sortedData.slice(startIndex, startIndex + rowsPerPage);
-  }, [sortedData, page, rowsPerPage, paginate]);
+  }, [sortedData, page, rowsPerPage, isPaginated, isServerSidePaginated]);
 
   const handleContextMenu = (event) => {
     event.preventDefault();
@@ -101,11 +115,18 @@ const CustomTable = ({
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
+    if (isServerSidePaginated && paginationConfig.onPageChange) {
+      paginationConfig.onPageChange(newPage, rowsPerPage);
+    }
   };
 
   const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
     setPage(0);
+    if (isServerSidePaginated && paginationConfig.onRowsPerPageChange) {
+      paginationConfig.onRowsPerPageChange(newRowsPerPage);
+    }
   };
 
   const handleSort = (columnId) => {
@@ -232,11 +253,11 @@ const CustomTable = ({
         }}
       />
       {tableContent}
-      {paginate && tableData.data && (
+      {isPaginated && (
         <TablePagination
           rowsPerPageOptions={[5, 10, 25]}
           component="div"
-          count={filteredData.length}
+          count={isServerSidePaginated ? (paginationConfig.totalItems || 0) : filteredData.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}

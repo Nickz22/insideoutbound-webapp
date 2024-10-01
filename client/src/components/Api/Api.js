@@ -147,14 +147,18 @@ export const fetchProspectingActivities = async (period, filterIds = []) => {
 };
 
 /**
- * Fetches full prospecting activities filtered by IDs
+ * Fetches paginated prospecting activities filtered by IDs
  * @param {string[]} filterIds - Array of IDs to filter by
+ * @param {number} page - Page number (0-indexed)
+ * @param {number} rowsPerPage - Number of rows per page
  * @returns {Promise<ApiResponse>}
  */
-export const getFullProspectingActivitiesFilteredByIds = async (filterIds = []) => {
+export const getPaginatedProspectingActivities = async (filterIds = [], page = 0, rowsPerPage = 10) => {
   const params = new URLSearchParams();
   filterIds.forEach(id => params.append('filter_ids[]', id));
-  const response = await api.get("/get_full_prospecting_activities_filtered_by_ids", { params });
+  params.append('page', page.toString());
+  params.append('rows_per_page', rowsPerPage.toString());
+  const response = await api.get("/get_paginated_prospecting_activities", { params });
   return { ...response.data, statusCode: response.status };
 };
 

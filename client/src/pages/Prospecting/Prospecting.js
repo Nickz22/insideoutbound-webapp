@@ -28,6 +28,7 @@ import {
   processNewProspectingActivity,
   getLoggedInUser,
   getUserTimezone,
+  getPaginatedProspectingActivities,
 } from "src/components/Api/Api";
 import CustomTable from "../../components/CustomTable/CustomTable";
 import ProspectingMetadataOverview from "../../components/ProspectingMetadataOverview/ProspectingMetadataOverview";
@@ -41,6 +42,7 @@ import FreeTrialExpired from "../../components/FreeTrialExpired/FreeTrialExpired
 import ProspectingSummary from "./ProspectingSummary";
 import LoadingComponent from "../../components/LoadingComponent/LoadingComponent";
 import FreeTrialRibbon from "../../components/FreeTrialRibbon/FreeTrialRibbon";
+import { debounce } from "lodash"; // Make sure to import lodash or use a custom debounce function
 
 const AntSwitch = styled(Switch)(({ theme }) => ({
   width: 28,
@@ -114,6 +116,11 @@ const Prospecting = () => {
   const [urlError, setUrlError] = useState(null);
 
   const [userTimezone, setUserTimezone] = useState("");
+
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalItems, setTotalItems] = useState(0);
+  const [detailedActivationData, setDetailedActivationData] = useState([]);
 
   useEffect(() => {
     async function fetchUserAndInstanceUrl() {
@@ -268,6 +275,62 @@ const Prospecting = () => {
       return true;
     });
   }, [originalRawData, dataFilter]);
+
+  const fetchPaginatedData = useCallback(
+    async (newPage, newRowsPerPage) => {
+      setLoading(true);
+      try {
+        const filteredIds = filteredData.map((item) => item.id);
+        const response = await getPaginatedProspectingActivities(
+          filteredIds,
+          newPage,
+          newRowsPerPage
+        );
+        if (response.statusCode === 200 && response.success) {
+          setDetailedActivationData(response.data[0].raw_data || []);
+          setTotalItems(response.data[0].total_items);
+        } else if (response.statusCode === 401) {
+          navigate("/");
+        } else {
+          setError(response.message);
+        }
+      } catch (err) {
+        setError("An error occurred while fetching data.");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [filteredData, navigate]
+  );
+
+  const debouncedFetchPaginatedData = useMemo(
+    () => debounce(fetchPaginatedData, 1000),
+    [fetchPaginatedData]
+  );
+
+  useEffect(() => {
+    return () => {
+      debouncedFetchPaginatedData.cancel();
+    };
+  }, [debouncedFetchPaginatedData]);
+
+  useEffect(() => {
+    if (filteredData.length > 0) {
+      debouncedFetchPaginatedData(page, rowsPerPage);
+    }
+  }, [debouncedFetchPaginatedData, page, rowsPerPage, filteredData]);
+
+  const handlePageChange = (newPage, newRowsPerPage) => {
+    setPage(newPage);
+    setRowsPerPage(newRowsPerPage);
+    // The debounced function will be called in the useEffect
+  };
+
+  const handleRowsPerPageChange = (newRowsPerPage) => {
+    setRowsPerPage(newRowsPerPage);
+    setPage(0);
+    // The debounced function will be called in the useEffect
+  };
 
   useEffect(() => {
     const filteredIds = filteredData.map((item) => item.id);
@@ -459,7 +522,7 @@ const Prospecting = () => {
             <CustomTable
               tableData={{
                 columns: columnShows,
-                data: filteredData.map((item) => ({
+                data: detailedActivationData.map((item) => ({
                   ...item,
                   "account.name": (
                     <Link
@@ -485,7 +548,14 @@ const Prospecting = () => {
                 selectedIds: new Set(),
                 availableColumns: tableColumns,
               }}
-              paginate={true}
+              paginationConfig={{
+                type: "server-side",
+                totalItems: totalItems,
+                page: page,
+                rowsPerPage: rowsPerPage,
+                onPageChange: handlePageChange,
+                onRowsPerPageChange: handleRowsPerPageChange
+              }}
               onRowClick={handleRowClick}
               onColumnsChange={handleColumnsChange}
             />

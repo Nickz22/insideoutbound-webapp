@@ -288,39 +288,31 @@ def get_prospecting_activities_by_ids():
     return jsonify(response.to_dict()), 200
 
 
-@bp.route("/get_full_prospecting_activities_filtered_by_ids", methods=["GET"])
+@bp.route("/get_paginated_prospecting_activities", methods=["GET"])
 @authenticate
-def get_full_prospecting_activities_filtered_by_ids():
+def get_paginated_prospecting_activities():
     from app.data_models import ApiResponse
+    from app.database.activation_selector import load_active_activations_paginated
 
     response = ApiResponse(data=[], message="", success=False)
     try:
         activation_ids = request.args.getlist("filter_ids[]")
-        if not activation_ids:
-            response.data = []
+        page = int(request.args.get('page', 0))
+        rows_per_page = int(request.args.get('rows_per_page', 10))
+
+        result = load_active_activations_paginated(page, rows_per_page, activation_ids)
+
+        if result.success:
+            response.data = [{
+                "raw_data": [activation.to_dict() for activation in result.data["activations"]],
+                "total_items": result.data["total_count"]
+            }]
             response.success = True
         else:
-            activations = (
-                load_active_activations_order_by_first_prospecting_activity_asc().data
-            )
-            filtered_activations = [
-                activation
-                for activation in activations
-                if activation.id in activation_ids
-            ]
-            response.data = [
-                {
-                    "raw_data": [
-                        activation.to_dict() for activation in filtered_activations
-                    ],
-                }
-            ]
-            response.success = True
+            response.message = result.message
     except Exception as e:
         log_error(e)
-        response.message = (
-            f"Failed to retrieve full prospecting activities: {format_error_message(e)}"
-        )
+        response.message = f"Failed to retrieve paginated prospecting activities: {format_error_message(e)}"
 
     return jsonify(response.to_dict()), get_status_code(response)
 

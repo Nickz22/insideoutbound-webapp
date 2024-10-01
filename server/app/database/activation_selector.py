@@ -164,3 +164,36 @@ def load_active_activations_minimal_by_ids(activation_ids: List[str]) -> ApiResp
             success=False,
             message=f"Failed to load minimal activations: {str(error_msg)}",
         )
+
+
+@retry_on_temporary_unavailable()
+def load_active_activations_paginated(page: int, rows_per_page: int, filter_ids: List[str] = None) -> ApiResponse:
+    supabase_client = get_supabase_admin_client()
+    team_member_ids = get_salesforce_team_ids(load_settings())
+
+    try:
+        query = (
+            supabase_client.table("Activations")
+            .select("*", count="exact")
+            .neq("status", "Unresponsive")
+            .in_("activated_by_id", team_member_ids)
+            .order("first_prospecting_activity", desc=False)
+        )
+
+        if filter_ids:
+            query = query.in_("id", filter_ids)
+
+        # Apply pagination
+        start = page * rows_per_page
+        end = start + rows_per_page - 1
+        query = query.range(start, end)
+
+        response = query.execute()
+
+        activations = [supabase_dict_to_python_activation(row) for row in response.data]
+        total_count = response.count
+
+        return ApiResponse(data={"activations": activations, "total_count": total_count}, success=True)
+    except Exception as e:
+        error_msg = format_error_message(e)
+        return ApiResponse(success=False, message=f"Failed to load activations: {str(error_msg)}")
