@@ -228,7 +228,7 @@ def increment_prospecting_effort_metadata(prospecting_effort, task, criteria_nam
                 task_ids=[task["Id"]],
             )
         )
-
+    return prospecting_effort
 
 def get_new_status(
     activation: Activation,
