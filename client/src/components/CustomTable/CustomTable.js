@@ -19,6 +19,7 @@ import {
   Checkbox,
   Avatar,
   Divider,
+  CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
@@ -47,7 +48,8 @@ import { sortData, filterData } from "../../utils/data";
  *   onSelectionChange: (selectedIds: Set<string>) => void,
  *   onColumnsChange: (columns: TableColumn[]) => void,
  *   paginationConfig?: PaginationConfig,
- *   onRowClick: (item: Record<string, any>) => void
+ *   onRowClick: (item: Record<string, any>) => void,
+ *   isLoading: boolean
  * }} props
  */
 const CustomTable = ({
@@ -56,10 +58,11 @@ const CustomTable = ({
   onColumnsChange,
   paginationConfig,
   onRowClick,
+  isLoading,
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
   const [page, setPage] = useState(paginationConfig?.page || 0);
-  const [rowsPerPage, setRowsPerPage] = useState(paginationConfig?.rowsPerPage || 10);
+  const [rowsPerPage, setRowsPerPage] = useState(paginationConfig?.rowsPerPage || 5);
   const [orderBy, setOrderBy] = useState("");
   const [order, setOrder] = useState("asc");
   const [contextMenu, setContextMenu] = useState(null);
@@ -215,17 +218,27 @@ const CustomTable = ({
             onSort={handleSort}
             onContextMenu={handleContextMenu}
           />
-          <TableBody
-            data={paginatedData}
-            columns={tableData.columns}
-            renderCell={renderCell}
-            onRowClick={handleRowClick}
-            selectedRowId={selectedRowId}
-          />
+          {isLoading ? (
+            <tbody>
+              <tr>
+                <td colSpan={tableData.columns.length} style={{ textAlign: 'center', padding: '20px' }}>
+                  <CircularProgress />
+                </td>
+              </tr>
+            </tbody>
+          ) : (
+            <TableBody
+              data={paginatedData}
+              columns={tableData.columns}
+              renderCell={renderCell}
+              onRowClick={handleRowClick}
+              selectedRowId={selectedRowId}
+            />
+          )}
         </Table>
       </TableContainer>
     ),
-    [paginatedData, tableData.columns, tableData.selectedIds, orderBy, order, selectedRowId]
+    [paginatedData, tableData.columns, tableData.selectedIds, orderBy, order, selectedRowId, isLoading]
   );
 
   return (
@@ -255,7 +268,7 @@ const CustomTable = ({
       {tableContent}
       {isPaginated && (
         <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={[5, 10]}
           component="div"
           count={isServerSidePaginated ? (paginationConfig.totalItems || 0) : filteredData.length}
           rowsPerPage={rowsPerPage}

@@ -118,9 +118,10 @@ const Prospecting = () => {
   const [userTimezone, setUserTimezone] = useState("");
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
   const [totalItems, setTotalItems] = useState(0);
   const [detailedActivationData, setDetailedActivationData] = useState([]);
+  const [tableLoading, setTableLoading] = useState(false);
 
   useEffect(() => {
     async function fetchUserAndInstanceUrl() {
@@ -278,7 +279,7 @@ const Prospecting = () => {
 
   const fetchPaginatedData = useCallback(
     async (newPage, newRowsPerPage) => {
-      setLoading(true);
+      setTableLoading(true);
       try {
         const filteredIds = filteredData.map((item) => item.id);
         const response = await getPaginatedProspectingActivities(
@@ -297,14 +298,14 @@ const Prospecting = () => {
       } catch (err) {
         setError("An error occurred while fetching data.");
       } finally {
-        setLoading(false);
+        setTableLoading(false);
       }
     },
     [filteredData, navigate]
   );
 
   const debouncedFetchPaginatedData = useMemo(
-    () => debounce(fetchPaginatedData, 1000),
+    () => debounce(fetchPaginatedData, 250),
     [fetchPaginatedData]
   );
 
@@ -558,6 +559,7 @@ const Prospecting = () => {
               }}
               onRowClick={handleRowClick}
               onColumnsChange={handleColumnsChange}
+              isLoading={tableLoading}
             />
 
             {selectedActivation && (
