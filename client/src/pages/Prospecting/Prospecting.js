@@ -93,7 +93,7 @@ const AntSwitch = styled(Switch)(({ theme }) => ({
 
 const Prospecting = () => {
   /** @type {[('This Week' | 'All' | 'Last Week' | 'This Month' | 'Last Month' | 'This Quarter' | 'Last Quarter'), Function]} */
-  const [period, setPeriod] = useState("This Week");
+  const [period, setPeriod] = useState("All");
   const [isSummary, setIsSummary] = useState(true);
   const [loading, setLoading] = useState(true);
   const [summaryLoading, setSummaryLoading] = useState(false);

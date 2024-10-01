@@ -260,9 +260,7 @@ async def increment_existing_activations(
         changed_activations = []
 
         for account_id, activation in activations_by_account_id.items():
-            original_activation = (
-                activation.model_copy()
-            )  # Create a copy of the original activation
+            original_activation = Activation(**activation.to_dict())
 
             opportunities = opportunities_by_account_id.get(account_id, [])
             meetings = meetings_by_account_id.get(account_id, [])
@@ -362,6 +360,7 @@ async def increment_existing_activations(
 
                     # Update activation and current PE
                     activation.task_ids.add(task["Id"])
+                    activation.tasks.append(task)
                     activation.last_prospecting_activity = max(
                         activation.last_prospecting_activity,
                         task_created_datetime.date(),
@@ -369,7 +368,7 @@ async def increment_existing_activations(
                     activation.active_contact_ids.add(task["WhoId"])
                     current_prospecting_effort.task_ids.add(task["Id"])
 
-                    increment_prospecting_effort_metadata(
+                    current_prospecting_effort = increment_prospecting_effort_metadata(
                         current_prospecting_effort, task, criteria_name
                     )
 
@@ -387,6 +386,7 @@ async def increment_existing_activations(
                             activation_metadata.last_occurrence,
                             task_created_datetime.date(),
                         )
+                        activation_metadata.task_ids.append(task["Id"])
                         activation_metadata.total += 1
                     else:
                         activation.prospecting_metadata.append(
@@ -394,6 +394,7 @@ async def increment_existing_activations(
                                 name=criteria_name,
                                 first_occurrence=task_created_datetime.date(),
                                 last_occurrence=task_created_datetime.date(),
+                                task_ids=[task["Id"]],
                                 total=1,
                             )
                         )
@@ -436,7 +437,6 @@ async def increment_existing_activations(
                     task_ids=[],
                 )
                 activation.prospecting_effort.append(new_pe)
-                current_prospecting_effort = new_pe
 
             # Update meeting/event if necessary
             if meetings:
@@ -458,7 +458,6 @@ async def increment_existing_activations(
                     task_ids=[],
                 )
                 activation.prospecting_effort.append(new_pe)
-                current_prospecting_effort = new_pe
 
             # Check if the activation has changed
             if activation != original_activation:
