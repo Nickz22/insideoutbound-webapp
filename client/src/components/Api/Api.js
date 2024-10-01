@@ -147,6 +147,18 @@ export const fetchProspectingActivities = async (period, filterIds = []) => {
 };
 
 /**
+ * Fetches full prospecting activities filtered by IDs
+ * @param {string[]} filterIds - Array of IDs to filter by
+ * @returns {Promise<ApiResponse>}
+ */
+export const getFullProspectingActivitiesFilteredByIds = async (filterIds = []) => {
+  const params = new URLSearchParams();
+  filterIds.forEach(id => params.append('filter_ids[]', id));
+  const response = await api.get("/get_full_prospecting_activities_filtered_by_ids", { params });
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
  * Fetches settings
  * @returns {Promise<ApiResponse>}
  */

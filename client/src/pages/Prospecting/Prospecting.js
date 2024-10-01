@@ -32,10 +32,6 @@ import {
 import CustomTable from "../../components/CustomTable/CustomTable";
 import ProspectingMetadataOverview from "../../components/ProspectingMetadataOverview/ProspectingMetadataOverview";
 import ProspectingEffortTimeline from "../../components/ProspectingEffortTimeline/ProspectingEffortTimeline";
-
-import Lottie from "lottie-react";
-import ProspectingLoadingAnimation from "../../assets/lottie/prospecting-loading-animation.json";
-import HintsShowOnLoading from "src/components/HintsShowOnLoading/HintsShowOnLoading";
 import CustomSelect from "src/components/CustomSelect/CustomSelect";
 /**
  * @typedef {import('types').Activation} Activation
@@ -43,6 +39,8 @@ import CustomSelect from "src/components/CustomSelect/CustomSelect";
 
 import FreeTrialExpired from "../../components/FreeTrialExpired/FreeTrialExpired";
 import ProspectingSummary from "./ProspectingSummary";
+import LoadingComponent from "../../components/LoadingComponent/LoadingComponent";
+import FreeTrialRibbon from "../../components/FreeTrialRibbon/FreeTrialRibbon";
 
 const AntSwitch = styled(Switch)(({ theme }) => ({
   width: 28,
@@ -291,72 +289,6 @@ const Prospecting = () => {
     setColumnShows(newColumns);
   };
 
-  const getLoadingComponent = (message) => {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-          height: "100vh",
-          width: "100%",
-        }}
-      >
-        <Box
-          sx={{
-            position: "relative",
-            width: "100%",
-            maxWidth: 852,
-            textAlign: "center",
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-          }}
-        >
-          <Typography
-            variant="h6"
-            gutterBottom
-            sx={{
-              fontWeight: "700",
-              fontSize: "54px",
-              letterSpacing: "-1.62px",
-              lineHeight: "1",
-            }}
-          >
-            {message}
-          </Typography>
-          <Box
-            sx={{
-              width: "271px",
-              height: "271px",
-              position: "relative",
-              top: "-75px",
-            }}
-          >
-            <Lottie animationData={ProspectingLoadingAnimation} loop={true} />
-          </Box>
-
-          <Typography
-            variant="caption"
-            gutterBottom
-            sx={{
-              marginTop: "-130px",
-              marginBottom: "20px",
-              width: "586px",
-              fontSize: "18px",
-              lineHeight: "1.78",
-            }}
-          >
-            While the magic runs behind the scenes, here are some helpful hints
-            to get the best use case from the app:
-          </Typography>
-
-          <HintsShowOnLoading />
-        </Box>
-      </Box>
-    );
-  };
-
   useEffect(() => {
     const fetchFilteredSummary = async () => {
       setSummaryLoading(true);
@@ -390,7 +322,7 @@ const Prospecting = () => {
   }, [dataFilter, period]);
 
   if (loading || summaryLoading || userLoading || urlLoading) {
-    return getLoadingComponent("We are fetching your activity...");
+    return <LoadingComponent message="We are fetching your activity..." />;
   }
 
   if (error || userError || urlError) {
@@ -529,7 +461,6 @@ const Prospecting = () => {
                 columns: columnShows,
                 data: filteredData.map((item) => ({
                   ...item,
-                  "account.owner.status": item.account?.owner?.status,
                   "account.name": (
                     <Link
                       href={`${instanceUrl}/${item.account?.id}`}
@@ -579,31 +510,7 @@ const Prospecting = () => {
       </Box>
 
       {loggedInUser?.status === "not paid" && freeTrialDaysLeft > 0 && (
-        <Box
-          onClick={() => {
-            navigate("/app/account");
-          }}
-          sx={{
-            position: "absolute",
-            bottom: "60px",
-            right: "-75px",
-            transform: "rotate(-45deg)",
-            backgroundColor: "#1E242F",
-            color: "white",
-            fontWeight: "bold",
-            height: "56px",
-            width: "320px",
-            boxShadow: "0px 4px 6px rgba(0,0,0,0.1)",
-            zIndex: 1,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            overflow: "hidden",
-            cursor: "pointer",
-          }}
-        >
-          {freeTrialDaysLeft} days left in trial
-        </Box>
+        <FreeTrialRibbon daysLeft={freeTrialDaysLeft} />
       )}
     </Box>
   );

@@ -6,7 +6,7 @@ export const tableColumns = [
 		dataType: "component",
 	},
 	{ id: "activated_date", label: "Activated", dataType: "date" },
-	{ id: "account.owner.status", label: "Status", dataType: "text" },
+	{ id: "status", label: "Status", dataType: "text" },
 	{ id: "days_activated", label: "Days Active", dataType: "number" },
 	{ id: "active_contact_count", label: "Active Contacts", dataType: "number" },
 	{ id: "days_engaged", label: "Days Engaged", dataType: "number" },

@@ -295,18 +295,9 @@ def get_full_prospecting_activities_filtered_by_ids():
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        activation_ids = request.args.getlist("activation_ids[]")
+        activation_ids = request.args.getlist("filter_ids[]")
         if not activation_ids:
-            response.data = {
-                "total_activations": 0,
-                "activations_today": 0,
-                "total_tasks": 0,
-                "total_events": 0,
-                "total_contacts": 0,
-                "total_accounts": 0,
-                "total_deals": 0,
-                "total_pipeline_value": 0,
-            }
+            response.data = []
             response.success = True
         else:
             activations = (
@@ -319,7 +310,6 @@ def get_full_prospecting_activities_filtered_by_ids():
             ]
             response.data = [
                 {
-                    "summary": generate_summary(filtered_activations),
                     "raw_data": [
                         activation.to_dict() for activation in filtered_activations
                     ],
