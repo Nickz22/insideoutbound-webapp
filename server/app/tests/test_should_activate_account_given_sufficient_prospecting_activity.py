@@ -14,11 +14,16 @@ from app.tests.mocks import (
     get_n_mock_tasks_for_contacts_for_unique_values_content_criteria_query,
     add_mock_response,
     clear_mocks,
-    set_mock_contacts_for_map
+    set_mock_contacts_for_map,
 )
-from app.tests.test_helpers import do_onboarding_flow, get_mock_token_data  # Import the new helper
+from app.tests.test_helpers import (
+    do_onboarding_flow,
+    get_mock_token_data,
+)  # Import the new helper
 from contextlib import contextmanager
 import logging
+
+from server.app.routes import get_full_prospecting_activities_filtered_by_ids
 
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
@@ -79,7 +84,10 @@ class TestActivationLogic:
 
     @pytest.mark.asyncio
     @patch("requests.get", side_effect=response_based_on_query)
-    @patch("app.salesforce_api.fetch_contact_by_id_map", side_effect=mock_fetch_contact_by_id_map)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
     async def test_should_create_activation_when_sufficient_outbound_prospecting_activities(
         self, mock_fetch_contact_composite, mock_sobject_fetch
     ):
@@ -105,13 +113,24 @@ class TestActivationLogic:
 
             # Fetch prospecting activity
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             activations = self.assert_and_return_payload(response)
-
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?activation_ids[]={activations[0]['id']}",
+                headers=self.api_header,
+            )
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
             # Assertions
-            assert len(activations) == 1, "Expected one activation to be created"
-            activation = activations[0]
+            assert (
+                len(database_activations) == 1
+            ), "Expected one activation to be created"
+            activation = database_activations[0]
             assert (
                 activation["status"] == "Activated"
             ), "Activation status should be 'Activated'"

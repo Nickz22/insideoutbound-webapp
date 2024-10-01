@@ -5,7 +5,9 @@ from os import environ
 from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
+    get_supabase_key,
     set_session_state,
+    get_supabase_url
 )
 from app.data_models import (
     Activation,
@@ -20,8 +22,11 @@ from app.mapper.mapper import (
     python_settings_to_supabase_dict,
     python_user_to_supabase_dict,
 )
-from app.utils import get_salesforce_team_ids, format_error_message
+from app.utils import get_salesforce_team_ids, log_error
 from app.database.settings_selector import load_settings
+import asyncio
+import aiohttp
+from typing import List
 
 SUPABASE_ALL_USERS_PASSWORD = environ.get("SUPABASE_ALL_USERS_PASSWORD")
 from datetime import datetime
@@ -75,23 +80,51 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool) -> str:
         raise Exception(f"An error occurred upserting user: {e}")
 
 
-def upsert_activations(new_activations: list[Activation]):
+async def upsert_activations_async(new_activations: List[Activation]):
     api_response = ApiResponse(data=[], message="", success=False)
-    supabase = get_supabase_admin_client()
+    CHUNK_SIZE = 50
+    MAX_CONCURRENT_REQUESTS = 10
 
-    CHUNK_SIZE = 100
+    async def upsert_chunk(session, chunk):
+        if not chunk:  # Skip empty chunks
+            return None
+        
+        ## we need clean JSON in Supabase so that we can filter jsonb fields
+        def parse_json_fields(activation):
+            json_fields = ['account', 'active_contacts', 'tasks', 'prospecting_metadata', 'prospecting_effort']
+            for field in json_fields:
+                if field in activation and isinstance(activation[field], str):
+                    try:
+                        activation[field] = json.loads(activation[field])
+                    except json.JSONDecodeError:
+                        print(f"Warning: Failed to parse JSON for field {field}")
+            return activation
 
-    for i in range(0, len(new_activations), CHUNK_SIZE):
-        chunk = new_activations[i : i + CHUNK_SIZE]
-        supabase_activations = [
-            python_activation_to_supabase_dict(activation) for activation in chunk
-        ]
+        supabase_activations = [parse_json_fields(python_activation_to_supabase_dict(activation)) for activation in chunk]
+        
+        url = f"{get_supabase_url()}/rest/v1/Activations"
+        headers = {
+            "apikey": get_supabase_key(),
+            "Authorization": f"Bearer {get_supabase_key()}",
+            "Content-Type": "application/json",
+            "Prefer": "resolution=merge-duplicates"
+        }
+        async with session.post(url, json=supabase_activations, headers=headers) as response:
+            if response.status != 201 and response.status != 200:
+                return f"Error upserting chunk with status {response.status}: {await response.text()}"
+        return None
 
-        try:
-            supabase.table("Activations").upsert(supabase_activations).execute()
-        except Exception as e:
-            api_response.message = f"Error upserting chunk {i//CHUNK_SIZE}: {str(e)}"
-            return api_response
+    async with aiohttp.ClientSession() as session:
+        chunks = [new_activations[i:i+CHUNK_SIZE] for i in range(0, len(new_activations), CHUNK_SIZE)]
+        
+        for i in range(0, len(chunks), MAX_CONCURRENT_REQUESTS):
+            batch = chunks[i:i+MAX_CONCURRENT_REQUESTS]
+            results = await asyncio.gather(*[upsert_chunk(session, chunk) for chunk in batch])
+            errors = [r for r in results if r is not None]
+            if errors:
+                api_response.message = "\n".join(errors)
+                log_error(Exception(api_response.message))
+                return api_response
 
     api_response.success = True
     api_response.message = f"Successfully upserted {len(new_activations)} activations"
@@ -102,10 +135,29 @@ def delete_all_activations():
     try:
         team_member_ids = get_salesforce_team_ids(load_settings())
         supabase = get_supabase_admin_client()
-        supabase.table("Activations").delete().in_(
-            "activated_by_id", team_member_ids
-        ).execute()
+        BATCH_SIZE = 100
+
+        while True:
+            # Fetch a batch of activation IDs to delete
+            activations = supabase.table("Activations") \
+                .select("id") \
+                .in_("activated_by_id", team_member_ids) \
+                .limit(BATCH_SIZE) \
+                .execute()
+
+            activation_ids = [activation['id'] for activation in activations.data]
+
+            if not activation_ids:
+                break  # No more activations to delete
+
+            # Delete the fetched batch of activations
+            supabase.table("Activations") \
+                .delete() \
+                .in_("id", activation_ids) \
+                .execute()
+
         return True
+
     except Exception as e:
         print(f"An error occurred: {e}")
         return False

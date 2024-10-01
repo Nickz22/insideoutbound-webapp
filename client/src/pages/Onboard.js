@@ -11,6 +11,7 @@ import {
   fetchTaskFilterFields,
   generateCriteria,
   saveSettings as saveSettingsToSupabase,
+  getUserTimezone,
 } from "../components/Api/Api";
 
 /**
@@ -204,6 +205,9 @@ const Onboard = () => {
         return acc;
       }, {});
 
+      const userTimeZone = await getUserTimezone();
+      settings.userTimeZone = userTimeZone.data;
+
       const result = await saveSettingsToSupabase(settings);
 
       if (!result.success) {
@@ -225,6 +229,7 @@ const Onboard = () => {
     const now = new Date();
     const threeMonthsAgo = new Date(now.setMonth(now.getMonth() - 3));
     return {
+      userRole: gatheringResponses["userRole"]?.value,
       inactivityThreshold: parseInt(
         gatheringResponses["inactivityThreshold"]?.value,
         10
@@ -251,7 +256,7 @@ const Onboard = () => {
         (salesforceUser) => salesforceUser
       ),
       salesforceUserId: gatheringResponses["salesforceUserId"]?.value,
-      latestDateQueried: threeMonthsAgo.toISOString(),
+      latestDateQueried: threeMonthsAgo.toISOString()
     };
   };
 

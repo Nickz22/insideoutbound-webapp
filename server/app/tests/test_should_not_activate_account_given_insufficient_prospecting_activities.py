@@ -17,7 +17,11 @@ from app.tests.mocks import (
     clear_mocks,
     set_mock_contacts_for_map,
 )
-from app.tests.test_helpers import do_onboarding_flow, assert_and_return_payload, get_mock_token_data
+from app.tests.test_helpers import (
+    do_onboarding_flow,
+    assert_and_return_payload,
+    get_mock_token_data,
+)
 from contextlib import contextmanager
 import logging
 
@@ -80,7 +84,10 @@ class TestInsufficientActivationLogic:
 
     @pytest.mark.asyncio
     @patch("requests.get", side_effect=response_based_on_query)
-    @patch("app.salesforce_api.fetch_contact_by_id_map", side_effect=mock_fetch_contact_by_id_map)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
     async def test_should_not_create_activation_with_insufficient_outbound_activities(
         self, mock_sobject_fetch, mock_fetch_contact_composite
     ):
@@ -113,7 +120,9 @@ class TestInsufficientActivationLogic:
 
             # Fetch prospecting activity
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             activations = assert_and_return_payload(response)
 

@@ -27,7 +27,7 @@ const OrangeBlueGradientColorDefs = () => {
  * @param {object} props
  * @param {string} [props.tooltipTitle = ''] 
  * @param {any[]} props.data 
- * @param {number} props.target 
+ * @param {number} [props.target] 
  * @param {string} props.title 
  * @param {'horizontal' | 'vertical'} props.direction 
  */
@@ -46,14 +46,14 @@ const SummaryBarChartCard = ({ tooltipTitle = '', data, target, title, direction
         <Tooltip title={tooltipTitle} arrow>
             <Box
                 sx={{
-                    borderRadius: "49px",
-                    padding: "34px 8px 34px 34px",
-                    textAlign: "center",
-                    minWidth: "150px",
-                    height: "379px",
+                    // borderRadius: "49px",
+                    // padding: "30px 8px 30px 30px",
+                    // textAlign: "center",
+                    // minWidth: "150px",
+                    height: "200px",
                     width: "100%",
                     boxSizing: "border-box",
-                    boxShadow: "0px 2px 4px rgba(0,0,0,0.1)",
+                    // boxShadow: "0px 2px 4px rgba(0,0,0,0.1)",
                 }}
             >
                 <Typography
@@ -71,20 +71,22 @@ const SummaryBarChartCard = ({ tooltipTitle = '', data, target, title, direction
                 >
                     {title}
                 </Typography>
-                <Typography
-                    variant='body1'
-                    sx={{
-                        fontSize: "12px",
-                        letterSpacing: "2.4px",
-                        color: "rgba(30, 36, 47, 1)",
-                        textAlign: "center",
-                        fontWeight: "500",
-                        lineHeight: "1",
-                        marginBottom: "0px"
-                    }}
-                >
-                    TARGET = {target}
-                </Typography>
+                {target && (
+                    <Typography
+                        variant='body1'
+                        sx={{
+                            fontSize: "12px",
+                            letterSpacing: "2.4px",
+                            color: "rgba(30, 36, 47, 1)",
+                            textAlign: "center",
+                            fontWeight: "500",
+                            lineHeight: "1",
+                            marginBottom: "0px"
+                        }}
+                    >
+                        TARGET = {target}
+                    </Typography>
+                )}
                 <BarChart
                     width={dimensions.width}
                     dataset={data}
@@ -96,6 +98,11 @@ const SummaryBarChartCard = ({ tooltipTitle = '', data, target, title, direction
                             colorMap: direction === "vertical" ? {
                                 type: 'ordinal',
                                 colors: data.map((val) => {
+
+                                    if (!target) {
+                                        return 'url(#paint0_linear_bar1)'
+                                    }
+
                                     if (val.value >= target) {
                                         return 'url(#paint0_linear_bar1)'
                                     } else {
@@ -103,7 +110,7 @@ const SummaryBarChartCard = ({ tooltipTitle = '', data, target, title, direction
                                     }
                                 })
                             } : undefined,
-                            categoryGapRatio: 0.4,
+                            categoryGapRatio: 0.5,
                         }
                     ]} // Keep band for categorical labels
                     grid={{
@@ -125,6 +132,10 @@ const SummaryBarChartCard = ({ tooltipTitle = '', data, target, title, direction
                                         return 'rgba(221, 64, 64, 1)'
                                     }
 
+                                    if (!target) {
+                                        return 'url(#paint0_linear_bar1)'
+                                    }
+
                                     if (val.value >= target) {
                                         return 'url(#paint0_linear_bar1)'
                                     } else {
@@ -132,7 +143,7 @@ const SummaryBarChartCard = ({ tooltipTitle = '', data, target, title, direction
                                     }
                                 })
                             } : undefined,
-                            categoryGapRatio: 0.7,
+                            categoryGapRatio: 0.5,
                         },
                     ]}
                 >

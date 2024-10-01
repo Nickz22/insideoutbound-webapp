@@ -27,7 +27,7 @@ const OrangeBlueGradientColorDefs = () => {
  * @param {object} props
  * @param {string} [props.tooltipTitle = ''] 
  * @param {any[]} props.data 
- * @param {number} props.target 
+ * @param {number} [props.target]
  * @param {string} props.title
  */
 const SummaryLineChartCard = ({ tooltipTitle = '', data, target, title }) => {
@@ -45,14 +45,15 @@ const SummaryLineChartCard = ({ tooltipTitle = '', data, target, title }) => {
         <Tooltip title={tooltipTitle} arrow>
             <Box
                 sx={{
-                    borderRadius: "49px",
-                    padding: "34px 8px 34px 34px",
-                    textAlign: "center",
-                    minWidth: "150px",
-                    height: "379px",
+                    // borderRadius: "49px",
+                    // padding: "34px 8px 34px 34px",
+                    // textAlign: "center",
+                    // minWidth: "150px",
+                    // height: "379px",
                     width: "100%",
+                    height: "200px",
                     boxSizing: "border-box",
-                    boxShadow: "0px 2px 4px rgba(0,0,0,0.1)",
+                    // boxShadow: "0px 2px 4px rgba(0,0,0,0.1)",
                 }}
             >
                 <Typography
@@ -70,20 +71,22 @@ const SummaryLineChartCard = ({ tooltipTitle = '', data, target, title }) => {
                 >
                     {title}
                 </Typography>
-                <Typography
-                    variant='body1'
-                    sx={{
-                        fontSize: "12px",
-                        letterSpacing: "2.4px",
-                        color: "rgba(30, 36, 47, 1)",
-                        textAlign: "center",
-                        fontWeight: "500",
-                        lineHeight: "1",
-                        marginBottom: "8px"
-                    }}
-                >
-                    TARGET = {target}
-                </Typography>
+                {target && (
+                    <Typography
+                        variant='body1'
+                        sx={{
+                            fontSize: "12px",
+                            letterSpacing: "2.4px",
+                            color: "rgba(30, 36, 47, 1)",
+                            textAlign: "center",
+                            fontWeight: "500",
+                            lineHeight: "1",
+                            marginBottom: "8px"
+                        }}
+                    >
+                        TARGET = {target}
+                    </Typography>
+                )}
                 <LineChart
                     width={dimensions.width}
                     dataset={data}

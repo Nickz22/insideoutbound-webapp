@@ -66,7 +66,11 @@ api.interceptors.response.use(
   async (error) => {
     if (error.response) {
       // The server responded with a status code outside the 2xx range
-      console.error("Server error:", error.response.status, error.response.data);
+      console.error(
+        "Server error:",
+        error.response.status,
+        error.response.data
+      );
       return Promise.reject(error.response.data);
     } else if (error.request) {
       // The request was made but no response was received
@@ -94,6 +98,13 @@ export const logout = async () => {
   }
 };
 
+export const getUserTimezone = async () => {
+  return Promise.resolve({
+    success: true,
+    data: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
+};
+
 // getInstanceUrl
 /**
  * @returns {Promise<ApiResponse>}
@@ -119,10 +130,37 @@ export const getRefreshToken = async () => {
 
 /**
  * Fetches prospecting activities
+ * @param {"Today" | "Yesterday" | "This Week" | "Last Week" | "This Month" | "Last Month" | "This Quarter" | "Last Quarter"} period
+ * @param {string[]} filterIds
  * @returns {Promise<ApiResponse>}
  */
-export const fetchProspectingActivities = async () => {
-  const response = await api.get("/get_prospecting_activities");
+export const fetchProspectingActivities = async (period, filterIds = []) => {
+  const params = new URLSearchParams();
+  params.append("period", period);
+  if (filterIds) {
+    filterIds.forEach((id) => params.append("filter_ids[]", id));
+  }
+  const response = await api.get("/get_prospecting_activities_by_ids", {
+    params,
+  });
+  return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * Fetches paginated prospecting activities filtered by IDs
+ * @param {string[]} filterIds - Array of IDs to filter by
+ * @param {number} page - Page number (0-indexed)
+ * @param {number} rowsPerPage - Number of rows per page
+ * @param {string} searchTerm - Search term
+ * @returns {Promise<ApiResponse>}
+ */
+export const getPaginatedProspectingActivities = async (filterIds = [], page = 0, rowsPerPage = 10, searchTerm = "") => {
+  const params = new URLSearchParams();
+  filterIds.forEach(id => params.append('filter_ids[]', id));
+  params.append('page', page.toString());
+  params.append('rows_per_page', rowsPerPage.toString());
+  if (searchTerm) params.append('search', searchTerm);
+  const response = await api.get("/get_paginated_prospecting_activities", { params });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -147,15 +185,17 @@ export const saveSettings = async (settings) => {
 
 /**
  * Fetches and updates prospecting activity data
- * @returns {Promise<ApiResponse>}
+ * @param {string} timezone
+ * @returns {Promise<{ statusCode: number }>}
  */
-export const fetchAndUpdateProspectingActivity = async () => {
+export const processNewProspectingActivity = async (timezone) => {
   try {
-    const response = await api.post("/fetch_prospecting_activity");
-    return { ...response.data, statusCode: response.status };
+    const response = await api.post("/process_new_prospecting_activity", {
+      timezone,
+    });
+    return { statusCode: response.status };
   } catch (error) {
-    // This will catch any errors that weren't handled by the interceptor
-    console.error("Error in fetchAndUpdateProspectingActivity:", error);
+    console.error("Error in processNewProspectingActivity:", error);
     throw error;
   }
 };

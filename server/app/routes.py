@@ -4,7 +4,9 @@ from urllib.parse import unquote
 from app.middleware import authenticate
 from app.utils import format_error_message, log_error
 from app.database.activation_selector import (
+    load_active_activations_minimal_by_ids,
     load_active_activations_order_by_first_prospecting_activity_asc,
+    load_activations_by_period,
 )
 from app.database.settings_selector import load_settings
 from app.database.supabase_user_selector import fetch_supabase_user
@@ -41,6 +43,7 @@ from app.database.supabase_connection import (
 from app.database.session_selector import fetch_supabase_session
 import stripe
 import asyncio
+from datetime import datetime
 
 stripe.api_key = Config.STRIPE_SECRET_KEY
 
@@ -82,7 +85,9 @@ def oauth_callback():
             token_data = response.json()
             save_session(token_data, is_sandbox)
             user: UserModel = fetch_logged_in_salesforce_user().data
-            session_token = save_session(token_data, is_sandbox, {"username": user.username})
+            session_token = save_session(
+                token_data, is_sandbox, {"username": user.username}
+            )
             settings = load_settings()
             if not settings:
                 upsert_supabase_user(user=user, is_sandbox=is_sandbox)
@@ -241,23 +246,34 @@ def get_instance_url():
     return jsonify(response.to_dict()), get_status_code(response)
 
 
-@bp.route("/get_prospecting_activities", methods=["GET"])
+@bp.route("/get_prospecting_activities_by_ids", methods=["GET"])
 @authenticate
-def get_prospecting_activities():
+def get_prospecting_activities_by_ids():
     from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        query_response = (
-            load_active_activations_order_by_first_prospecting_activity_asc()
-        )
-        if not query_response.success:
-            raise Exception(query_response.message)
+        period = request.args.get("period", "All")
+        filter_ids = request.args.getlist("filter_ids[]")
+
+        activations = []
+        if filter_ids and len(filter_ids) > 0:
+            activations = load_active_activations_minimal_by_ids(filter_ids).data
+        else:
+            activations = load_activations_by_period(period).data
+
         response.data = [
             {
-                "summary": generate_summary(query_response.data),
+                "summary": generate_summary(activations),
                 "raw_data": [
-                    activation.to_dict() for activation in query_response.data
+                    {
+                        "id": activation.id,
+                        "activated_by_id": activation.activated_by_id,
+                        "activated_by": activation.activated_by.to_dict(),
+                        "account": activation.account.to_dict(),
+                        "last_prospecting_activity": activation.last_prospecting_activity,
+                    }
+                    for activation in activations
                 ],
             }
         ]
@@ -272,88 +288,63 @@ def get_prospecting_activities():
     return jsonify(response.to_dict()), 200
 
 
-@bp.route("/get_prospecting_activities_filtered_by_ids", methods=["GET"])
+@bp.route("/get_paginated_prospecting_activities", methods=["GET"])
 @authenticate
-def get_prospecting_activities_filtered_by_ids():
+def get_paginated_prospecting_activities():
     from app.data_models import ApiResponse
+    from app.database.activation_selector import load_active_activations_paginated
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        activation_ids = request.args.getlist("activation_ids[]")
-        if not activation_ids:
-            response.data = {
-                "total_activations": len(activations),
-                "activations_today": 0,
-                "total_tasks": 0,
-                "total_events": 0,
-                "total_contacts": 0,
-                "total_accounts": 0,
-                "total_deals": 0,
-                "total_pipeline_value": 0,
-            }
+        activation_ids = request.args.getlist("filter_ids[]")
+        page = int(request.args.get('page', 0))
+        rows_per_page = int(request.args.get('rows_per_page', 10))
+        search_term = request.args.get('search', '')
+
+        result = load_active_activations_paginated(page, rows_per_page, activation_ids, search_term)
+
+        if result.success:
+            response.data = [{
+                "raw_data": [activation.to_dict() for activation in result.data["activations"]],
+                "total_items": result.data["total_count"]
+            }]
             response.success = True
         else:
-            activations = (
-                load_active_activations_order_by_first_prospecting_activity_asc().data
-            )
-            filtered_activations = [
-                activation
-                for activation in activations
-                if activation.id in activation_ids
-            ]
-            response.data = [
-                {
-                    "summary": generate_summary(filtered_activations),
-                    "raw_data": [
-                        activation.to_dict() for activation in filtered_activations
-                    ],
-                }
-            ]
-            response.success = True
+            response.message = result.message
     except Exception as e:
         log_error(e)
-        response.message = (
-            f"Failed to retrieve prospecting activities: {format_error_message(e)}"
-        )
+        response.message = f"Failed to retrieve paginated prospecting activities: {format_error_message(e)}"
 
     return jsonify(response.to_dict()), get_status_code(response)
 
 
-@bp.route("/fetch_prospecting_activity", methods=["POST"])
+@bp.route("/process_new_prospecting_activity", methods=["POST"])
 @authenticate
-def fetch_prospecting_activity():
+def process_new_prospecting_activity():
     from app.data_models import ApiResponse
-
     api_response = ApiResponse(data=[], message="", success=False)
-    print("fetching!")
 
     async def process_request():
         try:
-            response = await update_activation_states()
+            # Get the timezone from the request
+            user_timezone = request.json.get("timezone", "UTC")
+
+            # Pass the timezone to update_activation_states
+            response = await update_activation_states(user_timezone)
 
             if response.success:
-                activations = response.data
-
-                api_response.data = [
-                    {
-                        "summary": generate_summary(activations),
-                        "raw_data": [
-                            activation.to_dict() for activation in activations
-                        ],
-                    }
-                ]
                 api_response.success = True
-                api_response.message = "Prospecting activity data loaded successfully"
+                api_response.message = (
+                    "Prospecting activity data processed successfully"
+                )
             else:
                 api_response.message = response.message
 
-            status_code = get_status_code(api_response)
+            status_code = 200 if api_response.success else 500
         except Exception as e:
             log_error(e)
-            api_response.message = (
-                f"Failed to load prospecting activities data: {format_error_message(e)}"
-            )
-            status_code = get_status_code(api_response)
+            api_response.message = f"Failed to process prospecting activities data: {format_error_message(e)}"
+            status_code = 500
 
         return jsonify(api_response.to_dict()), status_code
 

@@ -97,7 +97,10 @@ class TestCreateNewActivationsForPreviouslyActivatedAccounts:
         side_effect=mock_fetch_contacts_by_account_ids,
     )
     async def test_should_create_new_activations_for_previously_activated_accounts_after_inactivity_threshold_is_reached(
-        self, mock_sobject_fetch, mock_fetch_contact_by_id_map, mock_fetch_contacts_by_account_ids
+        self,
+        mock_sobject_fetch,
+        mock_fetch_contact_by_id_map,
+        mock_fetch_contacts_by_account_ids,
     ):
         with self.app.app_context():
             # setup mock api responses
@@ -107,7 +110,9 @@ class TestCreateNewActivationsForPreviouslyActivatedAccounts:
 
             # initial account activation
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             initial_activations = assert_and_return_payload(response)
 
@@ -137,7 +142,9 @@ class TestCreateNewActivationsForPreviouslyActivatedAccounts:
 
             # inactivate the Accounts
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             assert_and_return_payload(response)
 
@@ -153,7 +160,9 @@ class TestCreateNewActivationsForPreviouslyActivatedAccounts:
 
             # assert that new activations are created for the previously activated accounts
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             updated_activations = assert_and_return_payload(response)
 

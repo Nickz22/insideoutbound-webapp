@@ -103,13 +103,16 @@ class Account(SerializableModel):
     created_date: Optional[datetime] = None
     owner: Optional[UserModel] = None
 
+
 class Contact(SerializableModel):
     id: str
     first_name: str
     last_name: str
     account_id: str
-    account: Account
+    account: Optional[Account] = None
     owner_id: Optional[str] = None
+
+
 class Task(SerializableModel):
     id: str
     created_date: datetime
@@ -174,6 +177,7 @@ class Opportunity(SerializableModel):
     name: str
     amount: float
     close_date: date
+    created_date: date
     stage: str
 
 
@@ -182,7 +186,7 @@ class ProspectingMetadata(SerializableModel):
     total: int
     first_occurrence: Optional[date] = None
     last_occurrence: Optional[date] = None
-    tasks: List[TaskSObject] = []
+    task_ids: List[str] = []  # Change this line
 
 
 class ProspectingEffort(SerializableModel):
@@ -197,9 +201,10 @@ class Activation(SerializableModel):
     id: str
     account: Account
     activated_by: UserModel
-    active_contact_ids: Set[str]
-    active_contacts: List[Contact]
-    task_ids: Set[str]
+    task_ids: Optional[Set[str]] = None
+    active_contact_ids: Optional[Set[str]] = None
+    active_contacts: Optional[List[Contact]] = None
+    tasks: Optional[List[Dict]] = None  # Add this line
     activated_by_id: Optional[str] = None
     active_contact_count: Optional[int] = None
     activated_date: Optional[date] = None
@@ -304,7 +309,9 @@ class FilterContainer(SerializableModel):
             # Replace condition numbers with their boolean values
             for i, condition in condition_map.items():
                 replace_condition_number = f"_{i}_"
-                logic = re.sub(r"\b" + replace_condition_number + r"\b", str(condition), logic)
+                logic = re.sub(
+                    r"\b" + replace_condition_number + r"\b", str(condition), logic
+                )
             return eval(logic, {"__builtins__": {}}, condition_map)
         except Exception as e:
             print(f"Error evaluating logic: {e}")
@@ -326,6 +333,7 @@ class Settings(SerializableModel):
     latest_date_queried: Optional[datetime] = None
     skip_account_criteria: Optional[FilterContainer] = None
     skip_opportunity_criteria: Optional[FilterContainer] = None
+    user_time_zone: Optional[str] = None
 
 
 class FilterModel(SerializableModel):
@@ -358,7 +366,7 @@ class SettingsModel(SerializableModel):
     salesforceUserId: Optional[str] = None
     skipAccountCriteria: Optional[FilterContainerModel] = None
     skipOpportunityCriteria: Optional[FilterContainerModel] = None
-
+    userTimeZone: Optional[str] = None
 
 class DataType(str, Enum):
     STRING = "string"

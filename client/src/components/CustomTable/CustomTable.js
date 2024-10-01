@@ -19,12 +19,13 @@ import {
   Checkbox,
   Avatar,
   Divider,
+  CircularProgress,
 } from "@mui/material";
 import SearchIcon from "@mui/icons-material/Search";
 import ClearIcon from "@mui/icons-material/Clear";
 import TableHeader from "./TableHeader";
 import TableBody from "./TableBody";
-import { sortData, filterData } from "../../utils/data";
+import { sortData } from "../../utils/data";
 
 /**
  * @typedef {import('types').TableColumn} TableColumn
@@ -32,43 +33,62 @@ import { sortData, filterData } from "../../utils/data";
  */
 
 /**
+ * @typedef {Object} PaginationConfig
+ * @property {"client-side" | "server-side"} type
+ * @property {number} [totalItems]
+ * @property {number} [page]
+ * @property {number} [rowsPerPage]
+ * @property {(page: number, rowsPerPage: number) => void} [onPageChange]
+ * @property {(rowsPerPage: number) => void} [onRowsPerPageChange]
+ */
+
+/**
  * @param {{
  *   tableData: TableData,
  *   onSelectionChange: (selectedIds: Set<string>) => void,
  *   onColumnsChange: (columns: TableColumn[]) => void,
- *   paginate?: boolean,
- *   onRowClick: (item: Record<string, any>) => void
+ *   paginationConfig?: PaginationConfig | undefined,
+ *   onRowClick: (item: Record<string, any>) => void,
+ *   isLoading: boolean
+ *   onSearch: (value: string) => void | undefined
  * }} props
  */
 const CustomTable = ({
   tableData,
   onSelectionChange,
   onColumnsChange,
-  paginate = false,
+  paginationConfig,
   onRowClick,
+  isLoading,
+  onSearch, // Add this new prop
 }) => {
   const [searchTerm, setSearchTerm] = useState("");
-  const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [localFilteredData, setLocalFilteredData] = useState(tableData.data);
+  const [page, setPage] = useState(paginationConfig?.page || 0);
+  const [rowsPerPage, setRowsPerPage] = useState(paginationConfig?.rowsPerPage || 5);
   const [orderBy, setOrderBy] = useState("");
   const [order, setOrder] = useState("asc");
   const [contextMenu, setContextMenu] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState(null);
 
+  const isPaginated = !!paginationConfig;
+  const isServerSidePaginated = isPaginated && paginationConfig.type === "server-side";
+
   const filteredData = useMemo(() => {
-    return filterData(tableData.data, searchTerm);
-  }, [tableData.data, searchTerm]);
+    return isServerSidePaginated ? tableData.data : localFilteredData;
+  }, [tableData.data, localFilteredData, isServerSidePaginated]);
 
   const sortedData = useMemo(() => {
-    return sortData(filteredData, orderBy, order);
-  }, [filteredData, orderBy, order]);
+    return isServerSidePaginated ? filteredData : sortData(filteredData, orderBy, order);
+  }, [filteredData, orderBy, order, isServerSidePaginated]);
 
   const paginatedData = useMemo(() => {
-    if (!paginate) return sortedData;
+    if (!isPaginated) return sortedData;
+    if (isServerSidePaginated) return sortedData;
     const startIndex = page * rowsPerPage;
     return sortedData.slice(startIndex, startIndex + rowsPerPage);
-  }, [sortedData, page, rowsPerPage, paginate]);
+  }, [sortedData, page, rowsPerPage, isPaginated, isServerSidePaginated]);
 
   const handleContextMenu = (event) => {
     event.preventDefault();
@@ -101,11 +121,18 @@ const CustomTable = ({
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
+    if (isServerSidePaginated && paginationConfig.onPageChange) {
+      paginationConfig.onPageChange(newPage, rowsPerPage);
+    }
   };
 
   const handleChangeRowsPerPage = (event) => {
-    setRowsPerPage(parseInt(event.target.value, 10));
+    const newRowsPerPage = parseInt(event.target.value, 10);
+    setRowsPerPage(newRowsPerPage);
     setPage(0);
+    if (isServerSidePaginated && paginationConfig.onRowsPerPageChange) {
+      paginationConfig.onRowsPerPageChange(newRowsPerPage);
+    }
   };
 
   const handleSort = (columnId) => {
@@ -194,18 +221,46 @@ const CustomTable = ({
             onSort={handleSort}
             onContextMenu={handleContextMenu}
           />
-          <TableBody
-            data={paginatedData}
-            columns={tableData.columns}
-            renderCell={renderCell}
-            onRowClick={handleRowClick}
-            selectedRowId={selectedRowId}
-          />
+          {isLoading ? (
+            <tbody>
+              <tr>
+                <td colSpan={tableData.columns.length} style={{ textAlign: 'center', padding: '20px' }}>
+                  <CircularProgress />
+                </td>
+              </tr>
+            </tbody>
+          ) : (
+            <TableBody
+              data={paginatedData}
+              columns={tableData.columns}
+              renderCell={renderCell}
+              onRowClick={handleRowClick}
+              selectedRowId={selectedRowId}
+            />
+          )}
         </Table>
       </TableContainer>
     ),
-    [paginatedData, tableData.columns, tableData.selectedIds, orderBy, order, selectedRowId]
+    [paginatedData, tableData.columns, tableData.selectedIds, orderBy, order, selectedRowId, isLoading]
   );
+
+  const handleSearch = (value) => {
+    setSearchTerm(value);
+    if (paginationConfig?.type === "server-side") {
+      if (value.length > 3 || value.length === 0) {
+        onSearch(value);
+      }
+    } else {
+      // Perform local wildcard search on all columns
+      const filtered = tableData.data.filter(item =>
+        Object.values(item).some(field =>
+          String(field).toLowerCase().includes(value.toLowerCase())
+        )
+      );
+      setLocalFilteredData(filtered);
+      setPage(0); // Reset to first page when filtering
+    }
+  };
 
   return (
     <Box>
@@ -214,7 +269,7 @@ const CustomTable = ({
         variant="outlined"
         placeholder="Search..."
         value={searchTerm}
-        onChange={(e) => setSearchTerm(e.target.value)}
+        onChange={(e) => handleSearch(e.target.value)}
         margin="normal"
         InputProps={{
           startAdornment: (
@@ -224,7 +279,7 @@ const CustomTable = ({
           ),
           endAdornment: searchTerm && (
             <InputAdornment position="end">
-              <IconButton onClick={() => setSearchTerm("")} edge="end">
+              <IconButton onClick={() => handleSearch("")} edge="end">
                 <ClearIcon />
               </IconButton>
             </InputAdornment>
@@ -232,11 +287,11 @@ const CustomTable = ({
         }}
       />
       {tableContent}
-      {paginate && tableData.data && (
+      {isPaginated && (
         <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={[5, 10]}
           component="div"
-          count={filteredData.length}
+          count={isServerSidePaginated ? (paginationConfig.totalItems || 0) : filteredData.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}

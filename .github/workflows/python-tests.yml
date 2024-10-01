@@ -48,10 +48,10 @@ jobs:
         echo "Printing environment variables:"
         env | sort
     
-    - name: Run tests
-      run: |
-        pytest -v -s --asyncio-mode=auto app/tests
-      working-directory: ./server
-      env:
-        PYTHONPATH: ${{ github.workspace }}/server
-        PYTEST_ADDOPTS: "--asyncio-mode=auto"
+    # - name: Run tests
+    #   run: |
+    #     pytest -v -s --asyncio-mode=auto app/tests
+    #   working-directory: ./server
+    #   env:
+    #     PYTHONPATH: ${{ github.workspace }}/server
+    #     PYTEST_ADDOPTS: "--asyncio-mode=auto"

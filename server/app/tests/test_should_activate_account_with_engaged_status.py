@@ -87,7 +87,10 @@ class TestActivationWithEngagedStatus:
 
     @pytest.mark.asyncio
     @patch("requests.get", side_effect=response_based_on_query)
-    @patch("app.salesforce_api.fetch_contact_by_id_map", side_effect=mock_fetch_contact_by_id_map)
+    @patch(
+        "app.salesforce_api.fetch_contact_by_id_map",
+        side_effect=mock_fetch_contact_by_id_map,
+    )
     async def test_should_activate_account_with_engaged_status_given_sufficient_outbound_activity_and_a_single_inbound_activity(
         self, mock_fetch_contact_composite, mock_sobject_fetch
     ):
@@ -133,13 +136,25 @@ class TestActivationWithEngagedStatus:
 
             # Fetch prospecting activity
             response = await asyncio.to_thread(
-                self.client.post, "/fetch_prospecting_activity", headers=self.api_header
+                self.client.post,
+                "/process_new_prospecting_activity",
+                headers=self.api_header,
             )
             activations = assert_and_return_payload(response)
 
+            database_activations_response = await asyncio.to_thread(
+                self.client.get,
+                f"/get_full_prospecting_activities_filtered_by_ids?activation_ids[]={activations[0]['id']}",
+                headers=self.api_header,
+            )
+            database_activations = database_activations_response.get_json()["data"][0][
+                "raw_data"
+            ]
             # Assertions
-            assert len(activations) == 1, "Expected one activation to be created"
-            activation = activations[0]
+            assert (
+                len(database_activations) == 1
+            ), "Expected one activation to be created"
+            activation = database_activations[0]
             assert (
                 activation["status"] == "Engaged"
             ), "Activation status should be 'Engaged'"
