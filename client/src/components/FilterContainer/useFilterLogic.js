@@ -130,17 +130,8 @@ export const useFilterLogic = (initialFilterContainer, initialFilterFields) => {
         ...prevContainer.filters,
         { field: "", operator: "", value: "", dataType: "string" },
       ],
+      filterLogic: prevContainer.filters.length === 0 ? "1" : `${prevContainer.filterLogic} AND ${prevContainer.filters.length + 1}`
     }));
-
-    setLogicErrors(
-      /**
-       * @param {{[key: number]: any}} currentErrors
-       */
-      (currentErrors) => ({
-        ...currentErrors,
-        0: "Please add new logic for the new filter.",
-      })
-    );
   }, []);
 
   const handleDeleteFilter = useCallback(
