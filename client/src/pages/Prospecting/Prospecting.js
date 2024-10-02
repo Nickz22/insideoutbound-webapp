@@ -105,7 +105,7 @@ const Prospecting = () => {
 
   const [dataFilter, setDataFilter] = useState(null);
   const [originalRawData, setOriginalRawData] = useState([]);
-  const [columnShows, setColumnShows] = useState(tableColumns);
+  const [columnShows, setColumnShows] = useState(localStorage.getItem("activationColumnShow") ? JSON.parse(localStorage.getItem("activationColumnShow")) : tableColumns);
 
   const [loggedInUser, setLoggedInUser] = useState(null);
   const [userLoading, setUserLoading] = useState(true);
@@ -353,6 +353,7 @@ const Prospecting = () => {
 
   const handleColumnsChange = (newColumns) => {
     setColumnShows(newColumns);
+    localStorage.setItem("activationColumnShow", JSON.stringify(newColumns))
   };
 
   useEffect(() => {
