@@ -65,6 +65,11 @@ api.interceptors.response.use(
   },
   async (error) => {
     if (error.response) {
+
+      if (error.response.data.message.toLowerCase().includes("session")) {
+        window.location.href = "/";
+        return Promise.reject(error.response.data);
+      }
       // The server responded with a status code outside the 2xx range
       console.error(
         "Server error:",

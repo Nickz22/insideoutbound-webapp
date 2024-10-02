@@ -754,6 +754,7 @@ def fetch_logged_in_salesforce_user() -> ApiResponse:
             and (e.response.status_code == 401 or e.response.status_code == 403)
         ):
             api_response.message = SESSION_EXPIRED
+            api_response.type = "AuthenticationError"
 
     return api_response
 
