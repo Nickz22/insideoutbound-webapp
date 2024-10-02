@@ -46,7 +46,7 @@ const Onboard = () => {
       name: category,
       filters: [],
       filterLogic: "",
-      direction: category.toLowerCase().includes("inbound")
+      direction: category.toLowerCase().includes("inbound") || category === "Call Connect"
         ? "Inbound"
         : "Outbound",
     }))
