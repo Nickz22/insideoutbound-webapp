@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react'
-import { Box, Divider, Grid, Typography, Tooltip } from '@mui/material'
+import { Box, Grid, Typography, Tooltip } from '@mui/material'
 import SummaryLineChartCard from 'src/components/SummaryCard/SummaryLineChartCard'
 import SummaryBarChartCard from 'src/components/SummaryCard/SummaryBarChartCard'
+import CustomFunnelChart from 'src/components/FunnelChart/FunnelChart'
 
 /**
  * @typedef {object} SummaryData
@@ -43,39 +44,16 @@ const ProspectingSummary = ({ summaryData, period }) => {
         if (!summaryData || !summaryData.activation_trend) {
             return [];
         }
-
-        const dateRange = summaryData.activation_trend_range || 0;
-        const trendData = Object.entries(summaryData.activation_trend);
-
-        if (dateRange <= 8) {
-            // Daily data
-            return trendData.map(([date, count]) => {
-                const parsedDate = new Date(date);
-                return {
-                    label: `${parsedDate.getMonth() + 1}/${parsedDate.getDate()}`,
-                    value: count
-                };
-            }).sort((a, b) => new Date(a.label) - new Date(b.label));
-        } else {
-            // Weekly data
-            const weeklyData = {};
-            trendData.forEach(([date, count]) => {
-                const parsedDate = new Date(date);
-                const weekStart = new Date(parsedDate.setDate(parsedDate.getDate() - parsedDate.getDay()));
-                const weekKey = weekStart.toISOString().split('T')[0];
-                weeklyData[weekKey] = (weeklyData[weekKey] || 0) + count;
-            });
-
-            return Object.entries(weeklyData).map(([weekStart, count]) => {
-                const startDate = new Date(weekStart);
-                const endDate = new Date(startDate);
-                endDate.setDate(endDate.getDate() + 6);
-                return {
-                    label: `${startDate.getMonth() + 1}/${startDate.getDate()} - ${endDate.getMonth() + 1}/${endDate.getDate()}`,
-                    value: count
-                };
-            }).sort((a, b) => new Date(a.label.split(' - ')[0]) - new Date(b.label.split(' - ')[0]));
-        }
+        return Object.entries(summaryData.activation_trend).map(([date, count]) => {
+            // Parse the ISO date string
+            const parsedDate = new Date(date);
+            // Format the date as needed, e.g., "MM/DD"
+            const formattedDate = `${parsedDate.getMonth() + 1}/${parsedDate.getDate()}`;
+            return {
+                label: formattedDate,
+                value: count
+            };
+        }).sort((a, b) => new Date(a.label) - new Date(b.label)); // Sort by date
     }, [summaryData]);
 
     const prospectingActivityData = useMemo(() => {
@@ -111,23 +89,7 @@ const ProspectingSummary = ({ summaryData, period }) => {
             <Box display={"grid"} marginTop={"20px"} columnGap={"32px"} gridTemplateColumns={"1fr 1fr"} >
                 <Box padding={"16px"} gap={"20px"} display={"flex"} flex={1} flexDirection={"column"} alignItems={"center"} sx={{ border: "1px solid #000000" }}>
                     <Typography variant="h3">Prospecting Funnel</Typography>
-                    <Box display={"flex"} width={"100%"} flexDirection={"column"} alignItems={"center"}>
-                        <Box padding={"16px"} width={"80%"} borderRadius={"50px"} alignItems={"center"} justifyContent={"center"} display={"flex"} flexDirection={"column"} sx={{ border: "1px solid #000000" }}>
-                            <Typography variant="body1">{summaryData.in_status_activated} Activated</Typography>
-                        </Box>
-                        <Divider sx={{ width: "2px", height: "40px", backgroundColor: "rgba(135, 159, 202, 0.5)" }} />
-                        <Box padding={"16px"} width={"70%"} borderRadius={"50px"} alignItems={"center"} justifyContent={"center"} display={"flex"} flexDirection={"column"} sx={{ border: "1px solid #000000" }}>
-                            <Typography variant="body1">{summaryData.in_status_engaged} Engaged</Typography>
-                        </Box>
-                        <Divider sx={{ width: "2px", height: "40px", backgroundColor: "rgba(135, 159, 202, 0.5)" }} />
-                        <Box padding={"16px"} width={"60%"} borderRadius={"50px"} alignItems={"center"} justifyContent={"center"} display={"flex"} flexDirection={"column"} sx={{ border: "1px solid #000000" }}>
-                            <Typography variant="body1">{summaryData.in_status_meeting_set} Meeting Set</Typography>
-                        </Box>
-                        <Divider sx={{ width: "2px", height: "40px", backgroundColor: "rgba(135, 159, 202, 0.5)" }} />
-                        <Box padding={"16px"} width={"50%"} borderRadius={"50px"} alignItems={"center"} justifyContent={"center"} display={"flex"} flexDirection={"column"} sx={{ border: "1px solid #000000" }}>
-                            <Typography variant="body1">{summaryData.in_status_opportunity_created} Opportunity</Typography>
-                        </Box>
-                    </Box>
+                    <CustomFunnelChart data={summaryData} />
                 </Box>
 
                 <Box padding={"16px"} display={"flex"} flex={1} flexDirection={"column"} alignItems={"center"} gap={"20px"} sx={{ border: "1px solid #000000" }}>
