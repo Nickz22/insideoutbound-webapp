@@ -1,7 +1,8 @@
-import React from 'react'
-import { Box, Divider, Grid, Typography, Tooltip } from '@mui/material'
+import React, { useMemo } from 'react'
+import { Box, Grid, Typography, Tooltip } from '@mui/material'
 import SummaryLineChartCard from 'src/components/SummaryCard/SummaryLineChartCard'
 import SummaryBarChartCard from 'src/components/SummaryCard/SummaryBarChartCard'
+import CustomFunnelChart from 'src/components/FunnelChart/FunnelChart'
 
 /**
  * @typedef {object} SummaryData
@@ -30,46 +31,8 @@ import SummaryBarChartCard from 'src/components/SummaryCard/SummaryBarChartCard'
  * @property {number} total_pipeline_value
  * @property {number} total_tasks
  * @property {{label: string, value: number}[]} activation_trend
- * @property {{label: string, value: number}[]} activities_type
+ * @property {{label: string, value: number}[]} prospecting_metadata_count_by_name
  */
-
-const activities_type = [
-    {
-        "label": "Call Connect",
-        "value": 75
-    },
-    {
-        "label": "Dial",
-        "value": 112
-    },
-    {
-        "label": "Inbound Email",
-        "value": 90
-    },
-    {
-        "label": "Outbound Email",
-        "value": 400
-    }
-];
-
-const activation_trend = [
-    {
-        "label": "2024/09/12",
-        "value": 75
-    },
-    {
-        "label": "2024/09/13",
-        "value": 112
-    },
-    {
-        "label": "2024/09/14",
-        "value": 90
-    },
-    {
-        "label": "2024/09/15",
-        "value": 400
-    }
-];
 
 /**
  * @param {object} props
@@ -77,6 +40,34 @@ const activation_trend = [
  * @param {string} props.period
  */
 const ProspectingSummary = ({ summaryData, period }) => {
+    const activationTrendData = useMemo(() => {
+        if (!summaryData || !summaryData.activation_trend) {
+            return [];
+        }
+        return Object.entries(summaryData.activation_trend).map(([date, count]) => {
+            // Parse the ISO date string
+            const parsedDate = new Date(date);
+            // Format the date as needed, e.g., "MM/DD"
+            const formattedDate = `${parsedDate.getMonth() + 1}/${parsedDate.getDate()}`;
+            return {
+                label: formattedDate,
+                value: count
+            };
+        }).sort((a, b) => new Date(a.label) - new Date(b.label)); // Sort by date
+    }, [summaryData]);
+
+    const prospectingActivityData = useMemo(() => {
+        if (!summaryData || !summaryData.prospecting_metadata_count_by_name) {
+            return [];
+        }
+        return Object.entries(summaryData.prospecting_metadata_count_by_name)
+            .map(([name, value]) => ({
+                label: name,
+                value: value
+            }))
+            .sort((a, b) => b.value - a.value); // Sort descending by value
+    }, [summaryData]);
+
     return (
         <>
             {/* First Row */}
@@ -86,7 +77,11 @@ const ProspectingSummary = ({ summaryData, period }) => {
                     <Typography variant="h4" textAlign={"center"}>{summaryData.total_accounts} Accounts</Typography>
                 </Grid>
                 <Grid item padding={"16px"} sx={{ border: "1px solid #000000" }}>
-                    <SummaryLineChartCard title='Activation Trend' data={activation_trend} />
+                    <SummaryLineChartCard 
+                        title='Activation Trend' 
+                        data={activationTrendData}
+                        tooltipTitle="Number of activations over time"
+                    />
                 </Grid>
             </Grid>
 
@@ -94,23 +89,7 @@ const ProspectingSummary = ({ summaryData, period }) => {
             <Box display={"grid"} marginTop={"20px"} columnGap={"32px"} gridTemplateColumns={"1fr 1fr"} >
                 <Box padding={"16px"} gap={"20px"} display={"flex"} flex={1} flexDirection={"column"} alignItems={"center"} sx={{ border: "1px solid #000000" }}>
                     <Typography variant="h3">Prospecting Funnel</Typography>
-                    <Box display={"flex"} width={"100%"} flexDirection={"column"} alignItems={"center"}>
-                        <Box padding={"16px"} width={"80%"} borderRadius={"50px"} alignItems={"center"} justifyContent={"center"} display={"flex"} flexDirection={"column"} sx={{ border: "1px solid #000000" }}>
-                            <Typography variant="body1">{summaryData.in_status_activated} Activated</Typography>
-                        </Box>
-                        <Divider sx={{ width: "2px", height: "40px", backgroundColor: "rgba(135, 159, 202, 0.5)" }} />
-                        <Box padding={"16px"} width={"70%"} borderRadius={"50px"} alignItems={"center"} justifyContent={"center"} display={"flex"} flexDirection={"column"} sx={{ border: "1px solid #000000" }}>
-                            <Typography variant="body1">{summaryData.in_status_engaged} Engaged</Typography>
-                        </Box>
-                        <Divider sx={{ width: "2px", height: "40px", backgroundColor: "rgba(135, 159, 202, 0.5)" }} />
-                        <Box padding={"16px"} width={"60%"} borderRadius={"50px"} alignItems={"center"} justifyContent={"center"} display={"flex"} flexDirection={"column"} sx={{ border: "1px solid #000000" }}>
-                            <Typography variant="body1">{summaryData.in_status_meeting_set} Meeting Set</Typography>
-                        </Box>
-                        <Divider sx={{ width: "2px", height: "40px", backgroundColor: "rgba(135, 159, 202, 0.5)" }} />
-                        <Box padding={"16px"} width={"50%"} borderRadius={"50px"} alignItems={"center"} justifyContent={"center"} display={"flex"} flexDirection={"column"} sx={{ border: "1px solid #000000" }}>
-                            <Typography variant="body1">{summaryData.in_status_opportunity_created} Opportunity</Typography>
-                        </Box>
-                    </Box>
+                    <CustomFunnelChart data={summaryData} />
                 </Box>
 
                 <Box padding={"16px"} display={"flex"} flex={1} flexDirection={"column"} alignItems={"center"} gap={"20px"} sx={{ border: "1px solid #000000" }}>
@@ -127,7 +106,11 @@ const ProspectingSummary = ({ summaryData, period }) => {
                     </Box>
 
                     <Box padding={"16px 0px"} display={"flex"} flex={1} flexDirection={"column"} sx={{ border: "1px solid #000000", width: "100%" }}>
-                        <SummaryBarChartCard direction='horizontal' title='Activities by Type' data={activities_type} />
+                        <SummaryBarChartCard 
+                            direction='horizontal' 
+                            title='Activities by Type' 
+                            data={prospectingActivityData}
+                        />
                     </Box>
                 </Box>
             </Box>

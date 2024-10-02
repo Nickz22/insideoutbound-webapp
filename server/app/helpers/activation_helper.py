@@ -1,5 +1,5 @@
 from typing import Dict, List
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from collections import defaultdict
 from app.data_models import Activation
 from app.utils import (
@@ -56,6 +56,8 @@ def generate_summary(activations: list[Activation]) -> dict:
     prospecting_activity_counts_meeting = defaultdict(int)
     total_prospecting_activities_engagement = 0
     total_prospecting_activities_meeting = 0
+
+    prospecting_metadata_count_by_name = defaultdict(int)
 
     for activation in activations:
         if activation.activated_date == today:
@@ -141,6 +143,11 @@ def generate_summary(activations: list[Activation]) -> dict:
                     prospecting_activity_counts_meeting[metadata.name] += metadata.total
                     total_prospecting_activities_meeting += metadata.total
 
+        # Add this new section to aggregate prospecting metadata
+        if activation.prospecting_metadata:
+            for metadata in activation.prospecting_metadata:
+                prospecting_metadata_count_by_name[metadata.name] += metadata.total
+
     summary["total_contacts"] = sum(
         len(contacts) for contacts in account_contacts.values()
     )
@@ -203,6 +210,33 @@ def generate_summary(activations: list[Activation]) -> dict:
         summary["most_effective_prospecting_activity_for_meeting_fraction"] = round(
             prospecting_activity_counts_meeting[most_effective_meeting] / total_prospecting_activities_meeting, 2
         )
+
+    # Add the new map to the summary
+    summary["prospecting_metadata_count_by_name"] = dict(prospecting_metadata_count_by_name)
+
+    # Sort activations by activated_date
+    sorted_activations = sorted(activations, key=lambda x: x.activated_date)
+
+    # Calculate the date range
+    if sorted_activations:
+        start_date = sorted_activations[0].activated_date
+        end_date = sorted_activations[-1].activated_date
+        date_range = (end_date - start_date).days + 1
+
+        # Always create daily trend data
+        daily_counts = defaultdict(int)
+        for activation in sorted_activations:
+            daily_counts[activation.activated_date.isoformat()] += 1
+
+        # Fill in missing dates with zero counts
+        current_date = start_date
+        while current_date <= end_date:
+            if current_date.isoformat() not in daily_counts:
+                daily_counts[current_date.isoformat()] = 0
+            current_date += timedelta(days=1)
+
+        summary["activation_trend"] = dict(daily_counts)
+        summary["activation_trend_range"] = date_range  # Add this to inform the client about the date range
 
     return summary
 

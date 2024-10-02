@@ -8,29 +8,30 @@ import {
   Cell
 } from 'recharts';
 
-const data = [
-  { name: 'Open', value: 15 },
-  { name: 'In Progress', value: 3 },
-  { name: 'Closing', value: 1 },
-  { name: 'Closed', value: 1 },
-];
-
 const COLORS = ['#8884d8', '#83a6ed', '#8dd1e1', '#82ca9d'];
 
-const CustomFunnelChart = () => {
+const CustomFunnelChart = ({ data }) => {
+  const funnelData = [
+    { name: 'Activated', value: data.in_status_activated },
+    { name: 'Engaged', value: data.in_status_engaged },
+    { name: 'Meeting Set', value: data.in_status_meeting_set },
+    { name: 'Opportunity', value: data.in_status_opportunity_created },
+  ];
+
   return (
     <ResponsiveContainer width="100%" height={300}>
       <FunnelChart>
         <Tooltip />
         <Funnel
           dataKey="value"
-          data={data}
+          data={funnelData}
           isAnimationActive
         >
-          {data.map((entry, index) => (
+          {funnelData.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
           ))}
           <LabelList position="right" fill="#000" stroke="none" dataKey="name" />
+          <LabelList position="center" fill="#fff" stroke="none" dataKey="value" />
         </Funnel>
       </FunnelChart>
     </ResponsiveContainer>
