@@ -478,12 +478,17 @@ def get_salesforce_user():
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        user: UserModel = fetch_logged_in_salesforce_user().data
-        supabase_user: UserModel = fetch_supabase_user(user.id)
-        user.status = supabase_user.status
-        user.created_at = supabase_user.created_at
-        response.data = [user.to_dict()]
-        response.success = True
+        user_response: ApiResponse = fetch_logged_in_salesforce_user()
+        if not user_response.success:
+            response = user_response
+            log_error(Exception(user_response.message))
+        else:
+            user: UserModel = user_response.data
+            supabase_user: UserModel = fetch_supabase_user(user.id)
+            user.status = supabase_user.status
+            user.created_at = supabase_user.created_at
+            response.data = [user.to_dict()]
+            response.success = True
     except Exception as e:
         log_error(e)
         response.message = (
