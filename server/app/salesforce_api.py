@@ -82,7 +82,7 @@ def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
         soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User"
 
         if ids:
-            soql_query += " AND Id IN ({})".format(",".join(f"'{id}'" for id in ids))
+            soql_query += " WHERE Id IN ({})".format(",".join(f"'{id}'" for id in ids))
 
         response = _fetch_sobjects(soql_query, get_credentials())
         for entry in response.data:

@@ -78,7 +78,7 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool) -> str:
 
     except Exception as e:
         raise Exception(f"An error occurred upserting user: {e}")
-
+    
 
 async def upsert_activations_async(new_activations: List[Activation]):
     api_response = ApiResponse(data=[], message="", success=False)
@@ -131,36 +131,57 @@ async def upsert_activations_async(new_activations: List[Activation]):
     return api_response
 
 
-def delete_all_activations():
+async def delete_all_activations_async():
     try:
         team_member_ids = get_salesforce_team_ids(load_settings())
         supabase = get_supabase_admin_client()
         BATCH_SIZE = 100
+        MAX_CONCURRENT_REQUESTS = 10
 
-        while True:
-            # Fetch a batch of activation IDs to delete
-            activations = supabase.table("Activations") \
-                .select("id") \
-                .in_("activated_by_id", team_member_ids) \
-                .limit(BATCH_SIZE) \
-                .execute()
+        # Fetch all matching activation IDs
+        all_activations = supabase.table("Activations") \
+            .select("id") \
+            .in_("activated_by_id", team_member_ids) \
+            .execute()
 
-            activation_ids = [activation['id'] for activation in activations.data]
+        all_activation_ids = [activation['id'] for activation in all_activations.data]
 
-            if not activation_ids:
-                break  # No more activations to delete
+        if not all_activation_ids:
+            return True  # No activations to delete
 
-            # Delete the fetched batch of activations
-            supabase.table("Activations") \
-                .delete() \
-                .in_("id", activation_ids) \
-                .execute()
+        async def delete_batch(session: aiohttp.ClientSession, batch: List[str]):
+            url = f"{get_supabase_url()}/rest/v1/Activations"
+            headers = {
+                "apikey": get_supabase_key(),
+                "Authorization": f"Bearer {get_supabase_key()}",
+                "Content-Type": "application/json",
+                "Prefer": "return=minimal"
+            }
+            params = {"id": f"in.({','.join(batch)})"}
+            async with session.delete(url, headers=headers, params=params) as response:
+                if response.status != 200 and response.status != 204:
+                    return f"Error deleting batch with status {response.status}: {await response.text()}"
+            return None
+
+        async with aiohttp.ClientSession() as session:
+            batches = [all_activation_ids[i:i+BATCH_SIZE] for i in range(0, len(all_activation_ids), BATCH_SIZE)]
+            
+            for i in range(0, len(batches), MAX_CONCURRENT_REQUESTS):
+                batch_group = batches[i:i+MAX_CONCURRENT_REQUESTS]
+                results = await asyncio.gather(*[delete_batch(session, batch) for batch in batch_group])
+                errors = [r for r in results if r is not None]
+                if errors:
+                    raise Exception("\n".join(errors))
 
         return True
 
     except Exception as e:
-        print(f"An error occurred: {e}")
+        log_error(e)  # Assuming you have a log_error function
         return False
+
+# Don't forget to update the original function to run the async version
+def delete_all_activations():
+    return asyncio.run(delete_all_activations_async())
 
 
 def save_settings(settings: Settings):
