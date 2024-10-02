@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import { Box, Divider, Grid, Typography, Tooltip } from '@mui/material'
 import SummaryLineChartCard from 'src/components/SummaryCard/SummaryLineChartCard'
 import SummaryBarChartCard from 'src/components/SummaryCard/SummaryBarChartCard'
@@ -30,46 +30,8 @@ import SummaryBarChartCard from 'src/components/SummaryCard/SummaryBarChartCard'
  * @property {number} total_pipeline_value
  * @property {number} total_tasks
  * @property {{label: string, value: number}[]} activation_trend
- * @property {{label: string, value: number}[]} activities_type
+ * @property {{label: string, value: number}[]} prospecting_metadata_count_by_name
  */
-
-const activities_type = [
-    {
-        "label": "Call Connect",
-        "value": 75
-    },
-    {
-        "label": "Dial",
-        "value": 112
-    },
-    {
-        "label": "Inbound Email",
-        "value": 90
-    },
-    {
-        "label": "Outbound Email",
-        "value": 400
-    }
-];
-
-const activation_trend = [
-    {
-        "label": "2024/09/12",
-        "value": 75
-    },
-    {
-        "label": "2024/09/13",
-        "value": 112
-    },
-    {
-        "label": "2024/09/14",
-        "value": 90
-    },
-    {
-        "label": "2024/09/15",
-        "value": 400
-    }
-];
 
 /**
  * @param {object} props
@@ -77,6 +39,57 @@ const activation_trend = [
  * @param {string} props.period
  */
 const ProspectingSummary = ({ summaryData, period }) => {
+    const activationTrendData = useMemo(() => {
+        if (!summaryData || !summaryData.activation_trend) {
+            return [];
+        }
+
+        const dateRange = summaryData.activation_trend_range || 0;
+        const trendData = Object.entries(summaryData.activation_trend);
+
+        if (dateRange <= 8) {
+            // Daily data
+            return trendData.map(([date, count]) => {
+                const parsedDate = new Date(date);
+                return {
+                    label: `${parsedDate.getMonth() + 1}/${parsedDate.getDate()}`,
+                    value: count
+                };
+            }).sort((a, b) => new Date(a.label) - new Date(b.label));
+        } else {
+            // Weekly data
+            const weeklyData = {};
+            trendData.forEach(([date, count]) => {
+                const parsedDate = new Date(date);
+                const weekStart = new Date(parsedDate.setDate(parsedDate.getDate() - parsedDate.getDay()));
+                const weekKey = weekStart.toISOString().split('T')[0];
+                weeklyData[weekKey] = (weeklyData[weekKey] || 0) + count;
+            });
+
+            return Object.entries(weeklyData).map(([weekStart, count]) => {
+                const startDate = new Date(weekStart);
+                const endDate = new Date(startDate);
+                endDate.setDate(endDate.getDate() + 6);
+                return {
+                    label: `${startDate.getMonth() + 1}/${startDate.getDate()} - ${endDate.getMonth() + 1}/${endDate.getDate()}`,
+                    value: count
+                };
+            }).sort((a, b) => new Date(a.label.split(' - ')[0]) - new Date(b.label.split(' - ')[0]));
+        }
+    }, [summaryData]);
+
+    const prospectingActivityData = useMemo(() => {
+        if (!summaryData || !summaryData.prospecting_metadata_count_by_name) {
+            return [];
+        }
+        return Object.entries(summaryData.prospecting_metadata_count_by_name)
+            .map(([name, value]) => ({
+                label: name,
+                value: value
+            }))
+            .sort((a, b) => b.value - a.value); // Sort descending by value
+    }, [summaryData]);
+
     return (
         <>
             {/* First Row */}
@@ -86,7 +99,11 @@ const ProspectingSummary = ({ summaryData, period }) => {
                     <Typography variant="h4" textAlign={"center"}>{summaryData.total_accounts} Accounts</Typography>
                 </Grid>
                 <Grid item padding={"16px"} sx={{ border: "1px solid #000000" }}>
-                    <SummaryLineChartCard title='Activation Trend' data={activation_trend} />
+                    <SummaryLineChartCard 
+                        title='Activation Trend' 
+                        data={activationTrendData}
+                        tooltipTitle="Number of activations over time"
+                    />
                 </Grid>
             </Grid>
 
@@ -127,7 +144,11 @@ const ProspectingSummary = ({ summaryData, period }) => {
                     </Box>
 
                     <Box padding={"16px 0px"} display={"flex"} flex={1} flexDirection={"column"} sx={{ border: "1px solid #000000", width: "100%" }}>
-                        <SummaryBarChartCard direction='horizontal' title='Activities by Type' data={activities_type} />
+                        <SummaryBarChartCard 
+                            direction='horizontal' 
+                            title='Activities by Type' 
+                            data={prospectingActivityData}
+                        />
                     </Box>
                 </Box>
             </Box>
