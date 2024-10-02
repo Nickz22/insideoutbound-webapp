@@ -1,10 +1,9 @@
 import requests
 import asyncio
 import aiohttp
-from datetime import datetime, timezone
 from flask import current_app as app
 from typing import List, Dict
-from app.utils import pluck, format_error_message, group_by, get_utc_now_for_supabase
+from app.utils import pluck, format_error_message, group_by
 from app.data_models import (
     ApiResponse,
     Contact,
@@ -80,7 +79,7 @@ def fetch_salesforce_users(ids: list[str] = None) -> ApiResponse:
     api_response = ApiResponse(data=[], message="", success=False)
 
     try:
-        soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User WHERE IsActive = true"
+        soql_query = "SELECT Id,Email,FirstName,LastName,Username,FullPhotoUrl,UserRole.Name FROM User"
 
         if ids:
             soql_query += " AND Id IN ({})".format(",".join(f"'{id}'" for id in ids))
