@@ -31,6 +31,7 @@ from app.utils import (
     convert_date_to_salesforce_datetime_format,
     get_team_member_salesforce_ids,
     parse_datetime_string_with_timezone,
+    log_message
 )
 from datetime import datetime, date
 from app.mapper.mapper import convert_dict_to_opportunity
@@ -138,8 +139,8 @@ async def find_unresponsive_activations(
                                 criteria_name_by_task_id[task_id] = criteria
                                 all_tasks.append(task)
                             else:
-                                print(
-                                    f"Warning: Task without Id found for account {account_id}, contact {contact_id}"
+                                log_message(
+                                    f"Warning: Task without Id found for account {account_id}, contact {contact_id}", "warning"
                                 )
                         except Exception as e:
                             set_context(
@@ -154,7 +155,7 @@ async def find_unresponsive_activations(
                                 },
                             )
                             capture_exception(e)
-                            print(f"Error processing task: {task}")
+                            log_message(f"Error processing task: {task}", "error")
                             traceback.print_exc()
                             # Continue to the next task instead of raising
                             continue
@@ -489,17 +490,17 @@ async def compute_activated_accounts(
     async def fetch_account_data(
         settings, criteria_tasks_by_who_id_by_account_id, first_prospecting_activity
     ):
-        print("Fetching account data")
+        log_message("Fetching account data")
         salesforce_user_ids = get_team_member_salesforce_ids(settings)
-        print("Fetching salesforce users")
+        log_message("Fetching salesforce users")
         salesforce_user_by_id = group_by(
             fetch_salesforce_users(salesforce_user_ids).data, "id"
         )
-        print("Fetching first prospecting activity date")
+        log_message("Fetching first prospecting activity date")
         first_prospecting_activity = get_first_prospecting_activity_date(
             criteria_tasks_by_who_id_by_account_id
         )
-        print("Fetching opportunities by account id")
+        log_message("Fetching opportunities by account id")
         opportunity_by_account_id = group_by(
             fetch_opportunities_by_account_ids_from_date(
                 list(criteria_tasks_by_who_id_by_account_id.keys()),
@@ -509,20 +510,20 @@ async def compute_activated_accounts(
             "AccountId",
         )
 
-        print("Fetching meetings by account id")
+        log_message("Fetching meetings by account id")
         meetings_by_account_id = await get_meetings_by_account_id(
             settings,
             criteria_tasks_by_who_id_by_account_id,
             first_prospecting_activity,
             salesforce_user_ids,
         )
-        print("Account data fetched successfully")
+        log_message("Account data fetched successfully")
         return salesforce_user_by_id, opportunity_by_account_id, meetings_by_account_id
 
     response = ApiResponse(data=[], message="", success=True)
 
     try:
-        print("Fetching account data")
+        log_message("Fetching account data")
         salesforce_user_by_id, opportunity_by_account_id, meetings_by_account_id = (
             await fetch_account_data(
                 settings,
@@ -533,7 +534,7 @@ async def compute_activated_accounts(
             )
         )
 
-        print("Getting task ids by criteria name")
+        log_message("Getting task ids by criteria name")
         task_ids_by_criteria_name = get_task_ids_by_criteria_name(
             criteria_tasks_by_who_id_by_account_id
         )
@@ -682,8 +683,8 @@ async def compute_activated_accounts(
                                     last_valid_task_assignee_id = task.get("OwnerId")
                                     break
                             else:
-                                print(
-                                    f"Warning: No valid Salesforce user found for account {account_id}"
+                                log_message(
+                                    f"Warning: No valid Salesforce user found for account {account_id}", "warning"
                                 )
                                 continue  # Skip this activation if no valid user is found
 

@@ -31,3 +31,5 @@ class Config:
     SESSION_COOKIE_DOMAIN = None  # Allow the cookie to be valid for all subdomains
     STRIPE_PRICE_ID = "price_1PnKvQEldv3lVQeQ8sfDVHBG"
     STRIPE_SECRET_KEY = "sk_test_51Pn71vEldv3lVQeQipdKnrCEaH3wPhplvxhUDjE3KMPFb1L1cJjj1hu1tkfFgbzakx4UmAmo0bzY6nkZpR8a597h00k1IA4yBL"
+    PAPERTRIAL_HOST = os.getenv("PAPERTRIAL_HOST")
+    PAPERTRIAL_PORT = os.getenv("PAPERTRIAL_PORT")

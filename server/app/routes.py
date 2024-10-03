@@ -2,7 +2,7 @@ import requests, json
 from flask import Blueprint, jsonify, redirect, request
 from urllib.parse import unquote
 from app.middleware import authenticate
-from app.utils import format_error_message, log_error
+from app.utils import format_error_message, log_error, log_message
 from app.database.activation_selector import (
     load_active_activations_minimal_by_ids,
     load_active_activations_order_by_first_prospecting_activity_asc,
@@ -731,7 +731,7 @@ def handle_exception(e):
     from app.data_models import AuthenticationError
 
     error_msg = format_error_message(e)
-    print(error_msg)
+    log_message(error_msg, "exception", exc_info=e)
     if isinstance(e, AuthenticationError):
         return jsonify({"error": str(e), "type": "AuthenticationError"}), 200
     return (

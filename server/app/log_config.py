@@ -1,9 +1,13 @@
 import logging
 import colorlog
+from logging.handlers import SysLogHandler
+import os
 
+PAPERTRIAL_HOST = os.getenv("PAPERTRIAL_HOST")
+PAPERTRIAL_PORT = os.getenv("PAPERTRIAL_PORT")
 
-def setup_logger(logger_name):
-    logger = colorlog.getLogger(logger_name)
+def setup_logger():
+    logger = logging.getLogger()
     if logger.handlers:
         return logger
 
@@ -22,8 +26,10 @@ def setup_logger(logger_name):
             style="%",
         )
     )
+    paper_trial_handler = SysLogHandler(address=(PAPERTRIAL_HOST, int(PAPERTRIAL_PORT)))
 
     logger.addHandler(handler)
+    logger.addHandler(paper_trial_handler)
     logger.setLevel(logging.DEBUG)  # Set this to the desired level
 
     return logger

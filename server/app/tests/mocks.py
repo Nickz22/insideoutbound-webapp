@@ -8,6 +8,7 @@ from app.tests.c import (
 from typing import List, Dict
 from datetime import datetime
 from app.data_models import Contact, Account, UserModel
+from app.log_config import log_message
 
 MOCK_CONTACT_IDS = [f"mock_contact_id{i}" for i in range(10)]
 MOCK_ACCOUNT_IDS = [f"mock_account_id{i}" for i in range(1, 6)]
@@ -93,9 +94,9 @@ def response_based_on_query(url, **kwargs):
     """
     Mocks the response of a GET or POST request to Salesforce's API
     """
-    print(f"URL: {url}")
-    print(f"Parameters: {kwargs}")
-    print(f"Return raw data: {kwargs.get('return_raw_data', False)}")
+    log_message(f"URL: {url}", "debug")
+    log_message(f"Parameters: {kwargs}", "debug")
+    log_message(f"Return raw data: {kwargs.get('return_raw_data', False)}", "debug")
     try:
         query_param = kwargs.get("params", {}).get("q", "") or url
         json_data = kwargs.get("json", {})

@@ -22,7 +22,7 @@ from app.mapper.mapper import (
     python_settings_to_supabase_dict,
     python_user_to_supabase_dict,
 )
-from app.utils import get_salesforce_team_ids, log_error
+from app.utils import get_salesforce_team_ids, log_error, log_message
 from app.database.settings_selector import load_settings
 import asyncio
 import aiohttp
@@ -97,7 +97,7 @@ async def upsert_activations_async(new_activations: List[Activation]):
                     try:
                         activation[field] = json.loads(activation[field])
                     except json.JSONDecodeError:
-                        print(f"Warning: Failed to parse JSON for field {field}")
+                        log_message(f"Failed to parse JSON for field {field}", "warning")
             return activation
 
         supabase_activations = [parse_json_fields(python_activation_to_supabase_dict(activation)) for activation in chunk]

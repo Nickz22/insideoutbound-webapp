@@ -3,7 +3,7 @@ import asyncio
 import aiohttp
 from flask import current_app as app
 from typing import List, Dict
-from app.utils import pluck, format_error_message, group_by
+from app.utils import pluck, format_error_message, group_by, log_message
 from app.data_models import (
     ApiResponse,
     Contact,
@@ -135,19 +135,19 @@ async def fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(
     api_response = ApiResponse(data={}, message="", success=False)
 
     # 1. Fetch all tasks meeting any criteria
-    print("Fetching all matching tasks")
+    log_message("Fetching all matching tasks")
     all_tasks = fetch_all_matching_tasks(start, criteria, salesforce_user_ids).data
 
     # 2. Group tasks by WhoId
-    print("Grouping tasks by WhoId")
+    log_message("Grouping tasks by WhoId")
     tasks_by_who_id = group_by(all_tasks, "WhoId")
 
     # 3. Fetch contacts for these WhoIds
-    print("Fetching contacts for these WhoIds")
+    log_message("Fetching contacts for these WhoIds")
     contact_by_id = await fetch_contact_by_id_map(list(tasks_by_who_id.keys()))
 
     # 4 & 5. Group tasks by AccountId and criteria
-    print("Grouping tasks by AccountId and criteria")
+    log_message("Grouping tasks by AccountId and criteria")
     tasks_by_account_and_criteria = group_tasks_by_account_and_criteria(
         tasks_by_who_id, contact_by_id, criteria, already_counted_task_ids
     )
@@ -279,7 +279,7 @@ import time
 
 async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
     start_time = time.time()
-    print(f"Starting fetch_contact_by_id_map for {len(contact_ids)} contacts")
+    log_message(f"Starting fetch_contact_by_id_map for {len(contact_ids)} contacts", "debug")
 
     contact_batch_size = 300
     composite_batch_size = 3  # Reduced from 5 to 3
@@ -295,7 +295,7 @@ async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
     async with aiohttp.ClientSession() as session:
         contact_by_id = {}
         for i, batch in enumerate(composite_batches):
-            print(f"Processing composite batch {i+1} of {len(composite_batches)}")
+            log_message(f"Processing composite batch {i+1} of {len(composite_batches)}", "debug")
             results = await fetch_contact_composite_batch(batch, session)
             for result in results:
                 contact_by_id.update(result)
@@ -304,7 +304,7 @@ async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
                 await asyncio.sleep(0.5)  # 0.5 second delay between composite batches
 
     end_time = time.time()
-    print(f"Completed fetch_contact_by_id_map. Total contacts processed: {len(contact_by_id)}. Time taken: {end_time - start_time:.2f} seconds")
+    log_message(f"Completed fetch_contact_by_id_map. Total contacts processed: {len(contact_by_id)}. Time taken: {end_time - start_time:.2f} seconds", "debug")
     return contact_by_id
 
 import logging
@@ -367,7 +367,7 @@ async def fetch_contact_composite_batch(
     if not access_token or not instance_url:
         raise Exception("Session expired")
     
-    print(f"Fetching contacts for batch with {len(contact_batches)} batches")
+    log_message(f"Fetching contacts for batch with {len(contact_batches)} batches", "debug")
 
     composite_request = {"allOrNone": False, "compositeRequest": []}
 
@@ -426,7 +426,7 @@ async def fetch_contact_composite_batch(
         result = {}
         contacts = composite_response["body"]["records"]
 
-        print(f"Processing {len(contacts)} contacts from initial batch")
+        log_message(f"Processing {len(contacts)} contacts from initial batch", "debug")
         for contact in contacts:
             if contact.get("AccountId"):
                 result[contact["Id"]] = _process_contact(contact)
@@ -434,7 +434,7 @@ async def fetch_contact_composite_batch(
         next_records_url = composite_response["body"].get("nextRecordsUrl")
         page_count = 1
         while next_records_url:
-            print(f"Fetching next records url (page {page_count}): {next_records_url}")
+            log_message(f"Fetching next records url (page {page_count}): {next_records_url}", "debug")
             try:
                 next_data = await make_request_with_retry(fetch_next_records, next_records_url)
                 logger.info(f"Next records request successful. Time taken: {time.time() - start_time:.2f} seconds")
@@ -442,7 +442,7 @@ async def fetch_contact_composite_batch(
                 logger.error(f"Next records request failed after {MAX_RETRIES} attempts: {str(e)}")
                 break
 
-            print(f"Processing {len(next_data['records'])} contacts from page {page_count}")
+            log_message(f"Processing {len(next_data['records'])} contacts from page {page_count}", "debug")
             for contact in next_data["records"]:
                 if contact.get("AccountId"):
                     result[contact["Id"]] = _process_contact(contact)
@@ -450,10 +450,10 @@ async def fetch_contact_composite_batch(
             next_records_url = next_data.get("nextRecordsUrl")
             page_count += 1
 
-        print(f"Finished processing batch. Total contacts: {len(result)}")
+        log_message(f"Finished processing batch. Total contacts: {len(result)}", "debug")
         results.append(result)
     
-    print(f"Completed fetch_contact_composite_batch. Total batches: {len(results)}")
+    log_message(f"Completed fetch_contact_composite_batch. Total batches: {len(results)}", "debug")
     return results
 
 
@@ -562,7 +562,7 @@ def fetch_tasks_by_user_ids(user_ids: List[str], limit: int = None):
         api_response.success = True
     except Exception as e:
         error_msg = format_error_message(e)
-        print(error_msg)
+        log_message(error_msg, "exception", exc_info=e)
         raise Exception(error_msg)
 
     return api_response

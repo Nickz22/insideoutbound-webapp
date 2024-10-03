@@ -4,7 +4,7 @@ from app.data_models import ApiResponse
 from app.database.supabase_connection import get_supabase_admin_client
 from app.mapper.mapper import supabase_dict_to_python_activation
 from app.database.settings_selector import load_settings
-from app.utils import get_salesforce_team_ids, format_error_message
+from app.utils import get_salesforce_team_ids, format_error_message, log_message
 
 from app.database.supabase_retry import retry_on_temporary_unavailable
 import logging
@@ -29,7 +29,7 @@ def load_active_activations_order_by_first_prospecting_activity_asc() -> ApiResp
             .range(current_page * page_size, (current_page + 1) * page_size - 1)
             .execute()
         )
-        print(f"current page of activation query results: {current_page}")
+        log_message(f"current page of activation query results: {current_page}", "debug")
         if not response.data:
             break
 

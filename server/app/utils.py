@@ -10,7 +10,7 @@ from sentry_sdk import capture_exception, set_user
 
 from app.log_config import setup_logger
 
-logger = setup_logger(__name__)
+logger = setup_logger()
 
 
 def get_salesforce_team_ids(settings: Settings):
@@ -35,6 +35,22 @@ def log_error(exception):
             f"Error getting user ID from session state [{format_error_message(e)}]. Logging error without user ID."
         )
         logger.error(f"[{datetime.now()}] - {error_msg}")
+
+def log_message(msg, log_type: str = "info", *args):
+    if log_type == "error":
+        logger.error(msg, *args)
+    elif log_type == "critical":
+        logger.critical(msg, *args)
+    elif log_type == "warning":
+        logger.warning(msg, *args)
+    elif log_type == "debug":
+        logger.debug(msg, *args)
+    elif log_type == "fatal":
+        logger.fatal(msg, *args)
+    elif log_type == "exception":
+        logger.exception(msg, *args)
+    elif log_type == "info":
+        logger.info(msg, *args)
 
 
 # filter utils

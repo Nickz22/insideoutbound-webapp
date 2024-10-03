@@ -20,6 +20,7 @@ from app.data_models import ApiResponse, FilterContainer, Settings
 from app.utils import (
     add_days,
     get_team_member_salesforce_ids,
+    log_message
 )
 import asyncio
 
@@ -59,12 +60,12 @@ async def update_activation_states(user_timezone):
         relevant_task_criteria = settings.criteria + [settings.meetings_criteria]
 
     if len(active_activations) > 0:
-        print("incrementing existing activations")
+        log_message("incrementing existing activations")
         async_response = await increment_existing_activations(
             active_activations, settings, relevant_task_criteria
         )
         incremented_activations = async_response.data
-        print(f"upserting {len(incremented_activations)} incremented activations")
+        log_message(f"upserting {len(incremented_activations)} incremented activations", "debug")
         await upsert_activations_async(incremented_activations)
 
     async_response = await fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(
@@ -74,27 +75,27 @@ async def update_activation_states(user_timezone):
         salesforce_user_ids,
     )
 
-    print("Tasks fetched and organized successfully")
+    log_message("Tasks fetched and organized successfully")
 
     prospecting_tasks_by_criteria_name_by_account_id = async_response.data
 
-    print("Computing activated accounts")
+    log_message("Computing activated accounts")
     async_response = await compute_activated_accounts(
         prospecting_tasks_by_criteria_name_by_account_id, settings
     )
     new_activations = async_response.data
 
-    print(f" {len(new_activations)} new activations computed")
+    log_message(f" {len(new_activations)} new activations computed")
 
     if len(new_activations) > 0:
-        print(f"Upserting {len(new_activations)} new activations")
+        log_message(f"Upserting {len(new_activations)} new activations")
         upsert_response = await upsert_activations_async(new_activations)
         if not upsert_response.success:
-            print(f"Error upserting new activations: {upsert_response.message}")
+            log_message(f"Error upserting new activations: {upsert_response.message}", "error")
             api_response.success = False
             api_response.message = f"Error upserting new activations: {upsert_response.message}"
             return api_response
-        print("New activations upserted successfully")
+        log_message("New activations upserted successfully")
 
     user_tz = pytz.timezone(user_timezone)
     settings.latest_date_queried = datetime.now(user_tz).strftime("%Y-%m-%d %H:%M:%S%z")
