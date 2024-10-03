@@ -692,7 +692,7 @@ async def compute_activated_accounts(
                             active_contact_ids=active_contact_ids,
                             last_valid_task_creator=salesforce_user_by_id.get(
                                 last_valid_task_assignee_id
-                            )[0] if last_valid_task_assignee_id in salesforce_user_by_id else all_tasks_under_account[0].get("OwnerId"),
+                            )[0],
                             last_prospecting_activity=last_prospecting_activity,
                             outbound_task_ids=task_ids,
                             qualifying_opportunity=qualifying_opportunity,
