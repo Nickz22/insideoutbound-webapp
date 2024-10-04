@@ -118,7 +118,6 @@ def load_activations_by_period(period: str) -> ApiResponse:
         .select(
             "id, activated_by_id, status, activated_by, activated_date, account, first_prospecting_activity, prospecting_effort, prospecting_metadata, last_prospecting_activity, active_contact_ids, opportunity, task_ids, event_ids"
         )
-        .neq("status", "Unresponsive")
         .in_("activated_by_id", team_member_ids)
         .order("first_prospecting_activity", desc=False)
     )
@@ -147,7 +146,6 @@ def load_active_activations_minimal_by_ids(activation_ids: List[str]) -> ApiResp
             .select(
                 "id, activated_by_id, activated_by, activated_date, account, first_prospecting_activity, prospecting_effort, prospecting_metadata, last_prospecting_activity, active_contact_ids, opportunity, task_ids, event_ids"
             )
-            .neq("status", "Unresponsive")
             .in_("activated_by_id", team_member_ids)
             .in_("id", activation_ids)
             .order("first_prospecting_activity", desc=False)
