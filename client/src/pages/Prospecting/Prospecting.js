@@ -237,7 +237,9 @@ const Prospecting = () => {
           setError(response.message);
         }
       } catch (err) {
-        setError("An error occurred while fetching data.");
+        setError(`An error occurred while fetching data: ${err.message}`);
+        console.error("Error details:", err);
+        throw err;
       } finally {
         setLoading(false);
         setSummaryLoading(false);
@@ -294,7 +296,8 @@ const Prospecting = () => {
           setError(response.message);
         }
       } catch (err) {
-        setError("An error occurred while fetching data.");
+        setError(`An error occurred while fetching data: ${err.message}`);
+        console.error("Error details:", err);
       } finally {
         setTableLoading(false);
       }
@@ -360,6 +363,7 @@ const Prospecting = () => {
         await fetchData(false, period, filteredIds);
       } catch (err) {
         setError(`An error occurred while generating the summary. ${err}`);
+        throw err;
       } finally {
         setSummaryLoading(false);
       }
