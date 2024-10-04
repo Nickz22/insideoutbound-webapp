@@ -80,11 +80,19 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool) -> str:
         raise Exception(f"An error occurred upserting user: {e}")
     
 
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
 async def upsert_activations_async(new_activations: List[Activation]):
     api_response = ApiResponse(data=[], message="", success=False)
     CHUNK_SIZE = 50
-    MAX_CONCURRENT_REQUESTS = 10
+    MAX_CONCURRENT_REQUESTS = 5
+    MAX_RETRIES = 3
 
+    @retry(
+        stop=stop_after_attempt(MAX_RETRIES),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError))
+    )
     async def upsert_chunk(session, chunk):
         if not chunk:  # Skip empty chunks
             return None
@@ -109,9 +117,14 @@ async def upsert_activations_async(new_activations: List[Activation]):
             "Content-Type": "application/json",
             "Prefer": "resolution=merge-duplicates"
         }
-        async with session.post(url, json=supabase_activations, headers=headers) as response:
+        async with session.post(url, json=supabase_activations, headers=headers, timeout=30) as response:
             if response.status != 201 and response.status != 200:
-                return f"Error upserting chunk with status {response.status}: {await response.text()}"
+                raise aiohttp.ClientResponseError(
+                    response.request_info,
+                    response.history,
+                    status=response.status,
+                    message=f"Error upserting chunk: {await response.text()}"
+                )
         return None
 
     async with aiohttp.ClientSession() as session:
@@ -119,11 +132,16 @@ async def upsert_activations_async(new_activations: List[Activation]):
         
         for i in range(0, len(chunks), MAX_CONCURRENT_REQUESTS):
             batch = chunks[i:i+MAX_CONCURRENT_REQUESTS]
-            results = await asyncio.gather(*[upsert_chunk(session, chunk) for chunk in batch])
-            errors = [r for r in results if r is not None]
-            if errors:
-                api_response.message = "\n".join(errors)
-                log_error(Exception(api_response.message))
+            try:
+                results = await asyncio.gather(*[upsert_chunk(session, chunk) for chunk in batch])
+                errors = [r for r in results if r is not None]
+                if errors:
+                    api_response.message = "\n".join(errors)
+                    log_error(Exception(api_response.message))
+                    return api_response
+            except Exception as e:
+                api_response.message = f"Error processing batch: {str(e)}"
+                log_error(e)
                 return api_response
 
     api_response.success = True
