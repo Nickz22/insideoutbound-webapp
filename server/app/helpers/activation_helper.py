@@ -92,9 +92,6 @@ def generate_summary(activations: list[Activation]) -> dict:
             days_to_opportunity = (opportunity_created_date - first_activity_date).days
             total_days_to_opportunity += days_to_opportunity
             activations_with_opportunity += 1
-            total_outbound_activities_before_engagement += len(
-                activation.prospecting_effort[0].task_ids
-            )
         if activation.status == "Engaged":
             summary["engaged_activations"] += 1
             engaged_accounts_contact_count.append(len(activation.active_contact_ids))
