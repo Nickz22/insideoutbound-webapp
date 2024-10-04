@@ -26,6 +26,7 @@ import ClearIcon from "@mui/icons-material/Clear";
 import TableHeader from "./TableHeader";
 import TableBody from "./TableBody";
 import { sortData } from "../../utils/data";
+import { debounce } from "lodash"; // Add this import at the top of the file
 
 /**
  * @typedef {import('types').TableColumn} TableColumn
@@ -65,7 +66,9 @@ const CustomTable = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [localFilteredData, setLocalFilteredData] = useState(tableData.data);
   const [page, setPage] = useState(paginationConfig?.page || 0);
-  const [rowsPerPage, setRowsPerPage] = useState(paginationConfig?.rowsPerPage || 10);
+  const [rowsPerPage, setRowsPerPage] = useState(
+    paginationConfig?.rowsPerPage || 10
+  );
   const [orderBy, setOrderBy] = useState("");
   const [order, setOrder] = useState("asc");
   const [contextMenu, setContextMenu] = useState(null);
@@ -73,14 +76,17 @@ const CustomTable = ({
   const [selectedRowId, setSelectedRowId] = useState(null);
 
   const isPaginated = !!paginationConfig;
-  const isServerSidePaginated = isPaginated && paginationConfig.type === "server-side";
+  const isServerSidePaginated =
+    isPaginated && paginationConfig.type === "server-side";
 
   const filteredData = useMemo(() => {
     return isServerSidePaginated ? tableData.data : localFilteredData;
   }, [tableData.data, localFilteredData, isServerSidePaginated]);
 
   const sortedData = useMemo(() => {
-    return isServerSidePaginated ? filteredData : sortData(filteredData, orderBy, order);
+    return isServerSidePaginated
+      ? filteredData
+      : sortData(filteredData, orderBy, order);
   }, [filteredData, orderBy, order, isServerSidePaginated]);
 
   const paginatedData = useMemo(() => {
@@ -224,7 +230,10 @@ const CustomTable = ({
           {isLoading ? (
             <tbody>
               <tr>
-                <td colSpan={tableData.columns.length} style={{ textAlign: 'center', padding: '20px' }}>
+                <td
+                  colSpan={tableData.columns.length}
+                  style={{ textAlign: "center", padding: "20px" }}
+                >
                   <CircularProgress />
                 </td>
               </tr>
@@ -241,25 +250,43 @@ const CustomTable = ({
         </Table>
       </TableContainer>
     ),
-    [paginatedData, tableData.columns, tableData.selectedIds, orderBy, order, selectedRowId, isLoading]
+    [
+      paginatedData,
+      tableData.columns,
+      tableData.selectedIds,
+      orderBy,
+      order,
+      selectedRowId,
+      isLoading,
+    ]
   );
 
+  // Create a debounced version of the search function
+  const debouncedSearch = useMemo(
+    () =>
+      debounce((value) => {
+        if (paginationConfig?.type === "server-side") {
+          if (value.length > 3 || value.length === 0) {
+            onSearch(value);
+          }
+        } else {
+          // Perform local wildcard search on all columns
+          const filtered = tableData.data.filter((item) =>
+            Object.values(item).some((field) =>
+              String(field).toLowerCase().includes(value.toLowerCase())
+            )
+          );
+          setLocalFilteredData(filtered);
+          setPage(0); // Reset to first page when filtering
+        }
+      }, 2000),
+    [paginationConfig, onSearch, tableData.data]
+  );
+
+  // Update the handleSearch function
   const handleSearch = (value) => {
     setSearchTerm(value);
-    if (paginationConfig?.type === "server-side") {
-      if (value.length > 3 || value.length === 0) {
-        onSearch(value);
-      }
-    } else {
-      // Perform local wildcard search on all columns
-      const filtered = tableData.data.filter(item =>
-        Object.values(item).some(field =>
-          String(field).toLowerCase().includes(value.toLowerCase())
-        )
-      );
-      setLocalFilteredData(filtered);
-      setPage(0); // Reset to first page when filtering
-    }
+    debouncedSearch(value);
   };
 
   return (
@@ -291,7 +318,11 @@ const CustomTable = ({
         <TablePagination
           rowsPerPageOptions={[5, 10]}
           component="div"
-          count={isServerSidePaginated ? (paginationConfig.totalItems || 0) : filteredData.length}
+          count={
+            isServerSidePaginated
+              ? paginationConfig.totalItems || 0
+              : filteredData.length
+          }
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}

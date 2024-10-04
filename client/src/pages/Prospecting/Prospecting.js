@@ -220,16 +220,12 @@ const Prospecting = () => {
         let response;
         if (isRefresh) {
           await processNewProspectingActivity(userTimezone);
-          response = await fetchProspectingActivities(
-            selectedPeriod,
-            filteredIds
-          );
-        } else {
-          response = await fetchProspectingActivities(
-            selectedPeriod,
-            filteredIds
-          );
         }
+
+        response = await fetchProspectingActivities(
+          selectedPeriod,
+          filteredIds
+        );
 
         if (response.statusCode === 200 && response.success) {
           setSummaryData(response.data[0].summary);
