@@ -3,8 +3,10 @@ tunnels:
   webapp1:
     proto: http
     addr: 3000
+    inspect: false
   webapp2:
     proto: http
     addr: 8000
     hostname: strongly-talented-troll.ngrok-free.app
+    inspect: false
 authtoken: 1aQHhya3sSfB001TmtG66cQSN6K_4ahpmL9A719aV8TiSPkn9
