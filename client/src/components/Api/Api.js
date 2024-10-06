@@ -140,13 +140,9 @@ export const getRefreshToken = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchProspectingActivities = async (period, filterIds = []) => {
-  const params = new URLSearchParams();
-  params.append("period", period);
-  if (filterIds) {
-    filterIds.forEach((id) => params.append("filter_ids[]", id));
-  }
-  const response = await api.get("/get_prospecting_activities_by_ids", {
-    params,
+  const response = await api.post("/get_prospecting_activities_by_ids", {
+    period,
+    filterIds
   });
   return { ...response.data, statusCode: response.status };
 };
@@ -160,12 +156,12 @@ export const fetchProspectingActivities = async (period, filterIds = []) => {
  * @returns {Promise<ApiResponse>}
  */
 export const getPaginatedProspectingActivities = async (filterIds = [], page = 0, rowsPerPage = 10, searchTerm = "") => {
-  const params = new URLSearchParams();
-  filterIds.forEach(id => params.append('filter_ids[]', id));
-  params.append('page', page.toString());
-  params.append('rows_per_page', rowsPerPage.toString());
-  if (searchTerm) params.append('search', searchTerm);
-  const response = await api.get("/get_paginated_prospecting_activities", { params });
+  const response = await api.post("/get_paginated_prospecting_activities", {
+    filterIds,
+    page,
+    rowsPerPage,
+    searchTerm
+  });
   return { ...response.data, statusCode: response.status };
 };
 

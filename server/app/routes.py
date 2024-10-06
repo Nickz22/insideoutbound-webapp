@@ -7,6 +7,8 @@ from app.database.activation_selector import (
     load_active_activations_minimal_by_ids,
     load_active_activations_order_by_first_prospecting_activity_asc,
     load_activations_by_period,
+    load_active_activations_paginated_by_ids,
+    load_active_activations_paginated_with_search,
 )
 from app.database.settings_selector import load_settings
 from app.database.supabase_user_selector import fetch_supabase_user
@@ -246,15 +248,16 @@ def get_instance_url():
     return jsonify(response.to_dict()), get_status_code(response)
 
 
-@bp.route("/get_prospecting_activities_by_ids", methods=["GET"])
+@bp.route("/get_prospecting_activities_by_ids", methods=["POST"])
 @authenticate
 def get_prospecting_activities_by_ids():
     from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        period = request.args.get("period", "All")
-        filter_ids = request.args.getlist("filter_ids[]")
+        data = request.json
+        period = data.get("period", "All")
+        filter_ids = data.get("filterIds", [])
 
         activations = []
         if filter_ids and len(filter_ids) > 0:
@@ -288,26 +291,38 @@ def get_prospecting_activities_by_ids():
     return jsonify(response.to_dict()), 200
 
 
-@bp.route("/get_paginated_prospecting_activities", methods=["GET"])
+@bp.route("/get_paginated_prospecting_activities", methods=["POST"])
 @authenticate
 def get_paginated_prospecting_activities():
     from app.data_models import ApiResponse
-    from app.database.activation_selector import load_active_activations_paginated
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        activation_ids = request.args.getlist("filter_ids[]")
-        page = int(request.args.get('page', 0))
-        rows_per_page = int(request.args.get('rows_per_page', 10))
-        search_term = request.args.get('search', '')
+        data = request.json
+        activation_ids = data.get("filterIds", [])
+        page = data.get("page", 0)
+        rows_per_page = data.get("rowsPerPage", 10)
+        search_term = data.get("searchTerm", "")
 
-        result = load_active_activations_paginated(page, rows_per_page, activation_ids, search_term)
+        if search_term:
+            result = load_active_activations_paginated_with_search(
+                page, rows_per_page, activation_ids, search_term
+            )
+        else:
+            result = load_active_activations_paginated_by_ids(
+                page, rows_per_page, activation_ids
+            )
 
         if result.success:
-            response.data = [{
-                "raw_data": [activation.to_dict() for activation in result.data["activations"]],
-                "total_items": result.data["total_count"]
-            }]
+            response.data = [
+                {
+                    "raw_data": [
+                        activation.to_dict()
+                        for activation in result.data["activations"]
+                    ],
+                    "total_items": result.data["total_count"],
+                }
+            ]
             response.success = True
         else:
             response.message = result.message
@@ -322,6 +337,7 @@ def get_paginated_prospecting_activities():
 @authenticate
 def process_new_prospecting_activity():
     from app.data_models import ApiResponse
+
     api_response = ApiResponse(data=[], message="", success=False)
 
     async def process_request():

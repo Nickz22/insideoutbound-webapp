@@ -7,7 +7,7 @@ from app.database.supabase_connection import (
     get_session_state,
     get_supabase_key,
     set_session_state,
-    get_supabase_url
+    get_supabase_url,
 )
 from app.data_models import (
     Activation,
@@ -78,28 +78,40 @@ def upsert_supabase_user(user: UserModel, is_sandbox: bool) -> str:
 
     except Exception as e:
         raise Exception(f"An error occurred upserting user: {e}")
-    
 
-from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+from tenacity import (
+    retry,
+    stop_after_attempt,
+    wait_exponential,
+    retry_if_exception_type,
+)
+
 
 async def upsert_activations_async(new_activations: List[Activation]):
     api_response = ApiResponse(data=[], message="", success=False)
     CHUNK_SIZE = 50
-    MAX_CONCURRENT_REQUESTS = 5
+    MAX_CONCURRENT_REQUESTS = 10
     MAX_RETRIES = 3
 
     @retry(
         stop=stop_after_attempt(MAX_RETRIES),
         wait=wait_exponential(multiplier=1, min=4, max=10),
-        retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError))
+        retry=retry_if_exception_type((aiohttp.ClientError, asyncio.TimeoutError)),
     )
     async def upsert_chunk(session, chunk):
         if not chunk:  # Skip empty chunks
             return None
-        
+
         ## we need clean JSON in Supabase so that we can filter jsonb fields
         def parse_json_fields(activation):
-            json_fields = ['account', 'active_contacts', 'tasks', 'prospecting_metadata', 'prospecting_effort']
+            json_fields = [
+                "account",
+                "active_contacts",
+                "tasks",
+                "prospecting_metadata",
+                "prospecting_effort",
+            ]
             for field in json_fields:
                 if field in activation and isinstance(activation[field], str):
                     try:
@@ -108,32 +120,42 @@ async def upsert_activations_async(new_activations: List[Activation]):
                         print(f"Warning: Failed to parse JSON for field {field}")
             return activation
 
-        supabase_activations = [parse_json_fields(python_activation_to_supabase_dict(activation)) for activation in chunk]
-        
+        supabase_activations = [
+            parse_json_fields(python_activation_to_supabase_dict(activation))
+            for activation in chunk
+        ]
+
         url = f"{get_supabase_url()}/rest/v1/Activations"
         headers = {
             "apikey": get_supabase_key(),
             "Authorization": f"Bearer {get_supabase_key()}",
             "Content-Type": "application/json",
-            "Prefer": "resolution=merge-duplicates"
+            "Prefer": "resolution=merge-duplicates",
         }
-        async with session.post(url, json=supabase_activations, headers=headers, timeout=30) as response:
+        async with session.post(
+            url, json=supabase_activations, headers=headers, timeout=30
+        ) as response:
             if response.status != 201 and response.status != 200:
                 raise aiohttp.ClientResponseError(
                     response.request_info,
                     response.history,
                     status=response.status,
-                    message=f"Error upserting chunk: {await response.text()}"
+                    message=f"Error upserting chunk: {await response.text()}",
                 )
         return None
 
     async with aiohttp.ClientSession() as session:
-        chunks = [new_activations[i:i+CHUNK_SIZE] for i in range(0, len(new_activations), CHUNK_SIZE)]
-        
+        chunks = [
+            new_activations[i : i + CHUNK_SIZE]
+            for i in range(0, len(new_activations), CHUNK_SIZE)
+        ]
+
         for i in range(0, len(chunks), MAX_CONCURRENT_REQUESTS):
-            batch = chunks[i:i+MAX_CONCURRENT_REQUESTS]
+            batch = chunks[i : i + MAX_CONCURRENT_REQUESTS]
             try:
-                results = await asyncio.gather(*[upsert_chunk(session, chunk) for chunk in batch])
+                results = await asyncio.gather(
+                    *[upsert_chunk(session, chunk) for chunk in batch]
+                )
                 errors = [r for r in results if r is not None]
                 if errors:
                     api_response.message = "\n".join(errors)
@@ -157,12 +179,14 @@ async def delete_all_activations_async():
         MAX_CONCURRENT_REQUESTS = 10
 
         # Fetch all matching activation IDs
-        all_activations = supabase.table("Activations") \
-            .select("id") \
-            .in_("activated_by_id", team_member_ids) \
+        all_activations = (
+            supabase.table("Activations")
+            .select("id")
+            .in_("activated_by_id", team_member_ids)
             .execute()
+        )
 
-        all_activation_ids = [activation['id'] for activation in all_activations.data]
+        all_activation_ids = [activation["id"] for activation in all_activations.data]
 
         if not all_activation_ids:
             return True  # No activations to delete
@@ -173,20 +197,26 @@ async def delete_all_activations_async():
                 "apikey": get_supabase_key(),
                 "Authorization": f"Bearer {get_supabase_key()}",
                 "Content-Type": "application/json",
-                "Prefer": "return=minimal"
+                "Prefer": "return=minimal",
             }
             params = {"id": f"in.({','.join(batch)})"}
             async with session.delete(url, headers=headers, params=params) as response:
                 if response.status != 200 and response.status != 204:
                     return f"Error deleting batch with status {response.status}: {await response.text()}"
+            print(f"Deleted batch of {len(batch)} activations")  # New print statement
             return None
 
         async with aiohttp.ClientSession() as session:
-            batches = [all_activation_ids[i:i+BATCH_SIZE] for i in range(0, len(all_activation_ids), BATCH_SIZE)]
-            
+            batches = [
+                all_activation_ids[i : i + BATCH_SIZE]
+                for i in range(0, len(all_activation_ids), BATCH_SIZE)
+            ]
+
             for i in range(0, len(batches), MAX_CONCURRENT_REQUESTS):
-                batch_group = batches[i:i+MAX_CONCURRENT_REQUESTS]
-                results = await asyncio.gather(*[delete_batch(session, batch) for batch in batch_group])
+                batch_group = batches[i : i + MAX_CONCURRENT_REQUESTS]
+                results = await asyncio.gather(
+                    *[delete_batch(session, batch) for batch in batch_group]
+                )
                 errors = [r for r in results if r is not None]
                 if errors:
                     raise Exception("\n".join(errors))
@@ -196,6 +226,7 @@ async def delete_all_activations_async():
     except Exception as e:
         log_error(e)  # Assuming you have a log_error function
         return False
+
 
 # Don't forget to update the original function to run the async version
 def delete_all_activations():

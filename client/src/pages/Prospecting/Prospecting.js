@@ -105,7 +105,11 @@ const Prospecting = () => {
 
   const [dataFilter, setDataFilter] = useState(null);
   const [originalRawData, setOriginalRawData] = useState([]);
-  const [columnShows, setColumnShows] = useState(localStorage.getItem("activationColumnShow") ? JSON.parse(localStorage.getItem("activationColumnShow")) : tableColumns);
+  const [columnShows, setColumnShows] = useState(
+    localStorage.getItem("activationColumnShow")
+      ? JSON.parse(localStorage.getItem("activationColumnShow"))
+      : tableColumns
+  );
 
   const [loggedInUser, setLoggedInUser] = useState(null);
   const [userLoading, setUserLoading] = useState(true);
@@ -118,7 +122,7 @@ const Prospecting = () => {
   const [userTimezone, setUserTimezone] = useState("");
 
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [detailedActivationData, setDetailedActivationData] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
@@ -154,10 +158,11 @@ const Prospecting = () => {
         } else {
           console.error("Failed to fetch user timezone");
         }
-      } catch (err) {
+      } catch (error) {
         setUserError("An error occurred while fetching user data");
         setUrlError("An error occurred while fetching instance URL");
         console.error("An error occurred while fetching user timezone");
+        throw error; // Add this line to ensure the error is propagated
       } finally {
         setUserLoading(false);
         setUrlLoading(false);
@@ -298,6 +303,7 @@ const Prospecting = () => {
       } catch (err) {
         setError(`An error occurred while fetching data: ${err.message}`);
         console.error("Error details:", err);
+        throw err; // Add this line to ensure the error is propagated
       } finally {
         setTableLoading(false);
       }
@@ -320,7 +326,13 @@ const Prospecting = () => {
     if (filteredData.length > 0) {
       debouncedFetchPaginatedData(page, rowsPerPage, searchTerm);
     }
-  }, [debouncedFetchPaginatedData, page, rowsPerPage, filteredData, searchTerm]);
+  }, [
+    debouncedFetchPaginatedData,
+    page,
+    rowsPerPage,
+    filteredData,
+    searchTerm,
+  ]);
 
   const handlePageChange = (newPage, newRowsPerPage) => {
     setPage(newPage);
@@ -352,7 +364,7 @@ const Prospecting = () => {
 
   const handleColumnsChange = (newColumns) => {
     setColumnShows(newColumns);
-    localStorage.setItem("activationColumnShow", JSON.stringify(newColumns))
+    localStorage.setItem("activationColumnShow", JSON.stringify(newColumns));
   };
 
   useEffect(() => {
@@ -564,7 +576,7 @@ const Prospecting = () => {
                 page: page,
                 rowsPerPage: rowsPerPage,
                 onPageChange: handlePageChange,
-                onRowsPerPageChange: handleRowsPerPageChange
+                onRowsPerPageChange: handleRowsPerPageChange,
               }}
               onRowClick={handleRowClick}
               onColumnsChange={handleColumnsChange}
