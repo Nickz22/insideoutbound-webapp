@@ -316,7 +316,7 @@ const CustomTable = ({
       {tableContent}
       {isPaginated && (
         <TablePagination
-          rowsPerPageOptions={[5, 10]}
+          rowsPerPageOptions={[5, 10, 25, 50]}
           component="div"
           count={
             isServerSidePaginated

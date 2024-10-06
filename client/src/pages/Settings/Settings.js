@@ -23,22 +23,13 @@ import { useSettings } from "./SettingProvider";
 const Settings = () => {
   const navigate = useNavigate();
   const {
-    status: {
-      isLoading,
-      saving,
-      saveSuccess,
-      setSaveSuccess,
-      setIsLoading
-    },
+    status: { isLoading, saving, saveSuccess, setSaveSuccess, setIsLoading },
     handleTabChange,
     currentTab,
-    filter: {
-      setEventFilterFields,
-      setTaskFilterFields
-    },
+    filter: { setEventFilterFields, setTaskFilterFields },
     setSettings,
     setCriteria,
-    fetchTeamMembersData
+    fetchTeamMembersData,
   } = useSettings();
 
   useEffect(() => {
@@ -95,6 +86,7 @@ const Settings = () => {
         }
       } catch (error) {
         console.error("Error fetching initial data:", error);
+        throw error; // Add this line to ensure the error is propagated
       } finally {
         setIsLoading(false);
       }
@@ -103,8 +95,6 @@ const Settings = () => {
     fetchInitialData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigate]);
-
-
 
   if (isLoading) {
     return (
@@ -131,7 +121,14 @@ const Settings = () => {
           <Tab label="User Role" />
         </Tabs>
       </AppBar>
-      <Box sx={{ overflow: "scroll", width: "100%", height: "100%", paddingBottom: "16px" }}>
+      <Box
+        sx={{
+          overflow: "scroll",
+          width: "100%",
+          height: "100%",
+          paddingBottom: "16px",
+        }}
+      >
         <TabGeneral />
         <TabProspecting />
         <TabMeeting />
