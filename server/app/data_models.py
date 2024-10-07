@@ -368,6 +368,7 @@ class SettingsModel(SerializableModel):
     skipOpportunityCriteria: Optional[FilterContainerModel] = None
     userTimeZone: Optional[str] = None
 
+
 class DataType(str, Enum):
     STRING = "string"
     NUMBER = "number"
@@ -375,6 +376,7 @@ class DataType(str, Enum):
     DATETIME = "datetime"
     SELECT = "select"
     IMAGE = "image"
+
 
 class SObjectFieldModel(SerializableModel):
     type: str
@@ -395,7 +397,8 @@ class TokenData(SerializableModel):
     id: str
     token_type: str
     issued_at: str
-    
+
+
 class SessionState(SerializableModel):
     salesforce_id: str
     access_token: str

@@ -12,6 +12,7 @@ import MainContent from "./components/MainContent";
 import Login from "./pages/Login";
 import Onboard from "./pages/Onboard";
 import "./App.css";
+import AdminLogin from "./pages/AdminLogin";
 
 const AppRoutes = () => {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/" element={<Login />} />
+      <Route path="/admin-login" element={<AdminLogin />} />
       <Route path="/onboard" element={<Onboard />} />
       <Route
         path="/app/*"
@@ -58,12 +60,12 @@ function App() {
         fontWeight: "700",
         lineHeight: "1.2",
       },
-      "body1": {
+      body1: {
         fontSize: "16px",
         lineHeight: "1.78",
         fontWeight: "400",
       },
-      "body2": {
+      body2: {
         fontSize: "18px",
         lineHeight: "1.78",
         fontWeight: "400",
@@ -76,19 +78,19 @@ function App() {
       h1: {
         fontWeight: "700",
         fontSize: "54px",
-        lineHeight: "0.93"
+        lineHeight: "0.93",
       },
       h2: {
         fontWeight: "500",
         fontSize: "40px",
-        lineHeight: "1.78"
+        lineHeight: "1.78",
       },
       h3: {
         fontWeight: "500",
         fontSize: "32px",
-        lineHeight: "1.78"
-      }
-    }
+        lineHeight: "1.78",
+      },
+    },
   });
 
   return (

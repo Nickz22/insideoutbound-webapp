@@ -36,16 +36,22 @@ from app.salesforce_api import (
     fetch_events_by_user_ids,
     fetch_logged_in_salesforce_user,
     get_task_query_count,
+    refresh_access_token,
 )
 from config import Config
 from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
 )
-from app.database.session_selector import fetch_supabase_session
+from app.database.session_selector import (
+    fetch_supabase_session,
+    fetch_session_by_salesforce_id,
+)
 import stripe
 import asyncio
 from datetime import datetime
+from app.data_models import TokenData
+import logging
 
 stripe.api_key = Config.STRIPE_SECRET_KEY
 
@@ -740,6 +746,46 @@ def set_supabase_user_status_to_paid():
         )
 
     return jsonify(api_response.to_dict()), get_status_code(api_response)
+
+
+@bp.route("/admin_login", methods=["POST"])
+def admin_login():
+    user_id = request.json.get("userId")
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
+
+    response = fetch_session_by_salesforce_id(user_id)
+
+    if response.success:
+        session_data = response.data[0]
+        session = session_data["session"]
+        refresh_token = session_data["refresh_token"]
+        state_dict = json.loads(session["state"])
+        is_sandbox = state_dict.get("is_sandbox", False)
+
+        # Refresh the access token
+        refresh_response = refresh_access_token(refresh_token, is_sandbox)
+        if not refresh_response.success:
+            logging.error(f"Failed to refresh token: {refresh_response.message}")
+            if refresh_response.error_details:
+                logging.error(f"Error details: {refresh_response.error_details}")
+            return (
+                jsonify(
+                    {
+                        "error": "Failed to refresh access token. Please try logging in again."
+                    }
+                ),
+                401,
+            )
+
+        new_token_data: TokenData = refresh_response.data[0]
+
+        # Save the new session
+        new_session_token = save_session(new_token_data, is_sandbox)
+
+        return jsonify({"success": True, "session_token": new_session_token}), 200
+    else:
+        return jsonify({"error": response.message}), 404
 
 
 @bp.app_errorhandler(Exception)

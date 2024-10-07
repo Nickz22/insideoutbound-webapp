@@ -13,10 +13,13 @@ from app.data_models import (
     SObjectFieldModel,
     UserModel,
     UserSObject,
+    TokenData,
 )
 from app.database.supabase_connection import get_session_state
 from app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 import concurrent.futures
+from config import Config
+import logging
 
 
 def get_credentials():
@@ -277,6 +280,7 @@ def _process_contacts(contacts):
 
 import time
 
+
 async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
     start_time = time.time()
     print(f"Starting fetch_contact_by_id_map for {len(contact_ids)} contacts")
@@ -299,26 +303,28 @@ async def fetch_contact_by_id_map(contact_ids: List[str]) -> Dict[str, str]:
             results = await fetch_contact_composite_batch(batch, session)
             for result in results:
                 contact_by_id.update(result)
-            
+
             if i < len(composite_batches) - 1:  # Don't wait after the last batch
                 await asyncio.sleep(0.5)  # 0.5 second delay between composite batches
 
     end_time = time.time()
-    print(f"Completed fetch_contact_by_id_map. Total contacts processed: {len(contact_by_id)}. Time taken: {end_time - start_time:.2f} seconds")
+    print(
+        f"Completed fetch_contact_by_id_map. Total contacts processed: {len(contact_by_id)}. Time taken: {end_time - start_time:.2f} seconds"
+    )
     return contact_by_id
+
 
 import logging
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 # Create logger
 logger = logging.getLogger(__name__)
-
 
 
 async def fetch_contact_composite_batch(
@@ -331,23 +337,29 @@ async def fetch_contact_composite_batch(
     async def make_request_with_retry(request_func, *args, **kwargs):
         for attempt in range(MAX_RETRIES):
             try:
-                return await asyncio.wait_for(request_func(*args, **kwargs), timeout=TIMEOUT)
+                return await asyncio.wait_for(
+                    request_func(*args, **kwargs), timeout=TIMEOUT
+                )
             except asyncio.TimeoutError:
                 if attempt == MAX_RETRIES - 1:
                     raise
-                logger.warning(f"Request timed out after {TIMEOUT} seconds. Retrying in {RETRY_DELAY} seconds... (Attempt {attempt + 1}/{MAX_RETRIES})")
+                logger.warning(
+                    f"Request timed out after {TIMEOUT} seconds. Retrying in {RETRY_DELAY} seconds... (Attempt {attempt + 1}/{MAX_RETRIES})"
+                )
                 await asyncio.sleep(RETRY_DELAY)
             except Exception as e:
                 if attempt == MAX_RETRIES - 1:
                     raise
-                logger.warning(f"Request failed: {str(e)}. Retrying in {RETRY_DELAY} seconds... (Attempt {attempt + 1}/{MAX_RETRIES})")
+                logger.warning(
+                    f"Request failed: {str(e)}. Retrying in {RETRY_DELAY} seconds... (Attempt {attempt + 1}/{MAX_RETRIES})"
+                )
                 await asyncio.sleep(RETRY_DELAY)
 
     async def make_composite_request():
         async with session.post(
             f"{instance_url}/services/data/v55.0/composite",
             json=composite_request,
-            headers=headers
+            headers=headers,
         ) as response:
             if response.status != 200:
                 raise Exception(f"API request failed: {await response.text()}")
@@ -356,8 +368,7 @@ async def fetch_contact_composite_batch(
     async def fetch_next_records(url):
         await asyncio.sleep(0.5)  # 0.5 second delay before each pagination request
         async with session.get(
-            f"{instance_url}{url}", 
-            headers=headers
+            f"{instance_url}{url}", headers=headers
         ) as next_response:
             if next_response.status != 200:
                 raise Exception(f"API request failed: {await next_response.text()}")
@@ -366,7 +377,7 @@ async def fetch_contact_composite_batch(
     access_token, instance_url = get_credentials()
     if not access_token or not instance_url:
         raise Exception("Session expired")
-    
+
     print(f"Fetching contacts for batch with {len(contact_batches)} batches")
 
     composite_request = {"allOrNone": False, "compositeRequest": []}
@@ -416,7 +427,9 @@ async def fetch_contact_composite_batch(
     start_time = time.time()
     try:
         data = await make_request_with_retry(make_composite_request)
-        logger.info(f"Composite request successful. Time taken: {time.time() - start_time:.2f} seconds")
+        logger.info(
+            f"Composite request successful. Time taken: {time.time() - start_time:.2f} seconds"
+        )
     except Exception as e:
         logger.error(f"Composite request failed after {MAX_RETRIES} attempts: {str(e)}")
         return []
@@ -436,13 +449,21 @@ async def fetch_contact_composite_batch(
         while next_records_url:
             print(f"Fetching next records url (page {page_count}): {next_records_url}")
             try:
-                next_data = await make_request_with_retry(fetch_next_records, next_records_url)
-                logger.info(f"Next records request successful. Time taken: {time.time() - start_time:.2f} seconds")
+                next_data = await make_request_with_retry(
+                    fetch_next_records, next_records_url
+                )
+                logger.info(
+                    f"Next records request successful. Time taken: {time.time() - start_time:.2f} seconds"
+                )
             except Exception as e:
-                logger.error(f"Next records request failed after {MAX_RETRIES} attempts: {str(e)}")
+                logger.error(
+                    f"Next records request failed after {MAX_RETRIES} attempts: {str(e)}"
+                )
                 break
 
-            print(f"Processing {len(next_data['records'])} contacts from page {page_count}")
+            print(
+                f"Processing {len(next_data['records'])} contacts from page {page_count}"
+            )
             for contact in next_data["records"]:
                 if contact.get("AccountId"):
                     result[contact["Id"]] = _process_contact(contact)
@@ -452,7 +473,7 @@ async def fetch_contact_composite_batch(
 
         print(f"Finished processing batch. Total contacts: {len(result)}")
         results.append(result)
-    
+
     print(f"Completed fetch_contact_composite_batch. Total batches: {len(results)}")
     return results
 
@@ -748,9 +769,8 @@ def fetch_logged_in_salesforce_user() -> ApiResponse:
         api_response.success = True
     except requests.exceptions.RequestException as e:
         api_response.message = f"Failed to fetch logged in user ID: {str(e)}"
-        if (
-            isinstance(e, requests.exceptions.HTTPError)
-            and (e.response.status_code == 401 or e.response.status_code == 403)
+        if isinstance(e, requests.exceptions.HTTPError) and (
+            e.response.status_code == 401 or e.response.status_code == 403
         ):
             api_response.message = SESSION_EXPIRED
             api_response.type = "AuthenticationError"
@@ -949,3 +969,45 @@ def get_http_error_message(response):
         return response.json().get("error", "An error occurred")
     else:
         return response.json()[0].get("message", "An error occurred")
+
+
+def refresh_access_token(refresh_token: str, is_sandbox: bool) -> ApiResponse:
+    base_sf_domain = "test" if is_sandbox else "login"
+    token_url = f"https://{base_sf_domain}.salesforce.com/services/oauth2/token"
+
+    payload = {
+        "grant_type": "refresh_token",
+        "client_id": Config.CLIENT_ID,
+        "client_secret": Config.CLIENT_SECRET,
+        "refresh_token": refresh_token,
+    }
+
+    try:
+        response = requests.post(token_url, data=payload)
+        response.raise_for_status()
+        token_data = response.json()
+
+        logging.info("Successfully refreshed access token")
+
+        # Create TokenData object, setting refresh_token only if it's in the response
+        token_data_obj = TokenData(
+            access_token=token_data["access_token"],
+            refresh_token=token_data.get(
+                "refresh_token", refresh_token
+            ),  # Use old refresh_token if not provided
+            instance_url=token_data["instance_url"],
+            id=token_data["id"],
+            token_type=token_data["token_type"],
+            issued_at=token_data["issued_at"],
+        )
+
+        return ApiResponse(success=True, data=[token_data_obj])
+    except requests.RequestException as e:
+        logging.error(f"Failed to refresh access token: {str(e)}")
+        if e.response is not None:
+            logging.error(f"Response content: {e.response.content}")
+        return ApiResponse(
+            success=False,
+            message=f"Failed to refresh access token: {str(e)}",
+            error_details=e.response.json() if e.response is not None else None,
+        )
