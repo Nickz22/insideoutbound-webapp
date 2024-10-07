@@ -1009,5 +1009,4 @@ def refresh_access_token(refresh_token: str, is_sandbox: bool) -> ApiResponse:
         return ApiResponse(
             success=False,
             message=f"Failed to refresh access token: {str(e)}",
-            error_details=e.response.json() if e.response is not None else None,
         )
