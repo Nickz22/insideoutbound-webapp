@@ -65,7 +65,6 @@ api.interceptors.response.use(
   },
   async (error) => {
     if (error.response) {
-
       if (error.response.data.message.toLowerCase().includes("session")) {
         window.location.href = "/";
         return Promise.reject(error.response.data);
@@ -142,7 +141,7 @@ export const getRefreshToken = async () => {
 export const fetchProspectingActivities = async (period, filterIds = []) => {
   const response = await api.post("/get_prospecting_activities_by_ids", {
     period,
-    filterIds
+    filterIds,
   });
   return { ...response.data, statusCode: response.status };
 };
@@ -155,12 +154,17 @@ export const fetchProspectingActivities = async (period, filterIds = []) => {
  * @param {string} searchTerm - Search term
  * @returns {Promise<ApiResponse>}
  */
-export const getPaginatedProspectingActivities = async (filterIds = [], page = 0, rowsPerPage = 10, searchTerm = "") => {
+export const getPaginatedProspectingActivities = async (
+  filterIds = [],
+  page = 0,
+  rowsPerPage = 10,
+  searchTerm = ""
+) => {
   const response = await api.post("/get_paginated_prospecting_activities", {
     filterIds,
     page,
     rowsPerPage,
-    searchTerm
+    searchTerm,
   });
   return { ...response.data, statusCode: response.status };
 };
@@ -414,4 +418,19 @@ export const pauseStripePaymentSchedule = async (userId, email) => {
     email,
   });
   return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * Performs an admin login with the given user ID
+ * @param {string} userId - The ID of the user to login as
+ * @returns {Promise<ApiResponse>}
+ */
+export const adminLogin = async (userId) => {
+  try {
+    const response = await api.post("/admin_login", { userId });
+    return { ...response.data, statusCode: response.status };
+  } catch (error) {
+    console.error("Error during admin login:", error);
+    throw error;
+  }
 };
