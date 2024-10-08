@@ -175,12 +175,32 @@ def load_active_activations_paginated_by_ids(
     team_member_ids = get_salesforce_team_ids(load_settings())
 
     try:
-        # Apply pagination to the filter_ids
+        
+        active_activation_ids = []
+        
+        for i in range(0, len(filter_ids), 250):
+            chunk = filter_ids[i:i+250]
+            query = (
+                supabase_client.table("Activations")
+                .select("id")
+                .in_("id", chunk)
+                .in_("activated_by_id", team_member_ids)
+                .neq("status", "Unresponsive")
+                .order("first_prospecting_activity", desc=False)
+            )
+            response = query.execute()
+            active_activation_ids.extend([row["id"] for row in response.data])
+        
+        total_count = len(active_activation_ids)
+        
+        # Apply pagination to the active_activation_ids
         start = page * rows_per_page
         end = start + rows_per_page
-        paginated_ids = filter_ids[start:end]
+        paginated_ids = active_activation_ids[start:end]
 
-        # Query full Activations for paginated IDs
+        activations = []
+        
+        # query the Active activations with the paginated_ids
         query = (
             supabase_client.table("Activations")
             .select("*")
@@ -189,17 +209,8 @@ def load_active_activations_paginated_by_ids(
             .neq("status", "Unresponsive")
             .order("first_prospecting_activity", desc=False)
         )
-
         response = query.execute()
-
         activations = [supabase_dict_to_python_activation(row) for row in response.data]
-        total_count = len(
-            filter_ids
-        )  # Total count is the length of the original filter_ids
-
-        logging.debug(
-            f"Query response: data_length={len(activations)}, total_count={total_count}"
-        )
 
         return ApiResponse(
             data={"activations": activations, "total_count": total_count}, success=True
