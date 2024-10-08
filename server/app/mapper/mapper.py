@@ -87,7 +87,8 @@ def supabase_dict_to_python_settings(row: Dict) -> Settings:
 
     # Convert team_member_ids from JSON string to list if it's not None
     if "team_member_ids" in row and row["team_member_ids"]:
-        row["team_member_ids"] = json.loads(row["team_member_ids"])
+        if isinstance(row["team_member_ids"], str):
+            row["team_member_ids"] = json.loads(row["team_member_ids"])
 
     row["skip_account_criteria"] = (
         None if row["skip_account_criteria"] == "" else row["skip_account_criteria"]
@@ -144,11 +145,6 @@ def python_settings_to_supabase_dict(settings: Settings) -> Dict:
         settings_dict["latest_date_queried"] = utc_time.isoformat()
 
     # Convert team_member_ids to JSON string if it's not None
-    if (
-        "team_member_ids" in settings_dict
-        and settings_dict["team_member_ids"] is not None
-    ):
-        settings_dict["team_member_ids"] = json.dumps(settings_dict["team_member_ids"])
 
     return settings_dict
 
