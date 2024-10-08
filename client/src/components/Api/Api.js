@@ -65,7 +65,6 @@ api.interceptors.response.use(
   },
   async (error) => {
     if (error.response) {
-
       if (error.response.data.message.toLowerCase().includes("session")) {
         window.location.href = "/";
         return Promise.reject(error.response.data);
@@ -140,13 +139,9 @@ export const getRefreshToken = async () => {
  * @returns {Promise<ApiResponse>}
  */
 export const fetchProspectingActivities = async (period, filterIds = []) => {
-  const params = new URLSearchParams();
-  params.append("period", period);
-  if (filterIds) {
-    filterIds.forEach((id) => params.append("filter_ids[]", id));
-  }
-  const response = await api.get("/get_prospecting_activities_by_ids", {
-    params,
+  const response = await api.post("/get_prospecting_activities_by_ids", {
+    period,
+    filterIds,
   });
   return { ...response.data, statusCode: response.status };
 };
@@ -159,13 +154,18 @@ export const fetchProspectingActivities = async (period, filterIds = []) => {
  * @param {string} searchTerm - Search term
  * @returns {Promise<ApiResponse>}
  */
-export const getPaginatedProspectingActivities = async (filterIds = [], page = 0, rowsPerPage = 10, searchTerm = "") => {
-  const params = new URLSearchParams();
-  filterIds.forEach(id => params.append('filter_ids[]', id));
-  params.append('page', page.toString());
-  params.append('rows_per_page', rowsPerPage.toString());
-  if (searchTerm) params.append('search', searchTerm);
-  const response = await api.get("/get_paginated_prospecting_activities", { params });
+export const getPaginatedProspectingActivities = async (
+  filterIds = [],
+  page = 0,
+  rowsPerPage = 10,
+  searchTerm = ""
+) => {
+  const response = await api.post("/get_paginated_prospecting_activities", {
+    filterIds,
+    page,
+    rowsPerPage,
+    searchTerm,
+  });
   return { ...response.data, statusCode: response.status };
 };
 
@@ -418,4 +418,19 @@ export const pauseStripePaymentSchedule = async (userId, email) => {
     email,
   });
   return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * Performs an admin login with the given user ID
+ * @param {string} userId - The ID of the user to login as
+ * @returns {Promise<ApiResponse>}
+ */
+export const adminLogin = async (userId) => {
+  try {
+    const response = await api.post("/admin_login", { userId });
+    return { ...response.data, statusCode: response.status };
+  } catch (error) {
+    console.error("Error during admin login:", error);
+    throw error;
+  }
 };

@@ -48,7 +48,6 @@ def generate_summary(activations: list[Activation]) -> dict:
     account_contacts = defaultdict(set)
     total_days_to_opportunity = 0
     activations_with_opportunity = 0
-    total_outbound_activities_before_engagement = 0
     engaged_accounts_contact_count = []
     total_engaged_activations = 0
 
@@ -92,9 +91,6 @@ def generate_summary(activations: list[Activation]) -> dict:
             days_to_opportunity = (opportunity_created_date - first_activity_date).days
             total_days_to_opportunity += days_to_opportunity
             activations_with_opportunity += 1
-            total_outbound_activities_before_engagement += len(
-                activation.prospecting_effort[0].task_ids
-            )
         if activation.status == "Engaged":
             summary["engaged_activations"] += 1
             engaged_accounts_contact_count.append(len(activation.active_contact_ids))
@@ -108,7 +104,7 @@ def generate_summary(activations: list[Activation]) -> dict:
             effort.status == StatusEnum.meeting_set
             for effort in activation.prospecting_effort
         )
-        
+
         if ever_engaged:
             total_engaged_activations += 1
 
@@ -124,7 +120,9 @@ def generate_summary(activations: list[Activation]) -> dict:
 
             if activated_effort:
                 for metadata in activated_effort.prospecting_metadata:
-                    prospecting_activity_counts_engagement[metadata.name] += metadata.total
+                    prospecting_activity_counts_engagement[
+                        metadata.name
+                    ] += metadata.total
                     total_prospecting_activities_engagement += metadata.total
 
         if ever_meeting_set:
@@ -137,7 +135,7 @@ def generate_summary(activations: list[Activation]) -> dict:
                 ),
                 None,
             )
-            
+
             if pre_meeting_effort:
                 for metadata in pre_meeting_effort.prospecting_metadata:
                     prospecting_activity_counts_meeting[metadata.name] += metadata.total
@@ -171,7 +169,7 @@ def generate_summary(activations: list[Activation]) -> dict:
     )
     summary["avg_outbound_activities_to_inbound_response"] = (
         round(
-            total_outbound_activities_before_engagement
+            total_prospecting_activities_engagement
             / summary["engaged_activations"],
             2,
         )
@@ -196,23 +194,34 @@ def generate_summary(activations: list[Activation]) -> dict:
         most_effective_engagement = max(
             prospecting_activity_counts_engagement, key=lambda x: x[1]
         )
-        summary["most_effective_prospecting_activity_for_engagement"] = most_effective_engagement
+        summary["most_effective_prospecting_activity_for_engagement"] = (
+            most_effective_engagement
+        )
         summary["most_effective_prospecting_activity_for_engagement_fraction"] = round(
-            prospecting_activity_counts_engagement[most_effective_engagement] / total_prospecting_activities_engagement, 2
+            prospecting_activity_counts_engagement[most_effective_engagement]
+            / total_prospecting_activities_engagement,
+            2,
         )
 
     # Calculate for meeting set
     if prospecting_activity_counts_meeting:
         most_effective_meeting = max(
-            prospecting_activity_counts_meeting, key=prospecting_activity_counts_meeting.get
+            prospecting_activity_counts_meeting,
+            key=prospecting_activity_counts_meeting.get,
         )
-        summary["most_effective_prospecting_activity_for_meeting"] = most_effective_meeting
+        summary["most_effective_prospecting_activity_for_meeting"] = (
+            most_effective_meeting
+        )
         summary["most_effective_prospecting_activity_for_meeting_fraction"] = round(
-            prospecting_activity_counts_meeting[most_effective_meeting] / total_prospecting_activities_meeting, 2
+            prospecting_activity_counts_meeting[most_effective_meeting]
+            / total_prospecting_activities_meeting,
+            2,
         )
 
     # Add the new map to the summary
-    summary["prospecting_metadata_count_by_name"] = dict(prospecting_metadata_count_by_name)
+    summary["prospecting_metadata_count_by_name"] = dict(
+        prospecting_metadata_count_by_name
+    )
 
     # Sort activations by activated_date
     sorted_activations = sorted(activations, key=lambda x: x.activated_date)
@@ -236,7 +245,9 @@ def generate_summary(activations: list[Activation]) -> dict:
             current_date += timedelta(days=1)
 
         summary["activation_trend"] = dict(daily_counts)
-        summary["activation_trend_range"] = date_range  # Add this to inform the client about the date range
+        summary["activation_trend_range"] = (
+            date_range  # Add this to inform the client about the date range
+        )
 
     return summary
 
@@ -263,6 +274,7 @@ def increment_prospecting_effort_metadata(prospecting_effort, task, criteria_nam
             )
         )
     return prospecting_effort
+
 
 def get_new_status(
     activation: Activation,
@@ -297,7 +309,6 @@ def create_activation(
     account_first_prospecting_activity,
     active_contact_ids,
     last_valid_task_creator,
-    last_prospecting_activity,
     outbound_task_ids,
     qualifying_opportunity,
     qualifying_event,
@@ -307,7 +318,9 @@ def create_activation(
     engaged_date,
 ):
     today = date.today()
-
+    last_prospecting_activity = parse_datetime_string_with_timezone(
+        all_tasks_under_account[-1]["CreatedDate"]
+    ).date()
     # Determine the activated_date based on the activation condition
     if qualifying_opportunity:
         activated_date = parse_datetime_string_with_timezone(
@@ -361,8 +374,9 @@ def create_activation(
     activation = Activation(
         id=generate_unique_id(),
         account=all_tasks_under_account[0]["Account"],
-        activated_date=activated_date,
-        days_activated=(today - activated_date).days,
+        # activated_date=activated_date,
+        activated_date=account_first_prospecting_activity,
+        days_activated=(today - account_first_prospecting_activity).days,
         engaged_date=engaged_date.date() if engaged_date else None,
         days_engaged=(today - engaged_date.date()).days if engaged_date else None,
         active_contact_ids=active_contact_ids,

@@ -3,7 +3,7 @@ import { debounce } from "lodash";
 import {
   saveSettings,
   deleteAllActivations,
-  fetchSalesforceUsers
+  fetchSalesforceUsers,
 } from "src/components/Api/Api";
 
 /** @typedef {import("types/Settings").SettingsContextValue} SettingsContextValue */
@@ -43,6 +43,7 @@ export const useSettingUtil = ({
           setSaveSuccess(true);
         } catch (error) {
           console.error("Error saving settings:", error);
+          throw error; // Add this line to ensure the error is propagated
         } finally {
           setSaving(false);
         }
@@ -76,9 +77,11 @@ export const useSettingUtil = ({
         });
       } else {
         console.error("Error fetching Salesforce users:", response.message);
+        throw error; // Add this line to ensure the error is propagated
       }
     } catch (error) {
       console.error("Error fetching Salesforce users:", error);
+      throw error; // Add this line to ensure the error is propagated
     } finally {
       setIsTableLoading(false);
     }

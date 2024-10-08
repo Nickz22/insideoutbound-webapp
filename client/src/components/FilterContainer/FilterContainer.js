@@ -353,7 +353,18 @@ const FilterContainer = ({
             logicErrors[0] ||
             "Use AND, OR, and numbers to create logic (e.g., 1 AND 2 OR 3)"
           }
-          onChange={(e) => handleLogicChange(e.target.value, onLogicChange)}
+          onChange={(e) => {
+            const value = e.target.value;
+
+            handleLogicChange(value, onLogicChange);
+          }}
+          onBlur={(e) => {
+            let value = e.target.value;
+            value = value.replace(/^\(\((.*)\)\)$/, "$1");
+            const formattedValue = `((${value}))`;
+
+            handleLogicChange(formattedValue, onLogicChange);
+          }}
         />
       </Box>
     </Box>

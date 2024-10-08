@@ -122,16 +122,29 @@ export const useFilterLogic = (initialFilterContainer, initialFilterFields) => {
   );
 
   const handleAddFilter = useCallback(() => {
-    setFilterContainer((prevContainer) => ({
-      ...(prevContainer
-        ? prevContainer
-        : { filters: [], filterLogic: "", name: "", direction: "" }),
-      filters: [
-        ...prevContainer.filters,
-        { field: "", operator: "", value: "", dataType: "string" },
-      ],
-      filterLogic: prevContainer.filters.length === 0 ? "1" : `${prevContainer.filterLogic} AND ${prevContainer.filters.length + 1}`
-    }));
+    setFilterContainer((prevContainer) => {
+      const isInitialFilter = prevContainer.filters.length === 0;
+      const newFilterIndex = prevContainer.filters.length + 1;
+
+      const baseLogic = isInitialFilter
+        ? "1"
+        : `${prevContainer.filterLogic} AND ${newFilterIndex}`;
+
+      const formattedLogic = prevContainer.filterLogic.startsWith("((") && prevContainer.filterLogic.endsWith("))")
+        ? baseLogic
+        : `((${baseLogic}))`;
+
+      return {
+        ...(prevContainer
+          ? prevContainer
+          : { filters: [], filterLogic: "", name: "", direction: "" }),
+        filters: [
+          ...prevContainer.filters,
+          { field: "", operator: "", value: "", dataType: "string" },
+        ],
+        filterLogic: formattedLogic
+      }
+    });
   }, []);
 
   const handleDeleteFilter = useCallback(

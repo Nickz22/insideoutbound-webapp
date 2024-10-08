@@ -7,6 +7,8 @@ from app.database.activation_selector import (
     load_active_activations_minimal_by_ids,
     load_active_activations_order_by_first_prospecting_activity_asc,
     load_activations_by_period,
+    load_active_activations_paginated_by_ids,
+    load_active_activations_paginated_with_search,
 )
 from app.database.settings_selector import load_settings
 from app.database.supabase_user_selector import fetch_supabase_user
@@ -34,16 +36,22 @@ from app.salesforce_api import (
     fetch_events_by_user_ids,
     fetch_logged_in_salesforce_user,
     get_task_query_count,
+    refresh_access_token,
 )
 from config import Config
 from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
 )
-from app.database.session_selector import fetch_supabase_session
+from app.database.session_selector import (
+    fetch_supabase_session,
+    fetch_session_by_salesforce_id,
+)
 import stripe
 import asyncio
 from datetime import datetime
+from app.data_models import TokenData
+import logging
 
 stripe.api_key = Config.STRIPE_SECRET_KEY
 
@@ -246,15 +254,16 @@ def get_instance_url():
     return jsonify(response.to_dict()), get_status_code(response)
 
 
-@bp.route("/get_prospecting_activities_by_ids", methods=["GET"])
+@bp.route("/get_prospecting_activities_by_ids", methods=["POST"])
 @authenticate
 def get_prospecting_activities_by_ids():
     from app.data_models import ApiResponse
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        period = request.args.get("period", "All")
-        filter_ids = request.args.getlist("filter_ids[]")
+        data = request.json
+        period = data.get("period", "All")
+        filter_ids = data.get("filterIds", [])
 
         activations = []
         if filter_ids and len(filter_ids) > 0:
@@ -288,26 +297,38 @@ def get_prospecting_activities_by_ids():
     return jsonify(response.to_dict()), 200
 
 
-@bp.route("/get_paginated_prospecting_activities", methods=["GET"])
+@bp.route("/get_paginated_prospecting_activities", methods=["POST"])
 @authenticate
 def get_paginated_prospecting_activities():
     from app.data_models import ApiResponse
-    from app.database.activation_selector import load_active_activations_paginated
 
     response = ApiResponse(data=[], message="", success=False)
     try:
-        activation_ids = request.args.getlist("filter_ids[]")
-        page = int(request.args.get('page', 0))
-        rows_per_page = int(request.args.get('rows_per_page', 10))
-        search_term = request.args.get('search', '')
+        data = request.json
+        activation_ids = data.get("filterIds", [])
+        page = data.get("page", 0)
+        rows_per_page = data.get("rowsPerPage", 10)
+        search_term = data.get("searchTerm", "")
 
-        result = load_active_activations_paginated(page, rows_per_page, activation_ids, search_term)
+        if search_term:
+            result = load_active_activations_paginated_with_search(
+                page, rows_per_page, activation_ids, search_term
+            )
+        else:
+            result = load_active_activations_paginated_by_ids(
+                page, rows_per_page, activation_ids
+            )
 
         if result.success:
-            response.data = [{
-                "raw_data": [activation.to_dict() for activation in result.data["activations"]],
-                "total_items": result.data["total_count"]
-            }]
+            response.data = [
+                {
+                    "raw_data": [
+                        activation.to_dict()
+                        for activation in result.data["activations"]
+                    ],
+                    "total_items": result.data["total_count"],
+                }
+            ]
             response.success = True
         else:
             response.message = result.message
@@ -322,6 +343,7 @@ def get_paginated_prospecting_activities():
 @authenticate
 def process_new_prospecting_activity():
     from app.data_models import ApiResponse
+
     api_response = ApiResponse(data=[], message="", success=False)
 
     async def process_request():
@@ -724,6 +746,46 @@ def set_supabase_user_status_to_paid():
         )
 
     return jsonify(api_response.to_dict()), get_status_code(api_response)
+
+
+@bp.route("/admin_login", methods=["POST"])
+def admin_login():
+    user_id = request.json.get("userId")
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
+
+    response = fetch_session_by_salesforce_id(user_id)
+
+    if response.success:
+        session_data = response.data[0]
+        session = session_data["session"]
+        refresh_token = session_data["refresh_token"]
+        state_dict = json.loads(session["state"])
+        is_sandbox = state_dict.get("is_sandbox", False)
+
+        # Refresh the access token
+        refresh_response = refresh_access_token(refresh_token, is_sandbox)
+        if not refresh_response.success:
+            logging.error(f"Failed to refresh token: {refresh_response.message}")
+            if refresh_response.error_details:
+                logging.error(f"Error details: {refresh_response.error_details}")
+            return (
+                jsonify(
+                    {
+                        "error": "Failed to refresh access token. Please try logging in again."
+                    }
+                ),
+                401,
+            )
+
+        new_token_data: TokenData = refresh_response.data[0]
+
+        # Save the new session
+        new_session_token = save_session(new_token_data, is_sandbox)
+
+        return jsonify({"success": True, "session_token": new_session_token}), 200
+    else:
+        return jsonify({"error": response.message}), 404
 
 
 @bp.app_errorhandler(Exception)
