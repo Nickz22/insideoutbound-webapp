@@ -618,23 +618,28 @@ const Prospecting = () => {
                 </Grid>
               </Grid>
             </Box>
-            <div id="hello">
-
-
-            </div>
-
-
-
             {selectedActivation && (
               <Box sx={{ mt: 4 }}>
-                <Box sx={{ mb: 4, overflowX: "auto", width: "100%" }}>
-                  <Box sx={{ minWidth: "600px" }}>
-                    <TimeLine />
-                    {/* <ProspectingEffortTimeline
+                <Card
+                  sx={{
+                    borderRadius: '20px',
+                    boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
+                    paddingX: 4,
+                    paddingY: 2,
+                    marginX: 'auto',
+                    marginBottom: 4,
+                    paddingBottom: 4
+                  }}
+                >
+                  <Box sx={{ overflowX: "auto", width: "100%" }}>
+                    <Box sx={{ minWidth: "600px" }}>
+                      <TimeLine />
+                      {/* <ProspectingEffortTimeline
                       efforts={selectedActivation.prospecting_effort}
                     /> */}
+                    </Box>
                   </Box>
-                </Box>
+                </Card>
                 <ProspectingMetadataOverview
                   activation={selectedActivation}
                   instanceUrl={instanceUrl}
