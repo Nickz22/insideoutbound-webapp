@@ -18,6 +18,8 @@ import {
   Switch,
   styled,
   Stack,
+  Grid,
+  Card
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "../../components/DataFilter/DataFilter";
@@ -31,18 +33,20 @@ import {
   getPaginatedProspectingActivities,
 } from "src/components/Api/Api";
 import CustomTable from "../../components/CustomTable/CustomTable";
-import ProspectingMetadataOverview from "../../components/ProspectingMetadataOverview/ProspectingMetadataOverview";
-import ProspectingEffortTimeline from "../../components/ProspectingEffortTimeline/ProspectingEffortTimeline";
+// import ProspectingMetadataOverview from "../../components/ProspectingMetadataOverview/ProspectingMetadataOverview";
+// import ProspectingEffortTimeline from "../../components/ProspectingEffortTimeline/ProspectingEffortTimeline";
 import CustomSelect from "src/components/CustomSelect/CustomSelect";
+import CardActiveAccount from "../../components/ProspectingActiveAccount/CardActiveAccount"
 /**
  * @typedef {import('types').Activation} Activation
  */
-
+import SummaryBarChartCard from 'src/components/SummaryCard/SummaryBarChartCard'
 import FreeTrialExpired from "../../components/FreeTrialExpired/FreeTrialExpired";
 import ProspectingSummary from "./ProspectingSummary";
 import LoadingComponent from "../../components/LoadingComponent/LoadingComponent";
 import FreeTrialRibbon from "../../components/FreeTrialRibbon/FreeTrialRibbon";
 import { debounce } from "lodash"; // Make sure to import lodash or use a custom debounce function
+import TimeLine from "src/components/ProspectingActiveAccount/TimeLine";
 
 const AntSwitch = styled(Switch)(({ theme }) => ({
   width: 28,
@@ -127,6 +131,24 @@ const Prospecting = () => {
   const [detailedActivationData, setDetailedActivationData] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
+  const mockData = [
+    {
+      label: "User 1",
+      value: 6
+    },
+    {
+      label: "User 2",
+      value: 4
+    },
+    {
+      label: "User 3",
+      value: 7
+    },
+    {
+      label: "User 4",
+      value: 2
+    }
+  ]
 
   useEffect(() => {
     async function fetchUserAndInstanceUrl() {
@@ -541,62 +563,156 @@ const Prospecting = () => {
           <ProspectingSummary period={period} summaryData={summaryData} />
         ) : (
           <>
-            <CustomTable
-              tableData={{
-                columns: columnShows,
-                data: detailedActivationData.map((item) => ({
-                  ...item,
-                  "account.name": (
-                    <Link
-                      href={`${instanceUrl}/${item.account?.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.account?.name || "N/A"}
-                    </Link>
-                  ),
-                  "opportunity.name": item.opportunity ? (
-                    <Link
-                      href={`${instanceUrl}/${item.opportunity.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.opportunity.name || "N/A"}
-                    </Link>
-                  ) : (
-                    "N/A"
-                  ),
-                })),
-                selectedIds: new Set(),
-                availableColumns: tableColumns,
-              }}
-              paginationConfig={{
-                type: "server-side",
-                totalItems: totalItems,
-                page: page,
-                rowsPerPage: rowsPerPage,
-                onPageChange: handlePageChange,
-                onRowsPerPageChange: handleRowsPerPageChange,
-              }}
-              onRowClick={handleRowClick}
-              onColumnsChange={handleColumnsChange}
-              isLoading={tableLoading}
-              onSearch={handleSearch}
-            />
+            <Box sx={{ flexGrow: 1, marginTop: 5 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={9}>
+                  <Card
+                    sx={{
+                      borderRadius: '20px',
+                      boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
+                      paddingX: 4,
+                      paddingY: 2,
+                      margin: 'auto',
+                    }}
+                  >
+                    <Typography variant="h2" align="center" sx={{
+                      fontFamily: 'Albert Sans',
+                      fontWeight: 700,
+                      fontSize: '24px',
+                      lineHeight: '22.32px',
+                      letterSpacing: '-3%',
+                      paddingTop: 2,
+                      paddingBottom: 1
+                    }}>
+                      Active Accounts List
+                    </Typography>
+                    <CustomTable
+                      tableData={{
+                        columns: columnShows,
+                        data: detailedActivationData.map((item) => ({
+                          ...item,
+                          "account.name": (
+                            <Link
+                              href={`${instanceUrl}/${item.account?.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {item.account?.name || "N/A"}
+                            </Link>
+                          ),
+                          "opportunity.name": item.opportunity ? (
+                            <Link
+                              href={`${instanceUrl}/${item.opportunity.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              {item.opportunity.name || "N/A"}
+                            </Link>
+                          ) : (
+                            "N/A"
+                          ),
+                        })),
+                        selectedIds: new Set(),
+                        availableColumns: tableColumns,
+                      }}
+                      paginationConfig={{
+                        type: "server-side",
+                        totalItems: totalItems,
+                        page: page,
+                        rowsPerPage: rowsPerPage,
+                        onPageChange: handlePageChange,
+                        onRowsPerPageChange: handleRowsPerPageChange,
+                      }}
+                      onRowClick={handleRowClick}
+                      onColumnsChange={handleColumnsChange}
+                      isLoading={tableLoading}
+                      onSearch={handleSearch}
+                    />
+                  </Card>
 
+                </Grid>
+                <Grid item xs={3}>
+                  <CardActiveAccount data={selectedActivation?.active_contacts || []} />
+                </Grid>
+              </Grid>
+            </Box>
             {selectedActivation && (
               <Box sx={{ mt: 4 }}>
-                <Box sx={{ mb: 4, overflowX: "auto", width: "100%" }}>
-                  <Box sx={{ minWidth: "600px" }}>
-                    <ProspectingEffortTimeline
+                <Card
+                  sx={{
+                    borderRadius: '20px',
+                    boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
+                    paddingX: 4,
+                    paddingY: 2,
+                    marginX: 'auto',
+                    marginBottom: 4,
+                    paddingBottom: 4
+                  }}
+                >
+                  <Box sx={{ overflowX: "auto", width: "100%" }}>
+                    <Box sx={{ minWidth: "600px" }}>
+                      <TimeLine tasks={selectedActivation.tasks} />
+                      {/* <ProspectingEffortTimeline
                       efforts={selectedActivation.prospecting_effort}
-                    />
+                    /> */}
+                    </Box>
                   </Box>
-                </Box>
-                <ProspectingMetadataOverview
+                </Card>
+                <Grid container spacing={2}>
+                  <Grid item xs={6}>
+                    <Card
+                      sx={{
+                        borderRadius: '20px',
+                        boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
+                        paddingX: 4,
+                        paddingTop: 4,
+                        marginX: 'auto',
+                        marginBottom: 4,
+                      }}
+                    >
+                      <Box sx={{ overflowX: "auto", width: "100%" }}>
+                        <Box sx={{ minWidth: "200px", height: "250px" }}>
+                          <SummaryBarChartCard
+                            direction='vertical'
+                            title='Effort'
+                            target={5}
+                            data={mockData}
+                          />
+                        </Box>
+                      </Box>
+                    </Card>
+
+                  </Grid>
+                  <Grid item xs={6}>
+                    <Card
+                      sx={{
+                        borderRadius: '20px',
+                        boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
+                        paddingX: 4,
+                        paddingTop: 4,
+                        marginX: 'auto',
+                        marginBottom: 4,
+                      }}
+                    >
+                      <Box sx={{ overflowX: "auto", width: "100%" }}>
+                        <Box sx={{ minWidth: "200px", height: "250px" }}>
+                          <SummaryBarChartCard
+                            direction='vertical'
+                            title='Outcomes'
+                            target={5}
+                            data={mockData}
+                          />
+                        </Box>
+                      </Box>
+                    </Card>
+
+                  </Grid>
+                </Grid>
+
+                {/* <ProspectingMetadataOverview
                   activation={selectedActivation}
                   instanceUrl={instanceUrl}
-                />
+                /> */}
               </Box>
             )}
           </>
