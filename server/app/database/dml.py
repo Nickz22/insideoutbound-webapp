@@ -262,6 +262,7 @@ def save_session(token_data: TokenData, is_sandbox: bool, extra_state: dict = {}
         token_dict = token_data
     else:
         token_dict = token_data.to_dict()
+    
     session_token = str(uuid4())
     salesforce_id = token_dict.get("id").split("/")[-1]
     org_id = token_dict.get("id").split("/")[-2]
