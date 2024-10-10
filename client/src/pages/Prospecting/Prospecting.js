@@ -381,8 +381,6 @@ const Prospecting = () => {
   const [selectedActivation, setSelectedActivation] = useState(null);
 
   const handleRowClick = (activation) => {
-    console.log("This log is for development only. To see your choosen account");
-    console.log(activation);
     setSelectedActivation(activation);
   };
 
@@ -653,7 +651,7 @@ const Prospecting = () => {
                 >
                   <Box sx={{ overflowX: "auto", width: "100%" }}>
                     <Box sx={{ minWidth: "600px" }}>
-                      <TimeLine />
+                      <TimeLine tasks={selectedActivation.tasks} />
                       {/* <ProspectingEffortTimeline
                       efforts={selectedActivation.prospecting_effort}
                     /> */}

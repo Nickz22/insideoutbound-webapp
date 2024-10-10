@@ -1,37 +1,49 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Typography, Box } from '@mui/material';
 import { AccessTime, Call, Message, Event, BusinessCenter } from '@mui/icons-material';
 
 // Function to map icon names to actual icons
 const getIcon = (iconName, color) => {
   switch (iconName) {
-    case 'message':
+    case 'Message':
       return <Message sx={{ color, marginLeft: "-100%" }} />;
-    case 'call':
+    case 'Dial':
       return <Call sx={{ color, marginLeft: "-100%" }} />;
-    case 'meeting':
+    case 'Meeting':
       return <Event sx={{ color, marginLeft: "-100%" }} />;
-    case 'opportunity':
+    case 'Opportunity':
       return <BusinessCenter sx={{ color, marginLeft: "-100%" }} />;
     default:
       return <AccessTime sx={{ color, marginLeft: "-100%" }} />;
   }
 };
 
-const MyTimelineComponent = () => {
+const MyTimelineComponent = ({ tasks }) => {
   // Sample data
-  const data = [
-    { icon: "message", date: "11/02", color: "#DD4040", format: "top" },
-    { icon: "call", date: "11/05", color: "#DD4040", format: "top" },
-    { icon: "meeting", date: "11/07", color: "#DD4040", format: "top", line: '6px solid grey', label: "Activated" },
-    { icon: "opportunity", date: "11/09", color: "#DD4040", format: "top" },
-    { icon: "call", date: "11/13", color: "#7AAD67", format: "top", line: '6px solid grey', label: "Engaged" },
-    { icon: "meeting", date: "11/14", color: "#7AAD67", format: "top" },
-    { icon: "message", date: "11/17", color: "#7AAD67", format: "top" },
-    { icon: "opportunity", date: "11/19", color: "#FF7D2F", format: "top", line: '6px solid grey', label: "Opportunity" },
-    { icon: "", date: "11/24", color: "#533AF3", format: "top", },
+  const [text, setText] = useState('')
+  const [data, setData] = useState([])
+  const [page, setPage] = useState(1)
+  const [maxPage, setMaxPage] = useState(1)
 
-  ];
+  useEffect(() => {
+    let array = tasks.map((e, index) => {
+      const date = new Date(e.CreatedDate);
+      const day = String(date.getDate()).padStart(2, '0');
+      const month = String(date.getMonth() + 1).padStart(2, '0'); // Months are zero-indexed
+      const formattedDate = `${day}/${month}`;
+      let format = 'top'
+      let color = '#7AAD67'
+      let icon = e.Subject
+      if (e.Priority === "Priority") color = '#DD4040'
+      let obj = { id: index, icon, date: formattedDate, color, format }
+      return obj
+    })
+    setText(array[0].date + ' - ' + array[array.length - 1].date)
+    let maxPage = Math.ceil(array.length / 10)
+    setPage(maxPage)
+    setMaxPage(maxPage)
+    setData(array)
+  }, [])
 
   return (
     <div>
@@ -55,21 +67,45 @@ const MyTimelineComponent = () => {
         paddingBottom: 4,
         color: "#4C4C4C"
       }}>
-        [Date] - [Date]
+        {text}
       </Typography>
       <Box display="flex" justifyContent="center" alignItems="center">
         {/* Header */}
-        <Box display="flex" alignItems="center" pb={6} mb={2} mx={2} height="80px">
-          <svg xmlns="http://www.w3.org/2000/svg" width="23" height="50" viewBox="0 0 23 50" fill="none">
-            <path d="M22 1L1 25.5L22 49.5" stroke="#4C4C4C" />
-          </svg>
-          <Typography sx={{ color: "#533AF3", marginLeft: '8px' }}>Previous<br />30 days</Typography>
-        </Box>
+
+        {
+          page > 1 && (
+            <Box sx={{ cursor: 'pointer' }} onClick={() => setPage(page - 1)} display="flex" alignItems="center" pb={6} mb={2} mx={2} height="80px">
+              <svg xmlns="http://www.w3.org/2000/svg" width="23" height="50" viewBox="0 0 23 50" fill="none">
+                <path d="M22 1L1 25.5L22 49.5" stroke="#4C4C4C" />
+              </svg>
+              <Typography sx={{ color: "#533AF3", marginLeft: '8px', cursor: 'pointer' }}>Previous</Typography>
+            </Box>
+          )
+        }
 
         {/* Timeline */}
         <Box display="flex" flexGrow="1" alignItems="center" justifyContent="center">
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            position="relative"
+            justifyContent="center"
+            sx={{ height: 200 }}
+          >
+            <Box
+              sx={{
+                height: '50px',
+                marginTop: '34px',
+                marginBottom: '8px',
+                borderTop: '4px solid gray',
+                width: '100px'
+              }}
+            />
+          </Box>
+
           {
-            data.map((el, index) => (
+            data.filter((e, i) => i > (page - 1) * 10 && i <= page * 10).map((el, index) => (
               <Box
                 key={index}
                 display="flex"
@@ -110,13 +146,23 @@ const MyTimelineComponent = () => {
                   )
                 }
                 {/* Date Below Icon */}
-                <Typography variant="caption" align='center' sx={{ textAlign: 'center', marginLeft: "-100%", marginTop: '8px', position: 'absolute', bottom: 0 }}>{el.line ? <b style={{ color: "gray" }}>{el.label}<br /></b> : <></>} {el.date}</Typography>
+                <Typography variant="caption" align='center' sx={{ textAlign: 'center', marginLeft: "-100%", marginTop: '8px', position: 'absolute', bottom: 0 }}>{el.line ? <b style={{ color: "gray" }}>{el.label}<br /></b> : <></>} {el.date} {el.id}</Typography>
               </Box>
             ))
           }
         </Box>
+        {
+          page < maxPage && (
+            <Box sx={{ cursor: 'pointer' }} onClick={() => setPage(page + 1)} display="flex" alignItems="center" pb={6} mb={2} mx={2} height="80px">
+              <svg xmlns="http://www.w3.org/2000/svg" width="23" height="50" viewBox="0 0 23 50" fill="none">
+                <path d="M22 1L1 25.5L22 49.5" stroke="#4C4C4C" transform="rotate(180 11.5 25)" />
+              </svg>
+              <Typography sx={{ color: "#533AF3", marginLeft: '8px', cursor: 'pointer' }}>Next</Typography>
+            </Box>
+          )
+        }
       </Box>
-    </div>
+    </div >
   );
 };
 
