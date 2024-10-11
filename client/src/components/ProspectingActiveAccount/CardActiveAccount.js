@@ -1,15 +1,25 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, Typography, Divider, Box } from '@mui/material';
 
 const ActivatedContacts = ({ data }) => {
-  const contacts = [
-    { name: 'Contact Name 1', status: 'Activated', activities: 4 },
-    { name: 'Contact Name 2', status: 'Engaged', activities: 2 },
-    { name: 'Contact Name 3', status: 'Activated', activities: 0 },
-    { name: 'Contact Name 4', status: 'Activated', activities: 4 },
-    { name: 'Contact Name 5', status: 'Engaged', activities: 2 },
-    { name: 'Contact Name 6', status: 'Activated', activities: 0 },
-  ];
+  const [contacts, setContacts] = useState([])
+  useEffect(() => {
+    if (data) {
+      let raw = data.active_contacts.map(e => {
+        let { id, first_name, last_name } = e
+        let len = data.tasks.filter(el => el.Contact.id === id)
+        let obj = {
+          id,
+          name: first_name + " " + last_name,
+          total: len.length,
+          data: len,
+          status: len[len.length - 1].Status
+        }
+        return obj
+      })
+      setContacts(raw)
+    }
+  }, [data])
 
   return (
     <Card
@@ -38,26 +48,26 @@ const ActivatedContacts = ({ data }) => {
           Activated Contacts
         </Typography>
 
-        {data.map(({ first_name, last_name }, index) => (
+        {contacts.map((el, index) => (
           <Box key={index}>
             <Typography
               variant="body1"
               align="center"
               sx={{ fontWeight: 700, color: '#FF6F00' }}
             >
-              {first_name} {last_name}
+              {el.name}
             </Typography>
             <Box display="flex" justifyContent="space-between" mt={1}>
               <Box display="flex" flexDirection="column" justifyItems="center">
                 <Typography variant="caption" align="center" >STATUS:</Typography>
                 <Typography variant="body2" fontWeight="600" align="center">
-                  Activated
+                  {el.status}
                 </Typography>
               </Box>
               <Box display="flex" flexDirection="column" justifyItems="center">
                 <Typography variant="caption" align="center">TOTAL ACTIVITIES:</Typography>
                 <Typography variant="body2" fontWeight="600" align="center">
-                  3
+                  {el.total}
                 </Typography>
               </Box>
             </Box>

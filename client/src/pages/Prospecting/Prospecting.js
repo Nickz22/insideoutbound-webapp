@@ -13,7 +13,6 @@ import {
   FormControl,
   IconButton,
   Tooltip,
-  Link,
   Typography,
   Switch,
   styled,
@@ -21,7 +20,6 @@ import {
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "../../components/DataFilter/DataFilter";
-import { tableColumns } from "./tableColumns";
 import {
   fetchProspectingActivities,
   getInstanceUrl,
@@ -30,21 +28,17 @@ import {
   getUserTimezone,
   getPaginatedProspectingActivities,
 } from "src/components/Api/Api";
-import CustomTable from "../../components/CustomTable/CustomTable";
-// import ProspectingMetadataOverview from "../../components/ProspectingMetadataOverview/ProspectingMetadataOverview";
-// import ProspectingEffortTimeline from "../../components/ProspectingEffortTimeline/ProspectingEffortTimeline";
+import AccountDetail from "../../components/ProspectingActiveAccount/AccountDetail"
 import CustomSelect from "src/components/CustomSelect/CustomSelect";
-import CardActiveAccount from "../../components/ProspectingActiveAccount/CardActiveAccount";
 /**
  * @typedef {import('types').Activation} Activation
  */
-import SummaryBarChartCard from "src/components/SummaryCard/SummaryBarChartCard";
 import FreeTrialExpired from "../../components/FreeTrialExpired/FreeTrialExpired";
 import ProspectingSummary from "./ProspectingSummary";
 import LoadingComponent from "../../components/LoadingComponent/LoadingComponent";
 import FreeTrialRibbon from "../../components/FreeTrialRibbon/FreeTrialRibbon";
 import { debounce } from "lodash"; // Make sure to import lodash or use a custom debounce function
-import TimeLine from "src/components/ProspectingActiveAccount/TimeLine";
+import SelectedAccount from "src/components/ProspectingActiveAccount/SelectedAccount";
 
 const AntSwitch = styled(Switch)(({ theme }) => ({
   width: 28,
@@ -104,34 +98,21 @@ const Prospecting = () => {
   const [rawData, setRawData] = useState([]);
   const inFlightRef = useRef(false);
   const navigate = useNavigate();
-
   const [dataFilter, setDataFilter] = useState(null);
   const [originalRawData, setOriginalRawData] = useState([]);
-  const [columnShows, setColumnShows] = useState(
-    localStorage.getItem("activationColumnShow")
-      ? JSON.parse(localStorage.getItem("activationColumnShow"))
-      : tableColumns
-  );
-
   const [loggedInUser, setLoggedInUser] = useState(null);
   const [userLoading, setUserLoading] = useState(true);
   const [userError, setUserError] = useState(null);
-
   const [instanceUrl, setInstanceUrl] = useState("");
   const [urlLoading, setUrlLoading] = useState(true);
   const [urlError, setUrlError] = useState(null);
-
   const [userTimezone, setUserTimezone] = useState("");
-
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [totalItems, setTotalItems] = useState(0);
   const [detailedActivationData, setDetailedActivationData] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortColumn, setSortColumn] = useState("");
-  /** @type {["asc" | "desc" | undefined, Function]} */
-  const [sortOrder, setSortOrder] = useState("asc");
 
   useEffect(() => {
     async function fetchUserAndInstanceUrl() {
@@ -287,13 +268,7 @@ const Prospecting = () => {
   }, [originalRawData, dataFilter]);
 
   const fetchPaginatedData = useCallback(
-    async (
-      newPage,
-      newRowsPerPage,
-      newSearchTerm,
-      newSortColumn,
-      newSortOrder
-    ) => {
+    async (newPage, newRowsPerPage, newSearchTerm) => {
       setTableLoading(true);
       try {
         const filteredIds = filteredData.map((item) => item.id);
@@ -301,9 +276,7 @@ const Prospecting = () => {
           filteredIds,
           newPage,
           newRowsPerPage,
-          newSearchTerm,
-          newSortColumn,
-          newSortOrder
+          newSearchTerm
         );
         if (response.statusCode === 200 && response.success) {
           setDetailedActivationData(response.data[0].raw_data || []);
@@ -316,7 +289,7 @@ const Prospecting = () => {
       } catch (err) {
         setError(`An error occurred while fetching data: ${err.message}`);
         console.error("Error details:", err);
-        throw err;
+        throw err; // Add this line to ensure the error is propagated
       } finally {
         setTableLoading(false);
       }
@@ -337,13 +310,7 @@ const Prospecting = () => {
 
   useEffect(() => {
     if (filteredData.length > 0) {
-      debouncedFetchPaginatedData(
-        page,
-        rowsPerPage,
-        searchTerm,
-        sortColumn,
-        sortOrder
-      );
+      debouncedFetchPaginatedData(page, rowsPerPage, searchTerm);
     }
   }, [
     debouncedFetchPaginatedData,
@@ -351,8 +318,6 @@ const Prospecting = () => {
     rowsPerPage,
     filteredData,
     searchTerm,
-    sortColumn,
-    sortOrder,
   ]);
 
   const handlePageChange = (newPage, newRowsPerPage) => {
@@ -381,11 +346,6 @@ const Prospecting = () => {
 
   const handleRowClick = (activation) => {
     setSelectedActivation(activation);
-  };
-
-  const handleColumnsChange = (newColumns) => {
-    setColumnShows(newColumns);
-    localStorage.setItem("activationColumnShow", JSON.stringify(newColumns));
   };
 
   useEffect(() => {
@@ -424,14 +384,7 @@ const Prospecting = () => {
   const handleSearch = (newSearchTerm) => {
     setSearchTerm(newSearchTerm);
     setPage(0); // Reset to first page when searching
-    fetchPaginatedData(0, rowsPerPage, newSearchTerm, sortColumn, sortOrder);
-  };
-
-  const handleSort = (columnId, order) => {
-    setSortColumn(columnId);
-    setSortOrder(order);
-    setPage(0); // Reset to first page when sorting
-    fetchPaginatedData(0, rowsPerPage, searchTerm, columnId, order);
+    fetchPaginatedData(0, rowsPerPage, newSearchTerm);
   };
 
   if (loading || summaryLoading || userLoading || urlLoading) {
@@ -481,13 +434,7 @@ const Prospecting = () => {
           }}
         >
           <DataFilter onFilter={handleDataFilter} rawData={rawData} />
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: "24px",
-            }}
-          >
+          <Box sx={{ display: "flex", alignItems: "center", gap: "24px" }}>
             <FormControl
               variant="outlined"
               size="small"
@@ -568,86 +515,17 @@ const Prospecting = () => {
             </Tooltip>
           </Box>
         </Box>
-
         {error ? (
           <Alert severity="error">{error}</Alert>
         ) : isSummary && !summaryLoading ? (
           <ProspectingSummary period={period} summaryData={summaryData} />
         ) : (
           <>
-            <CustomTable
-              tableData={{
-                columns: columnShows,
-                data: detailedActivationData.map((item) => ({
-                  ...item,
-                  "account.name": (
-                    <Link
-                      href={`${instanceUrl}/${item.account?.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.account?.name || "N/A"}
-                    </Link>
-                  ),
-                  "opportunity.name": item.opportunity ? (
-                    <Link
-                      href={`${instanceUrl}/${item.opportunity.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.opportunity.name || "N/A"}
-                    </Link>
-                  ) : (
-                    "N/A"
-                  ),
-                })),
-                selectedIds: new Set(),
-                availableColumns: tableColumns,
-              }}
-              paginationConfig={{
-                type: "server-side",
-                totalItems: totalItems,
-                page: page,
-                rowsPerPage: rowsPerPage,
-                onPageChange: handlePageChange,
-                onRowsPerPageChange: handleRowsPerPageChange,
-              }}
-              sortConfig={{
-                columnId: sortColumn,
-                order: sortOrder,
-                onSort: handleSort,
-              }}
-              onRowClick={handleRowClick}
-              onColumnsChange={handleColumnsChange}
-              isLoading={tableLoading}
-              onSearch={handleSearch}
-            />
-
-            {selectedActivation && (
-              <Box sx={{ mt: 4 }}>
-                <Box
-                  sx={{
-                    mb: 4,
-                    overflowX: "auto",
-                    width: "100%",
-                  }}
-                >
-                  <Box sx={{ minWidth: "600px" }}>
-                    <ProspectingEffortTimeline
-                      efforts={selectedActivation.prospecting_effort}
-                    />
-                  </Box>
-                </Box>
-                <ProspectingMetadataOverview
-                  activation={selectedActivation}
-                  instanceUrl={instanceUrl}
-                />
-              </Box>
-            )}
+            <AccountDetail detailedActivationData={detailedActivationData} instanceUrl={instanceUrl} totalItems={totalItems} page={page} rowsPerPage={rowsPerPage} handlePageChange={handlePageChange} handleRowsPerPageChange={handleRowsPerPageChange} handleRowClick={handleRowClick} tableLoading={tableLoading} handleSearch={handleSearch} selectedActivation={selectedActivation} />
+            {selectedActivation && (<SelectedAccount selectedActivation={selectedActivation} />)}
           </>
         )}
       </Box>
-
       {loggedInUser?.status === "not paid" && freeTrialDaysLeft > 0 && (
         <FreeTrialRibbon daysLeft={freeTrialDaysLeft} />
       )}

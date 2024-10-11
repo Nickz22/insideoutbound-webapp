@@ -39,7 +39,7 @@ const MyTimelineComponent = ({ tasks }) => {
       return obj
     })
     setText(array[0].date + ' - ' + array[array.length - 1].date)
-    let maxPage = Math.ceil(array.length / 10)
+    let maxPage = Math.ceil(array.length / 8)
     setPage(maxPage)
     setMaxPage(maxPage)
     setData(array)
@@ -71,20 +71,22 @@ const MyTimelineComponent = ({ tasks }) => {
       </Typography>
       <Box display="flex" justifyContent="center" alignItems="center">
         {/* Header */}
+        <Box width="120px">
+          {
+            page > 1 && (
+              <Box sx={{ cursor: 'pointer' }} onClick={() => setPage(page - 1)} display="flex" alignItems="center" pb={6} mb={2} mx={2} height="80px">
+                <svg xmlns="http://www.w3.org/2000/svg" width="23" height="50" viewBox="0 0 23 50" fill="none">
+                  <path d="M22 1L1 25.5L22 49.5" stroke="#4C4C4C" />
+                </svg>
+                <Typography sx={{ color: "#533AF3", marginLeft: '8px', cursor: 'pointer' }}>Previous</Typography>
+              </Box>
+            )
+          }
+        </Box>
 
-        {
-          page > 1 && (
-            <Box sx={{ cursor: 'pointer' }} onClick={() => setPage(page - 1)} display="flex" alignItems="center" pb={6} mb={2} mx={2} height="80px">
-              <svg xmlns="http://www.w3.org/2000/svg" width="23" height="50" viewBox="0 0 23 50" fill="none">
-                <path d="M22 1L1 25.5L22 49.5" stroke="#4C4C4C" />
-              </svg>
-              <Typography sx={{ color: "#533AF3", marginLeft: '8px', cursor: 'pointer' }}>Previous</Typography>
-            </Box>
-          )
-        }
 
         {/* Timeline */}
-        <Box display="flex" flexGrow="1" alignItems="center" justifyContent="center">
+        <Box sx={{ marginX: '20px' }} display="flex" flexGrow="1" alignItems="center" justifyContent="start">
           <Box
             display="flex"
             flexDirection="column"
@@ -99,13 +101,13 @@ const MyTimelineComponent = ({ tasks }) => {
                 marginTop: '34px',
                 marginBottom: '8px',
                 borderTop: '4px solid gray',
-                width: '100px'
+                width: '90px'
               }}
             />
           </Box>
 
           {
-            data.filter((e, i) => i > (page - 1) * 10 && i <= page * 10).map((el, index) => (
+            data.filter((e, i) => i > (page - 1) * 8 && i <= page * 8).map((el, index) => (
               <Box
                 key={index}
                 display="flex"
@@ -124,7 +126,7 @@ const MyTimelineComponent = ({ tasks }) => {
                         marginTop: '64px',               // Adjust spacing between icon and dashed line
                         marginBottom: '8px',            // Adjust spacing at the bottom
                         borderTop: '4px solid gray',
-                        width: '100px'
+                        width: '90px'
                       }}
                     />
                   )
@@ -139,28 +141,31 @@ const MyTimelineComponent = ({ tasks }) => {
                         marginTop: '8px',               // Adjust spacing between icon and dashed line
                         marginBottom: '98px',            // Adjust spacing at the bottom
                         borderBottom: '4px solid gray',
-                        width: '100px'
+                        width: '90px'
 
                       }}
                     />
                   )
                 }
                 {/* Date Below Icon */}
-                <Typography variant="caption" align='center' sx={{ textAlign: 'center', marginLeft: "-100%", marginTop: '8px', position: 'absolute', bottom: 0 }}>{el.line ? <b style={{ color: "gray" }}>{el.label}<br /></b> : <></>} {el.date} {el.id}</Typography>
+                <Typography variant="caption" align='center' sx={{ textAlign: 'center', marginLeft: "-100%", marginTop: '8px', position: 'absolute', bottom: 0 }}>{el.line ? <b style={{ color: "gray" }}>{el.label}<br /></b> : <></>} {el.date}</Typography>
               </Box>
             ))
           }
         </Box>
-        {
-          page < maxPage && (
-            <Box sx={{ cursor: 'pointer' }} onClick={() => setPage(page + 1)} display="flex" alignItems="center" pb={6} mb={2} mx={2} height="80px">
-              <svg xmlns="http://www.w3.org/2000/svg" width="23" height="50" viewBox="0 0 23 50" fill="none">
-                <path d="M22 1L1 25.5L22 49.5" stroke="#4C4C4C" transform="rotate(180 11.5 25)" />
-              </svg>
-              <Typography sx={{ color: "#533AF3", marginLeft: '8px', cursor: 'pointer' }}>Next</Typography>
-            </Box>
-          )
-        }
+        <Box width="120px">
+          {
+            page < maxPage && (
+              <Box sx={{ cursor: 'pointer' }} onClick={() => setPage(page + 1)} display="flex" alignItems="center" gap="10px" pb={6} mb={2} mx={2} height="80px">
+                <Typography sx={{ color: "#533AF3", marginLeft: '8px', cursor: 'pointer' }}>Next</Typography>
+                <svg xmlns="http://www.w3.org/2000/svg" width="23" height="50" viewBox="0 0 23 50" fill="none">
+                  <path d="M22 1L1 25.5L22 49.5" stroke="#4C4C4C" transform="rotate(180 11.5 25)" />
+                </svg>
+              </Box>
+            )
+          }
+        </Box>
+
       </Box>
     </div >
   );
