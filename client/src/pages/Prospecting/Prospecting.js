@@ -18,8 +18,6 @@ import {
   Switch,
   styled,
   Stack,
-  Grid,
-  Card
 } from "@mui/material";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import DataFilter from "../../components/DataFilter/DataFilter";
@@ -36,11 +34,11 @@ import CustomTable from "../../components/CustomTable/CustomTable";
 // import ProspectingMetadataOverview from "../../components/ProspectingMetadataOverview/ProspectingMetadataOverview";
 // import ProspectingEffortTimeline from "../../components/ProspectingEffortTimeline/ProspectingEffortTimeline";
 import CustomSelect from "src/components/CustomSelect/CustomSelect";
-import CardActiveAccount from "../../components/ProspectingActiveAccount/CardActiveAccount"
+import CardActiveAccount from "../../components/ProspectingActiveAccount/CardActiveAccount";
 /**
  * @typedef {import('types').Activation} Activation
  */
-import SummaryBarChartCard from 'src/components/SummaryCard/SummaryBarChartCard'
+import SummaryBarChartCard from "src/components/SummaryCard/SummaryBarChartCard";
 import FreeTrialExpired from "../../components/FreeTrialExpired/FreeTrialExpired";
 import ProspectingSummary from "./ProspectingSummary";
 import LoadingComponent from "../../components/LoadingComponent/LoadingComponent";
@@ -131,24 +129,9 @@ const Prospecting = () => {
   const [detailedActivationData, setDetailedActivationData] = useState([]);
   const [tableLoading, setTableLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const mockData = [
-    {
-      label: "User 1",
-      value: 6
-    },
-    {
-      label: "User 2",
-      value: 4
-    },
-    {
-      label: "User 3",
-      value: 7
-    },
-    {
-      label: "User 4",
-      value: 2
-    }
-  ]
+  const [sortColumn, setSortColumn] = useState("");
+  /** @type {["asc" | "desc" | undefined, Function]} */
+  const [sortOrder, setSortOrder] = useState("asc");
 
   useEffect(() => {
     async function fetchUserAndInstanceUrl() {
@@ -304,7 +287,13 @@ const Prospecting = () => {
   }, [originalRawData, dataFilter]);
 
   const fetchPaginatedData = useCallback(
-    async (newPage, newRowsPerPage, newSearchTerm) => {
+    async (
+      newPage,
+      newRowsPerPage,
+      newSearchTerm,
+      newSortColumn,
+      newSortOrder
+    ) => {
       setTableLoading(true);
       try {
         const filteredIds = filteredData.map((item) => item.id);
@@ -312,7 +301,9 @@ const Prospecting = () => {
           filteredIds,
           newPage,
           newRowsPerPage,
-          newSearchTerm
+          newSearchTerm,
+          newSortColumn,
+          newSortOrder
         );
         if (response.statusCode === 200 && response.success) {
           setDetailedActivationData(response.data[0].raw_data || []);
@@ -325,7 +316,7 @@ const Prospecting = () => {
       } catch (err) {
         setError(`An error occurred while fetching data: ${err.message}`);
         console.error("Error details:", err);
-        throw err; // Add this line to ensure the error is propagated
+        throw err;
       } finally {
         setTableLoading(false);
       }
@@ -346,7 +337,13 @@ const Prospecting = () => {
 
   useEffect(() => {
     if (filteredData.length > 0) {
-      debouncedFetchPaginatedData(page, rowsPerPage, searchTerm);
+      debouncedFetchPaginatedData(
+        page,
+        rowsPerPage,
+        searchTerm,
+        sortColumn,
+        sortOrder
+      );
     }
   }, [
     debouncedFetchPaginatedData,
@@ -354,6 +351,8 @@ const Prospecting = () => {
     rowsPerPage,
     filteredData,
     searchTerm,
+    sortColumn,
+    sortOrder,
   ]);
 
   const handlePageChange = (newPage, newRowsPerPage) => {
@@ -425,7 +424,14 @@ const Prospecting = () => {
   const handleSearch = (newSearchTerm) => {
     setSearchTerm(newSearchTerm);
     setPage(0); // Reset to first page when searching
-    fetchPaginatedData(0, rowsPerPage, newSearchTerm);
+    fetchPaginatedData(0, rowsPerPage, newSearchTerm, sortColumn, sortOrder);
+  };
+
+  const handleSort = (columnId, order) => {
+    setSortColumn(columnId);
+    setSortOrder(order);
+    setPage(0); // Reset to first page when sorting
+    fetchPaginatedData(0, rowsPerPage, searchTerm, columnId, order);
   };
 
   if (loading || summaryLoading || userLoading || urlLoading) {
@@ -475,7 +481,13 @@ const Prospecting = () => {
           }}
         >
           <DataFilter onFilter={handleDataFilter} rawData={rawData} />
-          <Box sx={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: "24px",
+            }}
+          >
             <FormControl
               variant="outlined"
               size="small"
@@ -563,156 +575,73 @@ const Prospecting = () => {
           <ProspectingSummary period={period} summaryData={summaryData} />
         ) : (
           <>
-            <Box sx={{ flexGrow: 1, marginTop: 5 }}>
-              <Grid container spacing={2}>
-                <Grid item xs={9}>
-                  <Card
-                    sx={{
-                      borderRadius: '20px',
-                      boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
-                      paddingX: 4,
-                      paddingY: 2,
-                      margin: 'auto',
-                    }}
-                  >
-                    <Typography variant="h2" align="center" sx={{
-                      fontFamily: 'Albert Sans',
-                      fontWeight: 700,
-                      fontSize: '24px',
-                      lineHeight: '22.32px',
-                      letterSpacing: '-3%',
-                      paddingTop: 2,
-                      paddingBottom: 1
-                    }}>
-                      Active Accounts List
-                    </Typography>
-                    <CustomTable
-                      tableData={{
-                        columns: columnShows,
-                        data: detailedActivationData.map((item) => ({
-                          ...item,
-                          "account.name": (
-                            <Link
-                              href={`${instanceUrl}/${item.account?.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {item.account?.name || "N/A"}
-                            </Link>
-                          ),
-                          "opportunity.name": item.opportunity ? (
-                            <Link
-                              href={`${instanceUrl}/${item.opportunity.id}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                            >
-                              {item.opportunity.name || "N/A"}
-                            </Link>
-                          ) : (
-                            "N/A"
-                          ),
-                        })),
-                        selectedIds: new Set(),
-                        availableColumns: tableColumns,
-                      }}
-                      paginationConfig={{
-                        type: "server-side",
-                        totalItems: totalItems,
-                        page: page,
-                        rowsPerPage: rowsPerPage,
-                        onPageChange: handlePageChange,
-                        onRowsPerPageChange: handleRowsPerPageChange,
-                      }}
-                      onRowClick={handleRowClick}
-                      onColumnsChange={handleColumnsChange}
-                      isLoading={tableLoading}
-                      onSearch={handleSearch}
-                    />
-                  </Card>
+            <CustomTable
+              tableData={{
+                columns: columnShows,
+                data: detailedActivationData.map((item) => ({
+                  ...item,
+                  "account.name": (
+                    <Link
+                      href={`${instanceUrl}/${item.account?.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.account?.name || "N/A"}
+                    </Link>
+                  ),
+                  "opportunity.name": item.opportunity ? (
+                    <Link
+                      href={`${instanceUrl}/${item.opportunity.id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {item.opportunity.name || "N/A"}
+                    </Link>
+                  ) : (
+                    "N/A"
+                  ),
+                })),
+                selectedIds: new Set(),
+                availableColumns: tableColumns,
+              }}
+              paginationConfig={{
+                type: "server-side",
+                totalItems: totalItems,
+                page: page,
+                rowsPerPage: rowsPerPage,
+                onPageChange: handlePageChange,
+                onRowsPerPageChange: handleRowsPerPageChange,
+              }}
+              sortConfig={{
+                columnId: sortColumn,
+                order: sortOrder,
+                onSort: handleSort,
+              }}
+              onRowClick={handleRowClick}
+              onColumnsChange={handleColumnsChange}
+              isLoading={tableLoading}
+              onSearch={handleSearch}
+            />
 
-                </Grid>
-                <Grid item xs={3}>
-                  <CardActiveAccount data={selectedActivation?.active_contacts || []} />
-                </Grid>
-              </Grid>
-            </Box>
             {selectedActivation && (
               <Box sx={{ mt: 4 }}>
-                <Card
+                <Box
                   sx={{
-                    borderRadius: '20px',
-                    boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
-                    paddingX: 4,
-                    paddingY: 2,
-                    marginX: 'auto',
-                    marginBottom: 4,
-                    paddingBottom: 4
+                    mb: 4,
+                    overflowX: "auto",
+                    width: "100%",
                   }}
                 >
-                  <Box sx={{ overflowX: "auto", width: "100%" }}>
-                    <Box sx={{ minWidth: "600px" }}>
-                      <TimeLine tasks={selectedActivation.tasks} />
-                      {/* <ProspectingEffortTimeline
+                  <Box sx={{ minWidth: "600px" }}>
+                    <ProspectingEffortTimeline
                       efforts={selectedActivation.prospecting_effort}
-                    /> */}
-                    </Box>
+                    />
                   </Box>
-                </Card>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Card
-                      sx={{
-                        borderRadius: '20px',
-                        boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
-                        paddingX: 4,
-                        paddingTop: 4,
-                        marginX: 'auto',
-                        marginBottom: 4,
-                      }}
-                    >
-                      <Box sx={{ overflowX: "auto", width: "100%" }}>
-                        <Box sx={{ minWidth: "200px", height: "250px" }}>
-                          <SummaryBarChartCard
-                            direction='vertical'
-                            title='Effort'
-                            target={5}
-                            data={mockData}
-                          />
-                        </Box>
-                      </Box>
-                    </Card>
-
-                  </Grid>
-                  <Grid item xs={6}>
-                    <Card
-                      sx={{
-                        borderRadius: '20px',
-                        boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
-                        paddingX: 4,
-                        paddingTop: 4,
-                        marginX: 'auto',
-                        marginBottom: 4,
-                      }}
-                    >
-                      <Box sx={{ overflowX: "auto", width: "100%" }}>
-                        <Box sx={{ minWidth: "200px", height: "250px" }}>
-                          <SummaryBarChartCard
-                            direction='vertical'
-                            title='Outcomes'
-                            target={5}
-                            data={mockData}
-                          />
-                        </Box>
-                      </Box>
-                    </Card>
-
-                  </Grid>
-                </Grid>
-
-                {/* <ProspectingMetadataOverview
+                </Box>
+                <ProspectingMetadataOverview
                   activation={selectedActivation}
                   instanceUrl={instanceUrl}
-                /> */}
+                />
               </Box>
             )}
           </>

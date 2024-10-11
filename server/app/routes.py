@@ -5,7 +5,6 @@ from app.middleware import authenticate
 from app.utils import format_error_message, log_error
 from app.database.activation_selector import (
     load_active_activations_minimal_by_ids,
-    load_active_activations_order_by_first_prospecting_activity_asc,
     load_activations_by_period,
     load_active_activations_paginated_by_ids,
     load_active_activations_paginated_with_search,
@@ -42,6 +41,7 @@ from config import Config
 from app.database.supabase_connection import (
     get_supabase_admin_client,
     get_session_state,
+    set_session_state,
 )
 from app.database.session_selector import (
     fetch_supabase_session,
@@ -49,8 +49,7 @@ from app.database.session_selector import (
 )
 import stripe
 import asyncio
-from datetime import datetime
-from app.data_models import TokenData
+from app.data_models import TokenData, SessionState
 import logging
 
 stripe.api_key = Config.STRIPE_SECRET_KEY
@@ -309,14 +308,21 @@ def get_paginated_prospecting_activities():
         page = data.get("page", 0)
         rows_per_page = data.get("rowsPerPage", 10)
         search_term = data.get("searchTerm", "")
+        sort_column = data.get("sortColumn", "")
+        sort_order = data.get("sortOrder", "asc")
 
         if search_term:
             result = load_active_activations_paginated_with_search(
-                page, rows_per_page, activation_ids, search_term
+                page,
+                rows_per_page,
+                activation_ids,
+                search_term,
+                sort_column,
+                sort_order,
             )
         else:
             result = load_active_activations_paginated_by_ids(
-                page, rows_per_page, activation_ids
+                page, rows_per_page, activation_ids, sort_column, sort_order
             )
 
         if result.success:
@@ -765,25 +771,35 @@ def admin_login():
 
         # Refresh the access token
         refresh_response = refresh_access_token(refresh_token, is_sandbox)
-        if not refresh_response.success:
+        if refresh_response.success:
+            new_token_data: TokenData = refresh_response.data[0]
+            new_session_token = save_session(new_token_data, is_sandbox)
+            return jsonify({"success": True, "session_token": new_session_token}), 200
+        else:
             logging.error(f"Failed to refresh token: {refresh_response.message}")
-            if refresh_response.error_details:
-                logging.error(f"Error details: {refresh_response.error_details}")
-            return (
-                jsonify(
-                    {
-                        "error": "Failed to refresh access token. Please try logging in again."
-                    }
-                ),
-                401,
-            )
-
-        new_token_data: TokenData = refresh_response.data[0]
-
-        # Save the new session
-        new_session_token = save_session(new_token_data, is_sandbox)
-
-        return jsonify({"success": True, "session_token": new_session_token}), 200
+            access_token = state_dict.get("access_token")
+            if access_token:
+                set_session_state(
+                    SessionState(
+                        salesforce_id=state_dict.get("salesforce_id"),
+                        access_token=access_token,
+                        refresh_token=refresh_token,
+                        instance_url=state_dict.get("instance_url"),
+                        org_id=state_dict.get("org_id"),
+                        is_sandbox=is_sandbox,
+                        username=state_dict.get("username"),
+                    ).to_dict()
+                )
+                user = fetch_logged_in_salesforce_user()
+                if user.success:
+                    return (
+                        jsonify({"success": True, "session_token": session.get("id")}),
+                        200,
+                    )
+                else:
+                    return jsonify({"error": user.message}), 401
+            else:
+                return jsonify({"error": "No access token available"}), 401
     else:
         return jsonify({"error": response.message}), 404
 

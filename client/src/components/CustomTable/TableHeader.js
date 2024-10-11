@@ -7,6 +7,19 @@ import {
   Tooltip,
 } from "@mui/material";
 
+/**
+ * @typedef {import('types').TableColumn} TableColumn
+ */
+
+/**
+ * @param {{
+ *   columns: TableColumn[],
+ *   orderBy: string,
+ *   order: "asc" | "desc",
+ *   onSort: (columnId: string) => void,
+ *   onContextMenu: (event: React.MouseEvent<HTMLTableRowElement>) => void
+ * }} props
+ */
 const TableHeader = ({ columns, orderBy, order, onSort, onContextMenu }) => {
   return (
     <TableHead>

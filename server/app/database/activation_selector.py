@@ -166,54 +166,86 @@ def load_active_activations_minimal_by_ids(activation_ids: List[str]) -> ApiResp
         )
 
 
-## expects filter_ids to be sorted by first_prospecting_activity asc
 @retry_on_temporary_unavailable()
 def load_active_activations_paginated_by_ids(
-    page: int, rows_per_page: int, filter_ids: List[str]
+    page: int,
+    rows_per_page: int,
+    filter_ids: List[str],
+    sort_column: str,
+    sort_order: str,
 ) -> ApiResponse:
     supabase_client = get_supabase_admin_client()
     team_member_ids = get_salesforce_team_ids(load_settings())
 
     try:
-        
-        active_activation_ids = []
-        
-        for i in range(0, len(filter_ids), 250):
-            chunk = filter_ids[i:i+250]
-            query = (
-                supabase_client.table("Activations")
-                .select("id")
-                .in_("id", chunk)
-                .in_("activated_by_id", team_member_ids)
-                .neq("status", "Unresponsive")
-                .order("first_prospecting_activity", desc=False)
-            )
-            response = query.execute()
-            active_activation_ids.extend([row["id"] for row in response.data])
-        
-        total_count = len(active_activation_ids)
-        
-        # Apply pagination to the active_activation_ids
-        start = page * rows_per_page
-        end = start + rows_per_page
-        paginated_ids = active_activation_ids[start:end]
+        # Create a set of filter_ids for faster lookup
+        filter_id_set = set(filter_ids)
 
-        activations = []
-        
-        # query the Active activations with the paginated_ids
-        query = (
+        # Build the query to get sorted IDs
+        id_query = (
             supabase_client.table("Activations")
-            .select("*")
-            .in_("id", paginated_ids)
+            .select("id")
             .in_("activated_by_id", team_member_ids)
             .neq("status", "Unresponsive")
-            .order("first_prospecting_activity", desc=False)
         )
-        response = query.execute()
-        activations = [supabase_dict_to_python_activation(row) for row in response.data]
+
+        # Add sorting
+        if sort_column:
+            if "." in sort_column:
+                json_field, json_key = sort_column.split(".")
+                id_query = id_query.order(
+                    f"{json_field}->>{json_key}", desc=(sort_order.lower() == "desc")
+                )
+            else:
+                id_query = id_query.order(
+                    sort_column, desc=(sort_order.lower() == "desc")
+                )
+        else:
+            id_query = id_query.order("first_prospecting_activity", desc=False)
+
+        # Execute the ID query
+        id_response = id_query.execute()
+
+        # Filter and paginate IDs
+        filtered_ids = [
+            row["id"] for row in id_response.data if row["id"] in filter_id_set
+        ]
+        total_count = len(filtered_ids)
+        start = page * rows_per_page
+        end = start + rows_per_page
+        paginated_ids = filtered_ids[start:end]
+
+        # Fetch full data for paginated IDs
+        if paginated_ids:
+            data_query = (
+                supabase_client.table("Activations")
+                .select("*")
+                .in_("id", paginated_ids)
+            )
+            if sort_column:
+                if "." in sort_column:
+                    json_field, json_key = sort_column.split(".")
+                    data_query = data_query.order(
+                        f"{json_field}->>{json_key}",
+                        desc=(sort_order.lower() == "desc"),
+                    )
+                else:
+                    data_query = data_query.order(
+                        sort_column, desc=(sort_order.lower() == "desc")
+                    )
+            else:
+                data_query = data_query.order("first_prospecting_activity", desc=False)
+
+            data_response = data_query.execute()
+            paginated_activations = [
+                supabase_dict_to_python_activation(row) for row in data_response.data
+            ]
+        else:
+            paginated_activations = []
 
         return ApiResponse(
-            data={"activations": activations, "total_count": total_count}, success=True
+            data={"activations": paginated_activations, "total_count": total_count},
+            success=True,
         )
     except Exception as e:
         error_msg = format_error_message(e)
@@ -225,52 +257,86 @@ def load_active_activations_paginated_by_ids(
 
 @retry_on_temporary_unavailable()
 def load_active_activations_paginated_with_search(
-    page: int, rows_per_page: int, filter_ids: List[str], search_term: str
+    page: int,
+    rows_per_page: int,
+    filter_ids: List[str],
+    search_term: str,
+    sort_column: str,
+    sort_order: str,
 ) -> ApiResponse:
     supabase_client = get_supabase_admin_client()
     team_member_ids = get_salesforce_team_ids(load_settings())
 
     try:
-        # Initial query to get all matching IDs
-        all_matching_ids = []
-        for i in range(0, len(filter_ids), 100):
-            batch = filter_ids[i : i + 100]
-            query = (
-                supabase_client.table("Activations")
-                .select("id")
-                .in_("id", batch)
-                .in_("activated_by_id", team_member_ids)
-                .neq("status", "Unresponsive")
-                .ilike("account->>name", f"%{search_term}%")
-                .order("first_prospecting_activity", desc=False)
-            )
-            response = query.execute()
-            all_matching_ids.extend([row["id"] for row in response.data])
+        # Create a set of filter_ids for faster lookup
+        filter_id_set = set(filter_ids)
 
-        total_count = len(all_matching_ids)
-
-        # Slice the IDs based on pagination
-        start_index = page * rows_per_page
-        end_index = start_index + rows_per_page
-        paginated_ids = all_matching_ids[start_index:end_index]
-
-        # Full query for the paginated IDs
-        full_query = (
+        # Build the query to get sorted and searched IDs
+        id_query = (
             supabase_client.table("Activations")
-            .select("*")
-            .in_("id", paginated_ids)
-            .order("first_prospecting_activity", desc=False)
+            .select("id")
+            .in_("activated_by_id", team_member_ids)
+            .neq("status", "Unresponsive")
+            .ilike("account->>name", f"%{search_term}%")
         )
-        response = full_query.execute()
 
-        activations = [supabase_dict_to_python_activation(row) for row in response.data]
+        # Add sorting
+        if sort_column:
+            if "." in sort_column:
+                json_field, json_key = sort_column.split(".")
+                id_query = id_query.order(
+                    f"{json_field}->>{json_key}", desc=(sort_order.lower() == "desc")
+                )
+            else:
+                id_query = id_query.order(
+                    sort_column, desc=(sort_order.lower() == "desc")
+                )
+        else:
+            id_query = id_query.order("first_prospecting_activity", desc=False)
 
-        logging.debug(
-            f"Query response: data_length={len(activations)}, total_count={total_count}"
-        )
+        # Execute the ID query
+        id_response = id_query.execute()
+
+        # Filter and paginate IDs
+        filtered_ids = [
+            row["id"] for row in id_response.data if row["id"] in filter_id_set
+        ]
+        total_count = len(filtered_ids)
+        start = page * rows_per_page
+        end = start + rows_per_page
+        paginated_ids = filtered_ids[start:end]
+
+        # Fetch full data for paginated IDs
+        if paginated_ids:
+            data_query = (
+                supabase_client.table("Activations")
+                .select("*")
+                .in_("id", paginated_ids)
+            )
+            if sort_column:
+                if "." in sort_column:
+                    json_field, json_key = sort_column.split(".")
+                    data_query = data_query.order(
+                        f"{json_field}->>{json_key}",
+                        desc=(sort_order.lower() == "desc"),
+                    )
+                else:
+                    data_query = data_query.order(
+                        sort_column, desc=(sort_order.lower() == "desc")
+                    )
+            else:
+                data_query = data_query.order("first_prospecting_activity", desc=False)
+
+            data_response = data_query.execute()
+            paginated_activations = [
+                supabase_dict_to_python_activation(row) for row in data_response.data
+            ]
+        else:
+            paginated_activations = []
 
         return ApiResponse(
-            data={"activations": activations, "total_count": total_count}, success=True
+            data={"activations": paginated_activations, "total_count": total_count},
+            success=True,
         )
     except Exception as e:
         error_msg = format_error_message(e)
