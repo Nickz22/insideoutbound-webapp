@@ -1,7 +1,7 @@
 import time
 from functools import wraps
 
-def retry_on_temporary_unavailable(max_retries=3, delay=0.5):
+def retry_on_temporary_unavailable(max_retries=5, delay=1):
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
