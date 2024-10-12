@@ -1,7 +1,7 @@
 from typing import Dict, List
 from datetime import datetime, date, timedelta
 from collections import defaultdict
-from app.data_models import Activation
+from app.data_models import Activation, Settings
 from app.utils import (
     parse_datetime_string_with_timezone,
     add_days,
@@ -169,8 +169,7 @@ def generate_summary(activations: list[Activation]) -> dict:
     )
     summary["avg_outbound_activities_to_inbound_response"] = (
         round(
-            total_prospecting_activities_engagement
-            / summary["engaged_activations"],
+            total_prospecting_activities_engagement / summary["engaged_activations"],
             2,
         )
         if summary["engaged_activations"] > 0
@@ -758,3 +757,62 @@ def get_inbound_tasks_within_period(inbound_tasks, start_date, period_days):
         for task in inbound_tasks
         if is_model_date_field_within_window(task, start_date, period_days)
     ]
+
+
+def get_prospecting_metadata_direction(
+    task_id: str, activation: Activation, settings: Settings
+) -> str:
+    for metadata in activation.prospecting_metadata:
+        if task_id in metadata.task_ids:
+            for criterion in settings.criteria:
+                if criterion.name == metadata.name:
+                    return (
+                        criterion.direction or "outbound"
+                    )  # Default to outbound if direction is not specified
+    return "matching_criteria_not_found"
+
+def set_effort_and_results_by_full_user_name(
+    activations: List[Activation], settings: Settings
+) -> List[Activation]:
+    for activation in activations:
+        outbound_metadata = defaultdict(lambda: defaultdict(list))
+        inbound_metadata = defaultdict(lambda: defaultdict(list))
+
+        for task in activation.tasks:
+            direction = get_prospecting_metadata_direction(
+                task["Id"], activation, settings
+            )
+            metadata_dict = (
+                outbound_metadata if direction.lower() == "outbound" else inbound_metadata
+            )
+
+            owner_id = task["OwnerId"]
+            criterion_name = next(
+                (
+                    m.name
+                    for m in activation.prospecting_metadata
+                    if task["Id"] in m.task_ids
+                ),
+                None,
+            )
+
+            if criterion_name:
+                metadata_dict[owner_id][criterion_name].append(task["Id"])
+
+        activation.outbound_prospecting_metadata_by_user = {
+            owner_id: [
+                ProspectingMetadata(name=name, task_ids=set(ids), total=len(ids))
+                for name, ids in criteria.items()
+            ]
+            for owner_id, criteria in outbound_metadata.items()
+        }
+
+        activation.inbound_prospecting_metadata_by_user = {
+            owner_id: [
+                ProspectingMetadata(name=name, task_ids=set(ids), total=len(ids))
+                for name, ids in criteria.items()
+            ]
+            for owner_id, criteria in inbound_metadata.items()
+        }
+
+    return activations

@@ -13,7 +13,7 @@ from app.log_config import setup_logger
 logger = setup_logger(__name__)
 
 
-def get_salesforce_team_ids(settings: Settings):
+def get_salesforce_team_ids(settings: Settings = None) -> list[str]:
     team_member_ids = [settings.salesforce_user_id]
     if settings.team_member_ids:
         team_member_ids.extend(settings.team_member_ids)
