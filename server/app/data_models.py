@@ -219,7 +219,9 @@ class Activation(SerializableModel):
     last_outbound_engagement: Optional[date] = None
     opportunity: Optional[Opportunity] = None
     status: StatusEnum = Field(default=StatusEnum.activated)
-
+    outbound_prospecting_metadata_by_user: Optional[Dict[str, List[ProspectingMetadata]]] = None
+    inbound_prospecting_metadata_by_user: Optional[Dict[str, List[ProspectingMetadata]]] = None
+    
     def __init__(self, **data):
         if "activated_by" in data and isinstance(data["activated_by"], UserModel):
             data["activated_by_id"] = data["activated_by"].id
