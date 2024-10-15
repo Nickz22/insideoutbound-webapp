@@ -954,8 +954,6 @@ def _construct_condition(filter_obj):
 
     if filter_obj.data_type == "string" and (operator == "LIKE" or operator == "NOT LIKE"):
         value = f" '%{value}%'"
-    elif filter_obj.data_type == "string" and operator == "NOT LIKE":
-        value = f" '%{value}%'"
     elif filter_obj.data_type == "string":
         value = f"'{value}'"
     elif filter_obj.data_type == "date" or filter_obj.data_type == "number":
