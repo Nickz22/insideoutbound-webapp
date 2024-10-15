@@ -24,6 +24,7 @@ export const FILTER_OPERATOR_MAPPING = {
     contains: "LIKE",
     equals: "=",
     "not equals": "!=",
+    "does not contain": "NOT LIKE",
   },
   int: {
     equals: "=",
