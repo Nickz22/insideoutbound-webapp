@@ -952,15 +952,15 @@ def _construct_condition(filter_obj):
 
     operator = _map_operator(filter_obj.operator, filter_obj.data_type)
 
-    if filter_obj.data_type == "string" and operator == "LIKE":
-        value = f" '%{value}%'"
-    elif filter_obj.data_type == "string" and operator == "NOT LIKE":
+    if filter_obj.data_type == "string" and (operator == "LIKE" or operator == "NOT LIKE"):
         value = f" '%{value}%'"
     elif filter_obj.data_type == "string":
         value = f"'{value}'"
     elif filter_obj.data_type == "date" or filter_obj.data_type == "number":
         value = f"{value}"
-
+        
+    if operator == 'NOT LIKE':
+        return f"NOT {field} LIKE{value}"
     return f"{field} {operator}{value}"
 
 
