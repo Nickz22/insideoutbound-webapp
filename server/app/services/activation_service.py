@@ -588,7 +588,7 @@ async def compute_activated_accounts(
                     period_days=settings.tracking_period,
                 )
 
-                # if the task is not in the tracking period, but was created before the start of the tracking period, 
+                # if the task is not in the tracking period, but was created before the start of the tracking period,
                 # let's proceed until we find a task that is in the tracking period
                 if (
                     not is_task_in_tracking_period
@@ -612,11 +612,6 @@ async def compute_activated_accounts(
                 if is_task_in_tracking_period:
                     if task.get("WhoId") not in valid_task_ids_by_who_id:
                         valid_task_ids_by_who_id[task.get("WhoId")] = []
-                        account_first_prospecting_activity = (
-                            parse_datetime_string_with_timezone(
-                                task.get("CreatedDate")
-                            ).date()
-                        )
                     valid_task_ids_by_who_id[task.get("WhoId")].append(task.get("Id"))
                     last_valid_task_assignee_id = task.get("OwnerId")
                     task_ids.append(task.get("Id"))
@@ -654,7 +649,6 @@ async def compute_activated_accounts(
                                 )
                             )
                             valid_task_ids_by_who_id.clear()
-                            account_first_prospecting_activity = None
                             task_ids.clear()
                             if is_model_date_field_within_window(
                                 task, start_tracking_period, settings.tracking_period
@@ -662,11 +656,6 @@ async def compute_activated_accounts(
                                 valid_task_ids_by_who_id[task.get("WhoId")] = [
                                     task.get("Id")
                                 ]
-                                account_first_prospecting_activity = (
-                                    parse_datetime_string_with_timezone(
-                                        task.get("CreatedDate")
-                                    ).date()
-                                )
                                 task_ids = [task.get("Id")]
                                 last_valid_task_assignee_id = task.get("OwnerId")
                             continue
@@ -704,8 +693,15 @@ async def compute_activated_accounts(
                                     f"Warning: No valid Salesforce user found for account {account_id}"
                                 )
                         if last_valid_task_assignee_id in salesforce_user_by_id:
+                            outbound_tasks_in_tracking_period = [
+                                task
+                                for task in all_outbound_tasks_under_account
+                                if task["Id"] in task_ids
+                            ]
                             activation = create_activation(
-                                account_first_prospecting_activity=account_first_prospecting_activity,
+                                account_first_prospecting_activity=parse_datetime_string_with_timezone(
+                                    outbound_tasks_in_tracking_period[0]["CreatedDate"]
+                                ).date(),
                                 active_contact_ids=active_contact_ids,
                                 last_valid_task_creator=salesforce_user_by_id.get(
                                     last_valid_task_assignee_id
@@ -715,11 +711,7 @@ async def compute_activated_accounts(
                                 qualifying_event=qualifying_event,
                                 task_ids_by_criteria_name=task_ids_by_criteria_name,
                                 settings=settings,
-                                all_tasks_under_account=[
-                                    task
-                                    for task in all_tasks_under_account
-                                    if task["Id"] in task_ids
-                                ],
+                                outbound_tasks_under_account=outbound_tasks_in_tracking_period,
                                 engaged_date=engaged_date,
                             )
                             activations.append(activation)
@@ -730,7 +722,6 @@ async def compute_activated_accounts(
                                 + settings.inactivity_threshold,
                             )
                             valid_task_ids_by_who_id.clear()
-                            account_first_prospecting_activity = None
                             task_ids.clear()
                     except Exception as e:
                         set_context(
@@ -790,8 +781,15 @@ async def compute_activated_accounts(
                     else None
                 )
                 try:
+                    outbound_tasks_in_tracking_period = [
+                        task
+                        for task in all_outbound_tasks_under_account
+                        if task["Id"] in task_ids
+                    ]
                     activation = create_activation(
-                        account_first_prospecting_activity=account_first_prospecting_activity,
+                        account_first_prospecting_activity=parse_datetime_string_with_timezone(
+                            outbound_tasks_in_tracking_period[0]["CreatedDate"]
+                        ).date(),
                         active_contact_ids=active_contact_ids,
                         last_valid_task_creator=salesforce_user_by_id.get(
                             last_valid_task_assignee_id
@@ -801,11 +799,7 @@ async def compute_activated_accounts(
                         qualifying_event=qualifying_event,
                         task_ids_by_criteria_name=task_ids_by_criteria_name,
                         settings=settings,
-                        all_tasks_under_account=[
-                            task
-                            for task in all_tasks_under_account
-                            if task["Id"] in task_ids
-                        ],
+                        outbound_tasks_under_account=outbound_tasks_in_tracking_period,
                         engaged_date=engaged_date,
                     )
                     activations.append(activation)

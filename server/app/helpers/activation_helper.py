@@ -314,12 +314,12 @@ def create_activation(
     qualifying_event,
     task_ids_by_criteria_name,
     settings,
-    all_tasks_under_account,
+    outbound_tasks_under_account,
     engaged_date,
 ):
     today = date.today()
     last_prospecting_activity = parse_datetime_string_with_timezone(
-        all_tasks_under_account[-1]["CreatedDate"]
+        outbound_tasks_under_account[-1]["CreatedDate"]
     ).date()
     # Determine the activated_date based on the activation condition
     if qualifying_opportunity:
@@ -335,12 +335,12 @@ def create_activation(
         activating_task = next(
             (
                 task
-                for task in reversed(all_tasks_under_account)
+                for task in reversed(outbound_tasks_under_account)
                 if task["Id"] in outbound_task_ids
                 and len(
                     [
                         t
-                        for t in all_tasks_under_account
+                        for t in outbound_tasks_under_account
                         if t["CreatedDate"] <= task["CreatedDate"]
                         and t["Id"] in outbound_task_ids
                     ]
@@ -367,13 +367,13 @@ def create_activation(
 
     contact_by_id = {
         task["Contact"].id: task["Contact"]
-        for task in all_tasks_under_account
+        for task in outbound_tasks_under_account
         if task["Contact"]
     }
 
     activation = Activation(
         id=generate_unique_id(),
-        account=all_tasks_under_account[0]["Account"],
+        account=outbound_tasks_under_account[0]["Account"],
         # activated_date=activated_date,
         activated_date=account_first_prospecting_activity,
         days_activated=(today - account_first_prospecting_activity).days,
@@ -395,12 +395,12 @@ def create_activation(
         ),
         event_ids=[qualifying_event["Id"]] if qualifying_event else None,
         task_ids=outbound_task_ids,
-        tasks=all_tasks_under_account,  # Add this line
+        tasks=outbound_tasks_under_account,  # Add this line
         status=activation_status,
         prospecting_metadata=create_prospecting_metadata(
             task_ids=outbound_task_ids,
             task_ids_by_criteria_name=task_ids_by_criteria_name,
-            all_tasks_under_account=all_tasks_under_account,
+            all_tasks_under_account=outbound_tasks_under_account,
         ),
     )
 
@@ -412,7 +412,7 @@ def create_activation(
 
     activation.prospecting_effort = create_prospecting_efforts(
         activation,
-        all_tasks_under_account,
+        outbound_tasks_under_account,
         outbound_task_ids,
         task_ids_by_criteria_name,
         qualifying_opportunity,
