@@ -5,6 +5,7 @@ import sentry_sdk
 from sentry_sdk.integrations.flask import FlaskIntegration
 import asyncio
 import os
+from .utils import log_message
 
 SERVER_URL = os.getenv("SERVER_URL", "http://localhost:8000")
 REACT_APP_URL = os.getenv("REACT_APP_URL", "http://localhost:3000")
@@ -13,7 +14,7 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 def create_app():
     app = Flask(__name__)
-
+    log_message("App initialized")
     if os.environ.get("FLASK_ENV") != "testing":
         sentry_sdk.init(
             integrations=[FlaskIntegration()],
