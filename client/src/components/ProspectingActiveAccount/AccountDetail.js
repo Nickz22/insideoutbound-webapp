@@ -1,11 +1,24 @@
-import { Box, Card, Grid, Typography } from "@mui/material"
-import CustomTable from "../CustomTable/CustomTable"
-import CardActiveAccount from "./CardActiveAccount"
-import { Link } from "react-router-dom"
+import { Box, Card, Grid, Typography } from "@mui/material";
+import CustomTable from "../CustomTable/CustomTable";
+import CardActiveAccount from "./CardActiveAccount";
+import { Link } from "react-router-dom";
 import { tableColumns } from "../../pages/Prospecting/tableColumns";
 import { useState } from "react";
 
-const AccountDetail = ({ detailedActivationData, instanceUrl, totalItems, page, rowsPerPage, handlePageChange, handleRowsPerPageChange, handleRowClick, tableLoading, handleSearch, selectedActivation }) => {
+const AccountDetail = ({
+  sortConfig,
+  detailedActivationData,
+  instanceUrl,
+  totalItems,
+  page,
+  rowsPerPage,
+  handlePageChange,
+  handleRowsPerPageChange,
+  handleRowClick,
+  tableLoading,
+  handleSearch,
+  selectedActivation,
+}) => {
   const [columnShows, setColumnShows] = useState(
     localStorage.getItem("activationColumnShow")
       ? JSON.parse(localStorage.getItem("activationColumnShow"))
@@ -23,22 +36,26 @@ const AccountDetail = ({ detailedActivationData, instanceUrl, totalItems, page, 
         <Grid item xs={9}>
           <Card
             sx={{
-              borderRadius: '20px',
-              boxShadow: '0px 0px 25px rgba(0, 0, 0, 0.1)',
+              borderRadius: "20px",
+              boxShadow: "0px 0px 25px rgba(0, 0, 0, 0.1)",
               paddingX: 4,
               paddingY: 2,
-              margin: 'auto',
+              margin: "auto",
             }}
           >
-            <Typography variant="h2" align="center" sx={{
-              fontFamily: 'Albert Sans',
-              fontWeight: 700,
-              fontSize: '24px',
-              lineHeight: '22.32px',
-              letterSpacing: '-3%',
-              paddingTop: 2,
-              paddingBottom: 1
-            }}>
+            <Typography
+              variant="h2"
+              align="center"
+              sx={{
+                fontFamily: "Albert Sans",
+                fontWeight: 700,
+                fontSize: "24px",
+                lineHeight: "22.32px",
+                letterSpacing: "-3%",
+                paddingTop: 2,
+                paddingBottom: 1,
+              }}
+            >
               Active Accounts List
             </Typography>
             <CustomTable
@@ -70,6 +87,7 @@ const AccountDetail = ({ detailedActivationData, instanceUrl, totalItems, page, 
                 selectedIds: new Set(),
                 availableColumns: tableColumns,
               }}
+              sortConfig={sortConfig}
               paginationConfig={{
                 type: "server-side",
                 totalItems: totalItems,
@@ -90,8 +108,7 @@ const AccountDetail = ({ detailedActivationData, instanceUrl, totalItems, page, 
         </Grid>
       </Grid>
     </Box>
-  )
-}
+  );
+};
 
-
-export default AccountDetail
+export default AccountDetail;
