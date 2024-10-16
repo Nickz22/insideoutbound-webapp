@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { Typography, Box } from "@mui/material";
+import { useEffect, useState } from "react";
+import { Typography, Box, Tooltip } from "@mui/material";
 import {
   AccessTime,
   Call,
@@ -9,46 +9,136 @@ import {
 } from "@mui/icons-material";
 
 // Function to map icon names to actual icons
-const getIcon = (iconName, color) => {
+const getIcon = (iconName, color, total) => {
+  let title = `${total} ${iconName}`;
   switch (iconName) {
     case "Message":
-      return <Message sx={{ color, marginLeft: "-100%" }} />;
+      return (
+        <Tooltip title={title} placement="right-start">
+          <Message sx={{ color, marginLeft: "-100%", background: "white" }} />
+        </Tooltip>
+      );
     case "Dial":
-      return <Call sx={{ color, marginLeft: "-100%" }} />;
+      return (
+        <Tooltip title={title} placement="right-start">
+          <Call sx={{ color, marginLeft: "-100%", background: "white" }} />
+        </Tooltip>
+      );
     case "Meeting":
-      return <Event sx={{ color, marginLeft: "-100%" }} />;
+      return (
+        <Tooltip title={title} placement="right-start">
+          <Event sx={{ color, marginLeft: "-100%", background: "white" }} />
+        </Tooltip>
+      );
     case "Opportunity":
-      return <BusinessCenter sx={{ color, marginLeft: "-100%" }} />;
+      return (
+        <Tooltip title={title} placement="right-start">
+          <BusinessCenter
+            sx={{ color, marginLeft: "-100%", background: "white" }}
+          />
+        </Tooltip>
+      );
     default:
-      return <AccessTime sx={{ color, marginLeft: "-100%" }} />;
+      return (
+        <Tooltip title={title} placement="right-start">
+          <AccessTime
+            sx={{ color, marginLeft: "-100%", background: "white" }}
+          />
+        </Tooltip>
+      );
   }
 };
 
+// Helper function to format the date
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-indexed
+  return `${day}/${month}/${year}`;
+};
+
+// Helper function to generate all dates for the past month
+function generateDatesForLastMonth() {
+  const now = new Date();
+  const oneMonthAgo = new Date();
+  oneMonthAgo.setDate(now.getDate() - 30); // Set the date 30 days ago
+
+  const dates = [];
+  let currentDate = new Date(oneMonthAgo);
+
+  while (currentDate <= now) {
+    dates.push(formatDate(currentDate));
+    currentDate.setDate(currentDate.getDate() + 1); // Move to the next day
+  }
+
+  return dates;
+}
+
 const MyTimelineComponent = ({ tasks }) => {
-  // Sample data
   const [text, setText] = useState("");
   const [data, setData] = useState([]);
   const [page, setPage] = useState(1);
   const [maxPage, setMaxPage] = useState(1);
 
   useEffect(() => {
-    let array = tasks.map((e, index) => {
-      const date = new Date(e.CreatedDate);
-      const day = String(date.getDate()).padStart(2, "0");
-      const month = String(date.getMonth() + 1).padStart(2, "0"); // Months are zero-indexed
-      const formattedDate = `${day}/${month}`;
-      let format = "top";
-      let color = "#7AAD67";
-      let icon = e.Subject;
-      if (e.Priority === "Priority") color = "#DD4040";
-      let obj = { id: index, icon, date: formattedDate, color, format };
-      return obj;
+    const allDates = generateDatesForLastMonth();
+
+    const result = allDates.map((formattedDate) => {
+      // Find tasks for the current date
+      const tasksForDate = tasks.filter(
+        (task) => formatDate(new Date(task.CreatedDate)) === formattedDate
+      );
+
+      if (tasksForDate.length > 0) {
+        // There are tasks for this date, process them as before
+        const detail = [];
+        let total = 0;
+        let icons = [];
+        let color = "#7AAD67"; // Default color
+
+        tasksForDate.forEach((task) => {
+          const icon = task.Subject;
+          total++;
+          color = task.Priority === "Priority" ? "#DD4040" : "#7AAD67"; // Set color based on Priority
+
+          const detailEntry = detail.find((d) => d[0] === icon);
+          if (detailEntry) {
+            detailEntry[1]++;
+          } else {
+            detail.push([icon, 1]);
+            icons.push(icon);
+          }
+        });
+
+        return {
+          total,
+          detail,
+          icons,
+          date: formattedDate,
+          color,
+          format: "top",
+        };
+      } else {
+        // No tasks for this date
+        return {
+          total: 0,
+          detail: [],
+          icons: [],
+          date: formattedDate,
+          color: "#7AAD67", // Default color
+          format: "top",
+        };
+      }
     });
-    setText(array[0].date + " - " + array[array.length - 1].date);
-    let maxPage = Math.ceil(array.length / 8);
+
+    // Update the state
+    setData(result);
+    setText(`${result[0].date} - ${result[result.length - 1].date}`);
+
+    const maxPage = Math.ceil(result.length / 8);
     setPage(maxPage);
     setMaxPage(maxPage);
-    setData(array);
   }, [tasks]);
 
   return (
@@ -121,7 +211,7 @@ const MyTimelineComponent = ({ tasks }) => {
           display="flex"
           flexGrow="1"
           alignItems="center"
-          justifyContent="start"
+          justifyContent="center"
         >
           <Box
             display="flex"
@@ -143,7 +233,7 @@ const MyTimelineComponent = ({ tasks }) => {
           </Box>
 
           {data
-            .filter((e, i) => i > (page - 1) * 8 && i <= page * 8)
+            .filter((e, i) => i >= (page - 1) * 8 && i <= page * 8)
             .map((el, index) => (
               <Box
                 key={index}
@@ -154,24 +244,21 @@ const MyTimelineComponent = ({ tasks }) => {
                 justifyContent="center"
                 sx={{ height: 200 }}
               >
-                {el.format == "bottom" && index < data.length && (
-                  <Box
-                    sx={{
-                      borderLeft: el.line || "1px dashed gray", // Dashed line between icons
-                      height: "50px", // Adjust height of the dashed line
-                      marginTop: "64px", // Adjust spacing between icon and dashed line
-                      marginBottom: "8px", // Adjust spacing at the bottom
-                      borderTop: "4px solid gray",
-                      width: "90px",
-                    }}
-                  />
-                )}
-                {getIcon(el.icon, el.color)}
+                <Box
+                  height="25px"
+                  position="absolute"
+                  top="0"
+                  left="15%"
+                  display="flex"
+                  flexDirection="column"
+                >
+                  {el.detail.map((e) => getIcon(e[0], el.color, e[1]))}
+                </Box>
                 {el.format == "top" && index < data.length && (
                   <Box
                     sx={{
                       borderLeft: el.line || "1px dashed gray", // Dashed line between icons
-                      height: "50px", // Adjust height of the dashed line
+                      height: "74px", // Adjust height of the dashed line
                       marginTop: "8px", // Adjust spacing between icon and dashed line
                       marginBottom: "98px", // Adjust spacing at the bottom
                       borderBottom: "4px solid gray",
