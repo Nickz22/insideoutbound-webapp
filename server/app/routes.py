@@ -2,7 +2,7 @@ import requests, json
 from flask import Blueprint, jsonify, redirect, request
 from urllib.parse import unquote
 from app.middleware import authenticate
-from app.utils import format_error_message, log_error
+from app.utils import format_error_message, log_error, get_salesforce_team_ids
 from app.database.activation_selector import (
     load_active_activations_minimal_by_ids,
     load_activations_by_period,
@@ -23,7 +23,10 @@ from app.mapper.mapper import (
     convert_settings_model_to_settings,
     convert_settings_to_settings_model,
 )
-from app.helpers.activation_helper import generate_summary
+from app.helpers.activation_helper import (
+    generate_summary,
+    set_effort_and_results_by_full_user_name,
+)
 from app.services.setting_service import define_criteria_from_events_or_tasks
 from app.engine.activation_engine import update_activation_states
 from app.salesforce_api import (
@@ -326,11 +329,14 @@ def get_paginated_prospecting_activities():
             )
 
         if result.success:
+            full_activations = result.data["activations"]
+            full_activations = set_effort_and_results_by_full_user_name(
+                full_activations, load_settings()
+            )
             response.data = [
                 {
                     "raw_data": [
-                        activation.to_dict()
-                        for activation in result.data["activations"]
+                        activation.to_dict() for activation in full_activations
                     ],
                     "total_items": result.data["total_count"],
                 }
@@ -450,6 +456,24 @@ def get_salesforce_users():
         log_error(e)
         error_message = format_error_message(e)
         response.message = f"Failed to retrieve Salesforce users: {error_message}"
+
+    return jsonify(response.to_dict()), get_status_code(response)
+
+
+@bp.route("/get_salesforce_team", methods=["POST"])
+@authenticate
+def get_salesforce_team():
+    from app.data_models import ApiResponse
+
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        response = fetch_salesforce_users(get_salesforce_team_ids(load_settings()))
+    except Exception as e:
+        log_error(e)
+        error_message = format_error_message(e)
+        response.message = (
+            f"Failed to retrieve Salesforce users by IDs: {error_message}"
+        )
 
     return jsonify(response.to_dict()), get_status_code(response)
 
