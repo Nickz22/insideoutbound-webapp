@@ -155,7 +155,6 @@ const CustomTable = ({
     const newOrder = isAsc ? "desc" : "asc";
     setOrder(newOrder);
     setOrderBy(columnId);
-
     if (sortConfig?.onSort) {
       sortConfig.onSort(columnId, newOrder);
     }

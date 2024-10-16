@@ -1,7 +1,6 @@
 import { Box, Card, Grid, Typography } from "@mui/material";
 import CustomTable from "../CustomTable/CustomTable";
 import CardActiveAccount from "./CardActiveAccount";
-import { Link } from "react-router-dom";
 import { tableColumns } from "../../pages/Prospecting/tableColumns";
 import { useState } from "react";
 
@@ -61,29 +60,31 @@ const AccountDetail = ({
             <CustomTable
               tableData={{
                 columns: columnShows,
-                data: detailedActivationData.map((item) => ({
-                  ...item,
-                  "account.name": (
-                    <Link
-                      href={`${instanceUrl}/${item.account?.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.account?.name || "N/A"}
-                    </Link>
-                  ),
-                  "opportunity.name": item.opportunity ? (
-                    <Link
-                      href={`${instanceUrl}/${item.opportunity.id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {item.opportunity.name || "N/A"}
-                    </Link>
-                  ) : (
-                    "N/A"
-                  ),
-                })),
+                data: detailedActivationData.map((item) => {
+                  return {
+                    ...item,
+                    "account.name": (
+                      <a
+                        href={`${instanceUrl}/${item.account?.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {item.account?.name || "N/A"}
+                      </a>
+                    ),
+                    "opportunity.name": item.opportunity ? (
+                      <a
+                        href={`${instanceUrl}/${item.opportunity.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {item.opportunity.name || "N/A"}
+                      </a>
+                    ) : (
+                      "N/A"
+                    ),
+                  };
+                }),
                 selectedIds: new Set(),
                 availableColumns: tableColumns,
               }}
