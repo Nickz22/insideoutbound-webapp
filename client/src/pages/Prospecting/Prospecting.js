@@ -27,6 +27,7 @@ import {
   getLoggedInUser,
   getUserTimezone,
   getPaginatedProspectingActivities,
+  fetchProspectingActivityTypeGroupings
 } from "src/components/Api/Api";
 import AccountDetail from "../../components/ProspectingActiveAccount/AccountDetail";
 import CustomSelect from "src/components/CustomSelect/CustomSelect";
@@ -227,6 +228,8 @@ const Prospecting = () => {
         if (response.statusCode === 200 && response.success) {
           setSummaryData(response.data[0].summary);
           setRawData(response.data[0].raw_data || []);
+          const testPmGroup = await fetchProspectingActivityTypeGroupings(response.data[0].raw_data[0].id);
+          console.log(testPmGroup);
           setOriginalRawData(response.data[0].raw_data || []);
         } else if (response.statusCode === 401) {
           navigate("/");

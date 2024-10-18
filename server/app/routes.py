@@ -5,6 +5,7 @@ from app.middleware import authenticate
 from app.utils import format_error_message, log_error, get_salesforce_team_ids
 from app.database.activation_selector import (
     load_active_activations_minimal_by_ids,
+    load_single_activation_by_id,
     load_activations_by_period,
     load_active_activations_paginated_by_ids,
     load_active_activations_paginated_with_search,
@@ -25,7 +26,7 @@ from app.mapper.mapper import (
 )
 from app.helpers.activation_helper import (
     generate_summary,
-    set_effort_and_results_by_full_user_name,
+    fetch_prospecting_activity_type_groupings
 )
 from app.services.setting_service import define_criteria_from_events_or_tasks
 from app.engine.activation_engine import update_activation_states
@@ -330,9 +331,6 @@ def get_paginated_prospecting_activities():
 
         if result.success:
             full_activations = result.data["activations"]
-            full_activations = set_effort_and_results_by_full_user_name(
-                full_activations, load_settings()
-            )
             response.data = [
                 {
                     "raw_data": [
@@ -641,6 +639,24 @@ def get_event_fields():
         response.message = f"Failed to retrieve event fields: {format_error_message(e)}"
 
     return jsonify(response.__dict__), get_status_code(response)
+
+@bp.route("/get_prospecting_activity_type_groupings", methods=["GET"])
+@authenticate
+def get_prospecting_activity_type_groupings():
+    from app.data_models import ApiResponse
+    activation_id = request.args.get("activation_id")
+    response = ApiResponse(data=[], message="", success=False)
+    try:
+        activation = load_single_activation_by_id(activation_id)
+        if not activation.success:
+            raise Exception(activation.message)
+        response.data = fetch_prospecting_activity_type_groupings(activation.data[0])
+        response.success = True
+    except Exception as e:
+        log_error(e)
+        response.message = f"Failed to retrieve prospecting activity type groupings: {format_error_message(e)}"
+
+    return jsonify(response.to_dict()), get_status_code(response)
 
 
 @bp.route("/get_task_query_count", methods=["POST"])
