@@ -346,3 +346,27 @@ def load_active_activations_paginated_with_search(
         return ApiResponse(
             success=False, message=f"Failed to load activations: {str(error_msg)}"
         )
+
+def load_single_activation_by_id(activation_id: str) -> ApiResponse:
+    supabase_client = get_supabase_admin_client()
+
+    try:
+        response = (
+            supabase_client.table("Activations")
+            .select("*")
+            .eq("id", activation_id)
+            .limit(1)
+            .execute()
+        )
+        if response.data:
+            activation = supabase_dict_to_python_activation(response.data[0])
+            return ApiResponse(data=[activation], success=True)
+        else:
+            return ApiResponse(data=[], success=False, message="Activation not found")
+    except Exception as e:
+        error_msg = format_error_message(e)
+        logging.error(f"Error in load_single_activation_by_id: {error_msg}")
+        return ApiResponse(
+            success=False, message=f"Failed to load activation: {str(error_msg)}"
+        )
+    
