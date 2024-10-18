@@ -621,13 +621,19 @@ async def compute_activated_accounts(
                         active_contact_ids = get_active_contact_ids(
                             valid_task_ids_by_who_id, settings.activities_per_contact
                         )
-
-                        is_account_active_for_tracking_period = (
-                            len(active_contact_ids) >= settings.contacts_per_account
-                            or (qualifying_event and settings.activate_by_meeting)
-                            or (
-                                qualifying_opportunity
-                                and settings.activate_by_opportunity
+                        is_eligible_for_meeting_activation = (
+                            qualifying_event and settings.activate_by_meeting
+                        )
+                        is_eligible_for_opportunity_activation = (
+                            qualifying_opportunity and settings.activate_by_opportunity
+                        )
+                        is_account_active_for_tracking_period = len(
+                            active_contact_ids
+                        ) >= settings.contacts_per_account or (
+                            len(task_ids) > 0
+                            and (
+                                is_eligible_for_meeting_activation
+                                or is_eligible_for_opportunity_activation
                             )
                         )
                         if not is_account_active_for_tracking_period:
@@ -754,10 +760,20 @@ async def compute_activated_accounts(
                 settings.tracking_period,
             )
 
-            is_account_active_for_tracking_period = (
-                len(active_contact_ids) >= settings.contacts_per_account
-                or (qualifying_event and settings.activate_by_meeting)
-                or (qualifying_opportunity and settings.activate_by_opportunity)
+            is_eligible_for_meeting_activation = (
+                qualifying_event and settings.activate_by_meeting
+            )
+            is_eligible_for_opportunity_activation = (
+                qualifying_opportunity and settings.activate_by_opportunity
+            )
+            is_account_active_for_tracking_period = len(
+                active_contact_ids
+            ) >= settings.contacts_per_account or (
+                len(task_ids) > 0
+                and (
+                    is_eligible_for_meeting_activation
+                    or is_eligible_for_opportunity_activation
+                )
             )
             if is_account_active_for_tracking_period:
 
