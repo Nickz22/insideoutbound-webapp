@@ -7,6 +7,7 @@ FILTER_OPERATOR_MAPPING = {
         "not equals": "!=",
         "starts with": "LIKE",
         "ends with": "LIKE",
+        "does not contain": "NOT LIKE",
     },
     "number": {
         "equals": "=",
