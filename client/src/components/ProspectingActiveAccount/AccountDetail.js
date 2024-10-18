@@ -32,7 +32,7 @@ const AccountDetail = ({
   return (
     <Box sx={{ flexGrow: 1, marginTop: 5 }}>
       <Grid container spacing={2}>
-        <Grid item xs={9}>
+        <Grid item xs={selectedActivation ? 9 : 12}>
           <Card
             sx={{
               borderRadius: "20px",
@@ -104,9 +104,11 @@ const AccountDetail = ({
             />
           </Card>
         </Grid>
-        <Grid item xs={3}>
-          <CardActiveAccount data={selectedActivation} />
-        </Grid>
+        {selectedActivation && (
+          <Grid item xs={3}>
+            <CardActiveAccount data={selectedActivation} />
+          </Grid>
+        )}
       </Grid>
     </Box>
   );
