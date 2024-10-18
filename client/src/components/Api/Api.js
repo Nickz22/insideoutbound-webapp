@@ -318,6 +318,19 @@ export const fetchSalesforceTasksByUserIds = async (userIds) => {
 };
 
 /**
+ * Fetches the prospecting activity type groupings for a given activation
+ * @param {string} activationId
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchProspectingActivityTypeGroupings = async (activationId) => {
+    const response = await api.get("/get_prospecting_activity_type_groupings", {
+        params: { activation_id: activationId },
+        validateStatus: () => true,
+    });
+    return { ...response.data, statusCode: response.status };
+};
+
+/**
  * Fetches Salesforce events from the Salesforce API
  * @param {string[]} userIds
  * @returns {Promise<ApiResponse>}
