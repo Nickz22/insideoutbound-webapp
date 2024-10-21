@@ -236,17 +236,6 @@ export const fetchEventFilterFields = async () => {
 };
 
 /**
- * Fetches Salesforce users from the Salesforce API
- * @returns {Promise<ApiResponse>}
- */
-export const fetchSalesforceUsers = async () => {
-    const response = await api.get("/get_salesforce_users", {
-        validateStatus: () => true,
-    });
-    return { ...response.data, statusCode: response.status };
-};
-
-/**
  * Fetches task query count from the Salesforce API
  * @param {Object} criteria - The criteria for the query
  * @param {String[]} salesforceUserIds - The Salesforce user IDs
@@ -287,6 +276,35 @@ export const fetchJwt = async () => {
 };
 
 /**
+ * Fetches Salesforce users from the Salesforce API
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchSalesforceUsers = async () => {
+    const response = await api.get("/get_salesforce_users", {
+        validateStatus: () => true,
+    });
+    return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * Fetches the Salesforce users who have been designated as team members in settings
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchSalesforceTeam = async () => {
+    const response = await api.post(
+        "/get_salesforce_team",
+        {
+            headers: {
+                "Content-Type": "application/json",
+                "X-Session-Token": localStorage.getItem("sessionToken"),
+            },
+            validateStatus: () => true,
+        }
+    );
+    return { ...response.data, statusCode: response.status };
+};
+
+/**
  * Fetches Salesforce tasks from the Salesforce API
  * @param {string[]} userIds
  * @returns {Promise<ApiResponse>}
@@ -294,6 +312,19 @@ export const fetchJwt = async () => {
 export const fetchSalesforceTasksByUserIds = async (userIds) => {
     const response = await api.get("/get_salesforce_tasks_by_user_ids", {
         params: { user_ids: userIds },
+        validateStatus: () => true,
+    });
+    return { ...response.data, statusCode: response.status };
+};
+
+/**
+ * Fetches the prospecting activity type groupings for a given activation
+ * @param {string} activationId
+ * @returns {Promise<ApiResponse>}
+ */
+export const fetchProspectingActivityTypeGroupings = async (activationId) => {
+    const response = await api.get("/get_prospecting_activity_type_groupings", {
+        params: { activation_id: activationId },
         validateStatus: () => true,
     });
     return { ...response.data, statusCode: response.status };

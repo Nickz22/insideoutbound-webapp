@@ -1,7 +1,7 @@
 from typing import Dict, List
 from datetime import datetime, date, timedelta
 from collections import defaultdict
-from app.data_models import Activation
+from app.data_models import Activation, Settings
 from app.utils import (
     parse_datetime_string_with_timezone,
     add_days,
@@ -169,8 +169,7 @@ def generate_summary(activations: list[Activation]) -> dict:
     )
     summary["avg_outbound_activities_to_inbound_response"] = (
         round(
-            total_prospecting_activities_engagement
-            / summary["engaged_activations"],
+            total_prospecting_activities_engagement / summary["engaged_activations"],
             2,
         )
         if summary["engaged_activations"] > 0
@@ -758,3 +757,14 @@ def get_inbound_tasks_within_period(inbound_tasks, start_date, period_days):
         for task in inbound_tasks
         if is_model_date_field_within_window(task, start_date, period_days)
     ]
+
+
+def fetch_prospecting_activity_type_groupings(
+    activation: Activation
+) -> List[ProspectingMetadata]:
+    if not activation.prospecting_metadata:
+        return []
+
+    sorted_metadata = sorted(activation.prospecting_metadata, key=lambda x: x.total)
+
+    return sorted_metadata 
