@@ -56,6 +56,7 @@ def load_inactive_activations() -> ApiResponse:
             .select("*")
             .eq("status", "Unresponsive")
             .in_("activated_by_id", team_member_ids)
+            .order("last_prospecting_activity", desc=True)
             .execute()
         )
 

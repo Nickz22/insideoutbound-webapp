@@ -14,6 +14,7 @@ from app.database.supabase_user_selector import fetch_supabase_user
 from app.database.dml import (
     save_settings,
     save_session,
+    delete_previous_session,
     delete_all_activations,
     upsert_supabase_user,
 )
@@ -90,6 +91,7 @@ def oauth_callback():
         response = requests.post(token_url, data=payload)
         if response.status_code == 200:
             token_data = response.json()
+            delete_previous_session(token_data["id"].split("/")[-1])
             save_session(token_data, is_sandbox)
             user: UserModel = fetch_logged_in_salesforce_user().data
             session_token = save_session(

@@ -24,6 +24,7 @@ from app.mapper.mapper import (
 )
 from app.utils import get_salesforce_team_ids, log_error
 from app.database.settings_selector import load_settings
+from app.database.session_selector import fetch_session_by_salesforce_id
 import asyncio
 import aiohttp
 from typing import List
@@ -262,7 +263,7 @@ def save_session(token_data: TokenData, is_sandbox: bool, extra_state: dict = {}
         token_dict = token_data
     else:
         token_dict = token_data.to_dict()
-    
+
     session_token = str(uuid4())
     salesforce_id = token_dict.get("id").split("/")[-1]
     org_id = token_dict.get("id").split("/")[-2]
@@ -287,3 +288,10 @@ def save_session(token_data: TokenData, is_sandbox: bool, extra_state: dict = {}
     supabase = get_supabase_admin_client()
     supabase.table("Session").insert(session_data).execute()
     return session_token
+
+
+def delete_previous_session(salesforce_id: str):
+    prior_session = fetch_session_by_salesforce_id(salesforce_id)
+    if prior_session.success and prior_session.data[0].get("session"):
+        delete_session(prior_session.data[0].get("session")["id"])
+    return True

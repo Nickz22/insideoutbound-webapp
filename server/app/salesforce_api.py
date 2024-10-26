@@ -20,7 +20,7 @@ from app.constants import SESSION_EXPIRED, FILTER_OPERATOR_MAPPING
 import concurrent.futures
 from config import Config
 import logging
-
+from datetime import datetime, timedelta
 
 def get_credentials():
     session_state = get_session_state()
@@ -134,6 +134,8 @@ async def fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(
     criteria: List[FilterContainer],
     already_counted_task_ids: List[str],
     salesforce_user_ids: List[str],
+    unresponsive_activations_ordered_by_last_prospecting_activity: List[Activation],
+    settings: Settings,
 ) -> ApiResponse:
     api_response = ApiResponse(data={}, message="", success=False)
 
@@ -155,7 +157,43 @@ async def fetch_prospecting_tasks_by_account_ids_from_date_not_in_ids(
         tasks_by_who_id, contact_by_id, criteria, already_counted_task_ids
     )
 
-    api_response.data = tasks_by_account_and_criteria
+    # Create a lookup dict for unresponsive activations by account ID
+    unresponsive_activations_by_account = {
+        ua.account.id: ua
+        for ua in unresponsive_activations_ordered_by_last_prospecting_activity
+    }
+
+    # Filter out tasks from accounts with recent unresponsive activations
+
+    filtered_tasks_by_account_and_criteria = {}
+    for account_id, who_id_data in tasks_by_account_and_criteria.items():
+        last_unresponsive_activation = unresponsive_activations_by_account.get(
+            account_id
+        )
+        if not last_unresponsive_activation:
+            continue
+
+        threshold_date = (
+            last_unresponsive_activation.last_prospecting_activity
+            + timedelta(days=settings.inactivity_threshold)
+        )
+        for who_id, criteria_data in who_id_data.items():
+            for criterion_name, tasks in criteria_data.items():
+                filtered_tasks = []
+                for task in tasks:
+                    task_created_date = datetime.strptime(
+                        task["CreatedDate"], "%Y-%m-%dT%H:%M:%S.%fZ"
+                    )
+                    if task_created_date > threshold_date:
+                        filtered_tasks.append(task)
+                if filtered_tasks:
+                    filtered_tasks_by_account_and_criteria.setdefault(
+                        account_id, {}
+                    ).setdefault(who_id, {}).setdefault(criterion_name, []).extend(
+                        filtered_tasks
+                    )
+
+    api_response.data = filtered_tasks_by_account_and_criteria
     api_response.success = True
     api_response.message = "Tasks fetched and organized successfully"
 

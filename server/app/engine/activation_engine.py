@@ -13,9 +13,13 @@ from app.salesforce_api import (
 )
 from app.database.activation_selector import (
     load_active_activations_order_by_first_prospecting_activity_asc,
+    load_inactive_activations,
 )
 from app.database.settings_selector import load_settings
-from app.database.dml import save_settings, upsert_activations_async  # Note the new import
+from app.database.dml import (
+    save_settings,
+    upsert_activations_async,
+)  # Note the new import
 from app.data_models import ApiResponse, FilterContainer, Settings
 from app.utils import (
     add_days,
@@ -72,11 +76,15 @@ async def update_activation_states(user_timezone):
         relevant_task_criteria,
         task_ids_to_exclude,
         salesforce_user_ids,
+        load_inactive_activations().data,
+        settings,
     )
 
     print("Tasks fetched and organized successfully")
 
     prospecting_tasks_by_criteria_name_by_account_id = async_response.data
+
+    # implement here
 
     print("Computing activated accounts")
     async_response = await compute_activated_accounts(
@@ -92,7 +100,9 @@ async def update_activation_states(user_timezone):
         if not upsert_response.success:
             print(f"Error upserting new activations: {upsert_response.message}")
             api_response.success = False
-            api_response.message = f"Error upserting new activations: {upsert_response.message}"
+            api_response.message = (
+                f"Error upserting new activations: {upsert_response.message}"
+            )
             return api_response
         print("New activations upserted successfully")
 
@@ -119,7 +129,6 @@ def get_threshold_date_for_activatable_tasks(settings: Settings):
     So querying for the last 40 days of Tasks will enable our algorithm to find a Task created 29 days ago, determine that
     that single Task isn't sufficient to activate the Account, and then bump the activation window 30 days so that the `compute_activated_accounts` algorithm
     only activates based on Tasks created 30 days after the Task that was created 29 days ago.
-
     """
     return add_days(
         (settings.latest_date_queried or datetime.now()).date(),

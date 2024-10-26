@@ -34,7 +34,9 @@ def fetch_session_by_salesforce_id(salesforce_id: str) -> ApiResponse:
         supabase = get_supabase_admin_client()
 
         # Query all sessions, ordered by expiry descending
-        response = supabase.table("Session").select("*").order("expiry", desc=True).execute()
+        response = (
+            supabase.table("Session").select("*").order("expiry", desc=True).execute()
+        )
 
         if not response.data:
             return ApiResponse(success=False, message="No sessions found")
